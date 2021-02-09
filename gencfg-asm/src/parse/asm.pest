@@ -2,7 +2,7 @@ program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+) * ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
-expr = _{ op | jumpdest | push }
+expr = _{ jumpdest | op | push }
 
 op = @{ 
 	"stop" | "add" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
@@ -24,12 +24,12 @@ swap = { "swap" ~ half_word_size }
 dup  = { "dup" ~ half_word_size }
 log = { "log" ~ '0'..'4' }
 
-word_size = @{ ('1'..'3' ~ '0'..'9') | '1'..'9' }
+word_size = @{ ('1'..'2' ~ '0'..'9') | ("3" ~ '0'..'2') |'1'..'9' }
 half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
 imm = { (ASCII_HEX_DIGIT)+ }
 	
-label = @{ ":" ~ (ASCII_ALPHA_LOWER)* }
-jumpdest = { label ~ "jumpdest" }
+label = @{ "." ~ (ASCII_ALPHA_LOWER)* }
+jumpdest = { "jumpdest" ~ label }
 
 WHITESPACE = _{ " " | "\t" }
 COMMENT = _{ ";" ~ (!"\n" ~ ANY)* }
