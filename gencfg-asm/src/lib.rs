@@ -1,11 +1,5 @@
-mod asm;
-mod ops;
+pub mod asm;
+pub mod ops;
 mod parse;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub use parse::parse_asm;

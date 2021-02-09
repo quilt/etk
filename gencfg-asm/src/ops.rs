@@ -8,6 +8,9 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub struct TryFromIntError(pub(crate) ());
 
+#[derive(Debug, Clone)]
+pub struct TryFromSliceError(pub(crate) ());
+
 #[derive(Clone, Eq, PartialEq)]
 pub enum Imm<T> {
     Label(String),
@@ -80,15 +83,15 @@ macro_rules! impl_try_from {
 macro_rules! impl_try_from_slice {
     ($ii:literal) => {
         impl TryFrom<&[u8]> for Imm<[u8; $ii]> {
-            type Error = TryFromIntError;
+            type Error = TryFromSliceError;
 
             fn try_from(x: &[u8]) -> Result<Self, Self::Error> {
-                if x.len() < $ii {
-                    return Err(TryFromIntError(()));
+                if x.len() > $ii {
+                    return Err(TryFromSliceError(()));
                 }
 
                 let mut output = [0u8; $ii];
-                output.copy_from_slice(&x);
+                output.copy_from_slice(&x[..]);
                 Ok(Imm::Constant(output))
             }
         }

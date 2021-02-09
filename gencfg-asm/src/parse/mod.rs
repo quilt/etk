@@ -1,4 +1,4 @@
-use crate::ops::{Imm, Op};
+use crate::ops::{Imm, Op, TryFromSliceError};
 
 use std::convert::TryFrom;
 
@@ -9,10 +9,23 @@ use pest_derive::Parser;
 #[grammar = "parse/asm.pest"]
 struct AsmParser;
 
-pub fn parse_asm(asm: &str) -> Vec<Op> {
+#[derive(Debug, Eq, PartialEq)]
+pub enum ParseError {
+    ImmediateTooLarge,
+    LexerError(String),
+}
+
+impl From<TryFromSliceError> for ParseError {
+    fn from(_: TryFromSliceError) -> Self {
+        ParseError::ImmediateTooLarge
+    }
+}
+
+pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
     let mut ops: Vec<Op> = Vec::new();
 
-    let pairs = AsmParser::parse(Rule::program, asm).unwrap_or_else(|e| panic!("{}", e));
+    let pairs =
+        AsmParser::parse(Rule::program, asm).map_err(|e| ParseError::LexerError(e.to_string()))?;
     for pair in pairs {
         match pair.as_rule() {
             Rule::jumpdest => {
@@ -32,41 +45,42 @@ pub fn parse_asm(asm: &str) -> Vec<Op> {
                     raw = format!("0{}", raw);
                 }
 
-                let imm = &hex::decode(raw).expect("immediate must be valid hex")[..];
+                let imm = &hex::decode(raw).unwrap()[..];
 
                 let op = match size {
-                    1 => Op::Push1(Imm::try_from(imm).unwrap()),
-                    2 => Op::Push2(Imm::try_from(imm).unwrap()),
-                    3 => Op::Push3(Imm::try_from(imm).unwrap()),
-                    4 => Op::Push4(Imm::try_from(imm).unwrap()),
-                    5 => Op::Push5(Imm::try_from(imm).unwrap()),
-                    6 => Op::Push6(Imm::try_from(imm).unwrap()),
-                    7 => Op::Push7(Imm::try_from(imm).unwrap()),
-                    8 => Op::Push8(Imm::try_from(imm).unwrap()),
-                    9 => Op::Push9(Imm::try_from(imm).unwrap()),
-                    10 => Op::Push10(Imm::try_from(imm).unwrap()),
-                    11 => Op::Push11(Imm::try_from(imm).unwrap()),
-                    12 => Op::Push12(Imm::try_from(imm).unwrap()),
-                    13 => Op::Push13(Imm::try_from(imm).unwrap()),
-                    14 => Op::Push14(Imm::try_from(imm).unwrap()),
-                    15 => Op::Push15(Imm::try_from(imm).unwrap()),
-                    16 => Op::Push16(Imm::try_from(imm).unwrap()),
-                    17 => Op::Push17(Imm::try_from(imm).unwrap()),
-                    18 => Op::Push18(Imm::try_from(imm).unwrap()),
-                    19 => Op::Push19(Imm::try_from(imm).unwrap()),
-                    20 => Op::Push20(Imm::try_from(imm).unwrap()),
-                    21 => Op::Push21(Imm::try_from(imm).unwrap()),
-                    22 => Op::Push22(Imm::try_from(imm).unwrap()),
-                    23 => Op::Push23(Imm::try_from(imm).unwrap()),
-                    24 => Op::Push24(Imm::try_from(imm).unwrap()),
-                    25 => Op::Push25(Imm::try_from(imm).unwrap()),
-                    26 => Op::Push26(Imm::try_from(imm).unwrap()),
-                    27 => Op::Push27(Imm::try_from(imm).unwrap()),
-                    28 => Op::Push28(Imm::try_from(imm).unwrap()),
-                    29 => Op::Push29(Imm::try_from(imm).unwrap()),
-                    30 => Op::Push30(Imm::try_from(imm).unwrap()),
-                    31 => Op::Push31(Imm::try_from(imm).unwrap()),
-                    32 => Op::Push32(Imm::try_from(imm).unwrap()),
+                    1 => Op::Push1(Imm::try_from(imm)?),
+                    2 => Op::Push2(Imm::try_from(imm)?),
+                    3 => Op::Push3(Imm::try_from(imm)?),
+                    4 => Op::Push4(Imm::try_from(imm)?),
+                    5 => Op::Push5(Imm::try_from(imm)?),
+                    6 => Op::Push6(Imm::try_from(imm)?),
+                    7 => Op::Push7(Imm::try_from(imm)?),
+                    8 => Op::Push8(Imm::try_from(imm)?),
+                    9 => Op::Push9(Imm::try_from(imm)?),
+                    10 => Op::Push10(Imm::try_from(imm)?),
+                    11 => Op::Push11(Imm::try_from(imm)?),
+                    12 => Op::Push12(Imm::try_from(imm)?),
+                    13 => Op::Push13(Imm::try_from(imm)?),
+                    14 => Op::Push14(Imm::try_from(imm)?),
+                    15 => Op::Push15(Imm::try_from(imm)?),
+                    16 => Op::Push16(Imm::try_from(imm)?),
+                    17 => Op::Push17(Imm::try_from(imm)?),
+                    18 => Op::Push18(Imm::try_from(imm)?),
+                    19 => Op::Push19(Imm::try_from(imm)?),
+                    20 => Op::Push20(Imm::try_from(imm)?),
+                    21 => Op::Push21(Imm::try_from(imm)?),
+                    22 => Op::Push22(Imm::try_from(imm)?),
+                    23 => Op::Push23(Imm::try_from(imm)?),
+                    24 => Op::Push24(Imm::try_from(imm)?),
+                    25 => Op::Push25(Imm::try_from(imm)?),
+                    26 => Op::Push26(Imm::try_from(imm)?),
+                    27 => Op::Push27(Imm::try_from(imm)?),
+                    28 => Op::Push28(Imm::try_from(imm)?),
+                    29 => Op::Push29(Imm::try_from(imm)?),
+                    30 => Op::Push30(Imm::try_from(imm)?),
+                    31 => Op::Push31(Imm::try_from(imm)?),
+                    32 => Op::Push32(Imm::try_from(imm)?),
+
                     _ => unreachable!(),
                 };
 
@@ -179,7 +193,7 @@ pub fn parse_asm(asm: &str) -> Vec<Op> {
                     "log2" => Op::Log2,
                     "log3" => Op::Log3,
                     "log4" => Op::Log4,
-                    inst => unreachable!("{}", inst),
+                    _ => unreachable!(),
                 };
                 ops.push(op);
             }
@@ -187,7 +201,7 @@ pub fn parse_asm(asm: &str) -> Vec<Op> {
         }
     }
 
-    ops
+    Ok(ops)
 }
 
 #[cfg(test)]
@@ -204,14 +218,14 @@ mod tests {
             xor
         "#;
         let expected = vec![Op::Stop, Op::GetPc, Op::Gas, Op::Xor];
-        assert_eq!(parse_asm(asm), expected);
+        assert_eq!(parse_asm(asm), Ok(expected));
     }
 
     #[test]
     fn parse_jumpdest_label() {
         let asm = "jumpdest .start";
         let expected = vec![Op::JumpDest(Some(String::from("start")))];
-        assert_eq!(parse_asm(asm), expected);
+        assert_eq!(parse_asm(asm), Ok(expected));
     }
 
     #[test]
@@ -240,7 +254,10 @@ mod tests {
                 "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
             ))),
         ];
-        assert_eq!(parse_asm(asm), expected);
+        assert_eq!(parse_asm(asm), Ok(expected));
+
+        let asm = "push2 010203";
+        assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
     }
 
     #[test]
@@ -265,6 +282,6 @@ mod tests {
             Op::Log0,
             Op::Log4,
         ];
-        assert_eq!(parse_asm(asm), expected);
+        assert_eq!(parse_asm(asm), Ok(expected));
     }
 }
