@@ -19,14 +19,14 @@ op = @{
 	"staticcall" | "revert" | "selfdestruct"
 }
 
-push = { "push" ~  word_size ~ operand}
+push = { "push" ~  word_size ~ imm }
 swap = { "swap" ~ half_word_size }
 dup  = { "dup" ~ half_word_size }
 log = { "log" ~ '0'..'4' }
 
 word_size = @{ ('1'..'3' ~ '0'..'9') | '1'..'9' }
 half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
-operand = { (ASCII_HEX_DIGIT)+ }
+imm = { (ASCII_HEX_DIGIT)+ }
 	
 label = @{ ":" ~ (ASCII_ALPHA_LOWER)* }
 jumpdest = { label ~ "jumpdest" }

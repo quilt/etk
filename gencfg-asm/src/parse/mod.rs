@@ -6,19 +6,14 @@ use pest::Parser;
 use pest_derive::Parser;
 
 #[derive(Parser)]
-#[grammar = "asm.pest"]
+#[grammar = "parse/asm.pest"]
 struct AsmParser;
 
-#[allow(dead_code)]
 pub fn parse_asm(asm: &str) -> Vec<Op> {
     let mut ops: Vec<Op> = Vec::new();
 
     let pairs = AsmParser::parse(Rule::program, asm).unwrap_or_else(|e| panic!("{}", e));
     for pair in pairs {
-        println!("Rule:    {:?}", pair.as_rule());
-        println!("Span:    {:?}", pair.as_span());
-        println!("Text:    {}", pair.as_str());
-
         match pair.as_rule() {
             Rule::jumpdest => {
                 let label = pair
@@ -78,7 +73,6 @@ pub fn parse_asm(asm: &str) -> Vec<Op> {
                 ops.push(op);
             }
             Rule::op => {
-                println!("instruction:  {}", pair.as_str());
                 let op: Op = match pair.as_str() {
                     "stop" => Op::Stop,
                     "add" => Op::Add,
@@ -186,8 +180,6 @@ pub fn parse_asm(asm: &str) -> Vec<Op> {
                     "log3" => Op::Log3,
                     "log4" => Op::Log4,
                     inst => unreachable!("{}", inst),
-                    // swap | dup |
-                    // push log
                 };
                 ops.push(op);
             }
