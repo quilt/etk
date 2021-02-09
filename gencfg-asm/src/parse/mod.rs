@@ -35,38 +35,38 @@ pub fn parse_asm(asm: &str) -> Vec<Op> {
                 let imm = &hex::decode(raw).expect("immediate must be valid hex")[..];
 
                 let op = match size {
-                    1 => Op::Push1(Imm::<[u8; 1]>::try_from(imm).unwrap()),
-                    2 => Op::Push2(Imm::<[u8; 2]>::try_from(imm).unwrap()),
-                    3 => Op::Push3(Imm::<[u8; 3]>::try_from(imm).unwrap()),
-                    4 => Op::Push4(Imm::<[u8; 4]>::try_from(imm).unwrap()),
-                    5 => Op::Push5(Imm::<[u8; 5]>::try_from(imm).unwrap()),
-                    6 => Op::Push6(Imm::<[u8; 6]>::try_from(imm).unwrap()),
-                    7 => Op::Push7(Imm::<[u8; 7]>::try_from(imm).unwrap()),
-                    8 => Op::Push8(Imm::<[u8; 8]>::try_from(imm).unwrap()),
-                    9 => Op::Push9(Imm::<[u8; 9]>::try_from(imm).unwrap()),
-                    10 => Op::Push10(Imm::<[u8; 10]>::try_from(imm).unwrap()),
-                    11 => Op::Push11(Imm::<[u8; 11]>::try_from(imm).unwrap()),
-                    12 => Op::Push12(Imm::<[u8; 12]>::try_from(imm).unwrap()),
-                    13 => Op::Push13(Imm::<[u8; 13]>::try_from(imm).unwrap()),
-                    14 => Op::Push14(Imm::<[u8; 14]>::try_from(imm).unwrap()),
-                    15 => Op::Push15(Imm::<[u8; 15]>::try_from(imm).unwrap()),
-                    16 => Op::Push16(Imm::<[u8; 16]>::try_from(imm).unwrap()),
-                    17 => Op::Push17(Imm::<[u8; 17]>::try_from(imm).unwrap()),
-                    18 => Op::Push18(Imm::<[u8; 18]>::try_from(imm).unwrap()),
-                    19 => Op::Push19(Imm::<[u8; 19]>::try_from(imm).unwrap()),
-                    20 => Op::Push20(Imm::<[u8; 20]>::try_from(imm).unwrap()),
-                    21 => Op::Push21(Imm::<[u8; 21]>::try_from(imm).unwrap()),
-                    22 => Op::Push22(Imm::<[u8; 22]>::try_from(imm).unwrap()),
-                    23 => Op::Push23(Imm::<[u8; 23]>::try_from(imm).unwrap()),
-                    24 => Op::Push24(Imm::<[u8; 24]>::try_from(imm).unwrap()),
-                    25 => Op::Push25(Imm::<[u8; 25]>::try_from(imm).unwrap()),
-                    26 => Op::Push26(Imm::<[u8; 26]>::try_from(imm).unwrap()),
-                    27 => Op::Push27(Imm::<[u8; 27]>::try_from(imm).unwrap()),
-                    28 => Op::Push28(Imm::<[u8; 28]>::try_from(imm).unwrap()),
-                    29 => Op::Push29(Imm::<[u8; 29]>::try_from(imm).unwrap()),
-                    30 => Op::Push30(Imm::<[u8; 30]>::try_from(imm).unwrap()),
-                    31 => Op::Push31(Imm::<[u8; 31]>::try_from(imm).unwrap()),
-                    32 => Op::Push32(Imm::<[u8; 32]>::try_from(imm).unwrap()),
+                    1 => Op::Push1(Imm::try_from(imm).unwrap()),
+                    2 => Op::Push2(Imm::try_from(imm).unwrap()),
+                    3 => Op::Push3(Imm::try_from(imm).unwrap()),
+                    4 => Op::Push4(Imm::try_from(imm).unwrap()),
+                    5 => Op::Push5(Imm::try_from(imm).unwrap()),
+                    6 => Op::Push6(Imm::try_from(imm).unwrap()),
+                    7 => Op::Push7(Imm::try_from(imm).unwrap()),
+                    8 => Op::Push8(Imm::try_from(imm).unwrap()),
+                    9 => Op::Push9(Imm::try_from(imm).unwrap()),
+                    10 => Op::Push10(Imm::try_from(imm).unwrap()),
+                    11 => Op::Push11(Imm::try_from(imm).unwrap()),
+                    12 => Op::Push12(Imm::try_from(imm).unwrap()),
+                    13 => Op::Push13(Imm::try_from(imm).unwrap()),
+                    14 => Op::Push14(Imm::try_from(imm).unwrap()),
+                    15 => Op::Push15(Imm::try_from(imm).unwrap()),
+                    16 => Op::Push16(Imm::try_from(imm).unwrap()),
+                    17 => Op::Push17(Imm::try_from(imm).unwrap()),
+                    18 => Op::Push18(Imm::try_from(imm).unwrap()),
+                    19 => Op::Push19(Imm::try_from(imm).unwrap()),
+                    20 => Op::Push20(Imm::try_from(imm).unwrap()),
+                    21 => Op::Push21(Imm::try_from(imm).unwrap()),
+                    22 => Op::Push22(Imm::try_from(imm).unwrap()),
+                    23 => Op::Push23(Imm::try_from(imm).unwrap()),
+                    24 => Op::Push24(Imm::try_from(imm).unwrap()),
+                    25 => Op::Push25(Imm::try_from(imm).unwrap()),
+                    26 => Op::Push26(Imm::try_from(imm).unwrap()),
+                    27 => Op::Push27(Imm::try_from(imm).unwrap()),
+                    28 => Op::Push28(Imm::try_from(imm).unwrap()),
+                    29 => Op::Push29(Imm::try_from(imm).unwrap()),
+                    30 => Op::Push30(Imm::try_from(imm).unwrap()),
+                    31 => Op::Push31(Imm::try_from(imm).unwrap()),
+                    32 => Op::Push32(Imm::try_from(imm).unwrap()),
                     _ => unreachable!(),
                 };
 
@@ -193,6 +193,7 @@ pub fn parse_asm(asm: &str) -> Vec<Op> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hex_literal::hex;
 
     #[test]
     fn parse_ops() {
@@ -208,7 +209,7 @@ mod tests {
 
     #[test]
     fn parse_jumpdest_label() {
-        let asm = ":start jumpdest";
+        let asm = "jumpdest .start";
         let expected = vec![Op::JumpDest(Some(String::from("start")))];
         assert_eq!(parse_asm(asm), expected);
     }
@@ -217,7 +218,7 @@ mod tests {
     fn parse_push() {
         let asm = r#"
             push1 1
-            push1 2a
+            push1 42
             push2 0102
             push4 01020304
             push8 0102030405060708
@@ -226,22 +227,18 @@ mod tests {
             push32 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
         "#;
         let expected = vec![
-            Op::Push1(Imm::from([1])),
-            Op::Push1(Imm::from([42])),
-            Op::Push2(Imm::from([1, 2])),
-            Op::Push4(Imm::from([1, 2, 3, 4])),
-            Op::Push8(Imm::from([1, 2, 3, 4, 5, 6, 7, 8])),
-            Op::Push16(Imm::from([
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-            ])),
-            Op::Push24(Imm::from([
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                24,
-            ])),
-            Op::Push32(Imm::from([
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                24, 25, 26, 27, 28, 29, 30, 31, 32,
-            ])),
+            Op::Push1(Imm::from(hex!("01"))),
+            Op::Push1(Imm::from(hex!("42"))),
+            Op::Push2(Imm::from(hex!("0102"))),
+            Op::Push4(Imm::from(hex!("01020304"))),
+            Op::Push8(Imm::from(hex!("0102030405060708"))),
+            Op::Push16(Imm::from(hex!("0102030405060708090a0b0c0d0e0f10"))),
+            Op::Push24(Imm::from(hex!(
+                "0102030405060708090a0b0c0d0e0f101112131415161718"
+            ))),
+            Op::Push32(Imm::from(hex!(
+                "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+            ))),
         ];
         assert_eq!(parse_asm(asm), expected);
     }
