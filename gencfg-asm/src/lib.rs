@@ -1,5 +1,6 @@
 mod asm;
 mod ops;
+mod parse;
 
 #[cfg(test)]
 mod tests {

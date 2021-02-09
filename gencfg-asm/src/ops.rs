@@ -8,7 +8,7 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub struct TryFromIntError(pub(crate) ());
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum Imm<T> {
     Label(String),
     Constant(T),
@@ -77,6 +77,24 @@ macro_rules! impl_try_from {
     }
 }
 
+macro_rules! impl_try_from_slice {
+    ($ii:literal) => {
+        impl TryFrom<&[u8]> for Imm<[u8; $ii]> {
+            type Error = TryFromIntError;
+
+            fn try_from(x: &[u8]) -> Result<Self, Self::Error> {
+                if x.len() < $ii {
+                    return Err(TryFromIntError(()));
+                }
+
+                let mut output = [0u8; $ii];
+                output.copy_from_slice(&x);
+                Ok(Imm::Constant(output))
+            }
+        }
+    };
+}
+
 impl_from!(1; u8);
 impl_from!(2; u8, u16);
 impl_from!(3; u8, u16);
@@ -109,6 +127,39 @@ impl_from!(29; u8, u16, u32, u64, u128);
 impl_from!(30; u8, u16, u32, u64, u128);
 impl_from!(31; u8, u16, u32, u64, u128);
 impl_from!(32; u8, u16, u32, u64, u128);
+
+impl_try_from_slice!(1);
+impl_try_from_slice!(2);
+impl_try_from_slice!(3);
+impl_try_from_slice!(4);
+impl_try_from_slice!(5);
+impl_try_from_slice!(6);
+impl_try_from_slice!(7);
+impl_try_from_slice!(8);
+impl_try_from_slice!(9);
+impl_try_from_slice!(10);
+impl_try_from_slice!(11);
+impl_try_from_slice!(12);
+impl_try_from_slice!(13);
+impl_try_from_slice!(14);
+impl_try_from_slice!(15);
+impl_try_from_slice!(16);
+impl_try_from_slice!(17);
+impl_try_from_slice!(18);
+impl_try_from_slice!(19);
+impl_try_from_slice!(20);
+impl_try_from_slice!(21);
+impl_try_from_slice!(22);
+impl_try_from_slice!(23);
+impl_try_from_slice!(24);
+impl_try_from_slice!(25);
+impl_try_from_slice!(26);
+impl_try_from_slice!(27);
+impl_try_from_slice!(28);
+impl_try_from_slice!(29);
+impl_try_from_slice!(30);
+impl_try_from_slice!(31);
+impl_try_from_slice!(32);
 
 impl_try_from!(1; u16, u32, u64, u128);
 impl_try_from!(2; u32, u64, u128);
@@ -150,7 +201,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Op {
     Stop,
     Add,
