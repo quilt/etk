@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn parse_push() {
         let asm = r#"
-            push1 1
+            push1 1 ; comment
             push1 42
             push2 0102
             push4 01020304
