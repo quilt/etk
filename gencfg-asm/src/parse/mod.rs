@@ -265,8 +265,11 @@ mod tests {
 
     #[test]
     fn parse_push_label() {
-        let asm = "push2 .snake_case";
-        let expected = vec![Op::Push2(Imm::from("snake_case"))];
+        let asm = r#"
+            push2 .snake_case
+            jumpi
+        "#;
+        let expected = vec![Op::Push2(Imm::from("snake_case")), Op::JumpI];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 

@@ -1,4 +1,4 @@
-program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+) * ~ stmt? ~ EOI }
+program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+)* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
@@ -13,8 +13,8 @@ op = @{
 	"codesize" | "codecopy" | "gasprice" | "extcodesize" | "extcodecopy" |
 	"returndatasize" | "returndatacopy" | "extcodehash" | "blockhash" |
 	"coinbase" | "timestamp" | "number" | "difficulty" | "gaslimit" | 
-	"pop" | "mload" | "mstore" | "mstore8" | "sload" | "sstore" | "jump" |
-	"jumpi" | "pc" | "msize" | "gas" | swap | dup | log |
+	"pop" | "mload" | "mstore" | "mstore8" | "sload" | "sstore" | "jumpi" |
+	"jump" | "pc" | "msize" | "gas" | swap | dup | log |
 	"create" | "call" | "callcode" | "return" | "delegatecall" | "create2" |
 	"staticcall" | "revert" | "selfdestruct"
 }
@@ -30,7 +30,7 @@ imm = { (ASCII_HEX_DIGIT)+ }
 selector = { "selector(\"" ~ function_declaration ~ "\")" }
 function_declaration = { ASCII_ALPHANUMERIC+ ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
 	
-label = @{ "." ~ (ASCII_ALPHA_LOWER ~ "_"*)* }
+label = @{ "." ~ (ASCII_ALPHA_LOWER ~ "_"*)+ }
 jumpdest = { "jumpdest" ~ label }
 
 WHITESPACE = _{ " " | "\t" }
