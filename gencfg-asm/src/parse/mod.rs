@@ -301,8 +301,17 @@ mod tests {
 
     #[test]
     fn parse_selector() {
-        let asm = r#"push4 selector("transfer(address,uint256)")"#;
-        let expected = vec![Op::Push4(Imm::from(hex!("a9059cbb")))];
+        let asm = r#"
+            push4 selector("name()")
+            push4 selector("balanceOf(address)")
+            push4 selector("transfer(address,uint256)")
+
+        "#;
+        let expected = vec![
+            Op::Push4(Imm::from(hex!("06fdde03"))),
+            Op::Push4(Imm::from(hex!("70a08231"))),
+            Op::Push4(Imm::from(hex!("a9059cbb"))),
+        ];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 }

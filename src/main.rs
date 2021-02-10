@@ -15,7 +15,7 @@ fn main() {
     let asm = fs::read_to_string(opt.input).unwrap();
     let parsed = match parse_asm(&asm) {
         Ok(p) => p,
-        Err(e) => panic!("Parse error: {}"),
+        Err(e) => panic!("Parse error: {:?}", e),
     };
     let mut assembler = Assembler::new();
     assembler.push_all(parsed).unwrap();
