@@ -1,3 +1,6 @@
+[workspace]
+members = ["gencfg-asm"]
+
 [package]
 name = "gencfg"
 version = "0.1.0"

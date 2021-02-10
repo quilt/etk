@@ -1,5 +1,7 @@
 pub mod asm;
-mod disasm;
+#[cfg(feature = "cli")]
+pub mod cli;
+pub mod disasm;
 pub mod ops;
 mod parse;
 

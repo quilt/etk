@@ -1,6 +1,7 @@
 use crate::ops::{Op, Specifier};
 
 use std::collections::VecDeque;
+use std::fmt;
 use std::io::{self, Write};
 
 #[derive(Debug, Clone)]
@@ -17,6 +18,15 @@ pub struct Offset<T> {
 impl<T> Offset<T> {
     const fn new(offset: usize, item: T) -> Self {
         Self { offset, item }
+    }
+}
+
+impl<T> fmt::Display for Offset<T>
+where
+    T: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{: >4x}:   {}", self.offset, self.item)
     }
 }
 

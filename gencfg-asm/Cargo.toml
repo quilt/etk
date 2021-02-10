@@ -6,13 +6,21 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+cli = ["structopt"]
+
 [dependencies]
 num_enum = "0.5.1"
 hex = "0.4.2"
 pest = "2.1"
 pest_derive = "2.1"
 sha3 = "0.9.1"
+structopt = { optional = true, version = "0.3.21" }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
 hex-literal = "0.3.1"
+
+[[bin]]
+name = "disease"
+required-features = ["cli"]
