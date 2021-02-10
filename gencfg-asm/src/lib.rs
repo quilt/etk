@@ -1,4 +1,5 @@
 pub mod asm;
+mod disasm;
 pub mod ops;
 mod parse;
 

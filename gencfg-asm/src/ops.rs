@@ -1,6 +1,6 @@
 use hex::ToHex;
 
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+use num_enum::{FromPrimitive, IntoPrimitive};
 
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
@@ -369,9 +369,547 @@ pub enum Op {
     Revert,
     Invalid,
     SelfDestruct,
+
+    Invalid0c,
+    Invalid0d,
+    Invalid0e,
+    Invalid0f,
+
+    Invalid1e,
+    Invalid1f,
+
+    Invalid21,
+    Invalid22,
+    Invalid23,
+    Invalid24,
+    Invalid25,
+    Invalid26,
+    Invalid27,
+    Invalid28,
+    Invalid29,
+    Invalid2a,
+    Invalid2b,
+    Invalid2c,
+    Invalid2d,
+    Invalid2e,
+    Invalid2f,
+
+    Invalid47,
+    Invalid48,
+    Invalid49,
+    Invalid4a,
+    Invalid4b,
+    Invalid4c,
+    Invalid4d,
+    Invalid4e,
+    Invalid4f,
+
+    Invalid5c,
+    Invalid5d,
+    Invalid5e,
+    Invalid5f,
+
+    InvalidA5,
+    InvalidA6,
+    InvalidA7,
+    InvalidA8,
+    InvalidA9,
+    InvalidAa,
+    InvalidAb,
+    InvalidAc,
+    InvalidAd,
+    InvalidAe,
+    InvalidAf,
+
+    InvalidB3,
+
+    InvalidB7,
+
+    InvalidBb,
+    InvalidBc,
+    InvalidBd,
+    InvalidBe,
+    InvalidBf,
+    InvalidC0,
+    InvalidC1,
+    InvalidC2,
+    InvalidC3,
+    InvalidC4,
+    InvalidC5,
+    InvalidC6,
+    InvalidC7,
+    InvalidC8,
+    InvalidC9,
+    InvalidCa,
+    InvalidCb,
+    InvalidCc,
+    InvalidCd,
+    InvalidCe,
+    InvalidCf,
+    InvalidD0,
+    InvalidD1,
+    InvalidD2,
+    InvalidD3,
+    InvalidD4,
+    InvalidD5,
+    InvalidD6,
+    InvalidD7,
+    InvalidD8,
+    InvalidD9,
+    InvalidDa,
+    InvalidDb,
+    InvalidDc,
+    InvalidDd,
+    InvalidDe,
+    InvalidDf,
+    InvalidE0,
+
+    InvalidE4,
+    InvalidE5,
+    InvalidE6,
+    InvalidE7,
+    InvalidE8,
+    InvalidE9,
+    InvalidEa,
+    InvalidEb,
+    InvalidEc,
+    InvalidEd,
+    InvalidEe,
+    InvalidEf,
+
+    InvalidF6,
+    InvalidF7,
+    InvalidF8,
+    InvalidF9,
+
+    InvalidFb,
 }
 
 impl Op {
+    pub(crate) fn push1(a: &[u8]) -> Self {
+        Op::Push1(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push2(a: &[u8]) -> Self {
+        Op::Push2(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push3(a: &[u8]) -> Self {
+        Op::Push3(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push4(a: &[u8]) -> Self {
+        Op::Push4(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push5(a: &[u8]) -> Self {
+        Op::Push5(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push6(a: &[u8]) -> Self {
+        Op::Push6(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push7(a: &[u8]) -> Self {
+        Op::Push7(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push8(a: &[u8]) -> Self {
+        Op::Push8(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push9(a: &[u8]) -> Self {
+        Op::Push9(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push10(a: &[u8]) -> Self {
+        Op::Push10(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push11(a: &[u8]) -> Self {
+        Op::Push11(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push12(a: &[u8]) -> Self {
+        Op::Push12(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push13(a: &[u8]) -> Self {
+        Op::Push13(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push14(a: &[u8]) -> Self {
+        Op::Push14(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push15(a: &[u8]) -> Self {
+        Op::Push15(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push16(a: &[u8]) -> Self {
+        Op::Push16(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push17(a: &[u8]) -> Self {
+        Op::Push17(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push18(a: &[u8]) -> Self {
+        Op::Push18(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push19(a: &[u8]) -> Self {
+        Op::Push19(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push20(a: &[u8]) -> Self {
+        Op::Push20(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push21(a: &[u8]) -> Self {
+        Op::Push21(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push22(a: &[u8]) -> Self {
+        Op::Push22(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push23(a: &[u8]) -> Self {
+        Op::Push23(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push24(a: &[u8]) -> Self {
+        Op::Push24(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push25(a: &[u8]) -> Self {
+        Op::Push25(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push26(a: &[u8]) -> Self {
+        Op::Push26(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push27(a: &[u8]) -> Self {
+        Op::Push27(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push28(a: &[u8]) -> Self {
+        Op::Push28(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push29(a: &[u8]) -> Self {
+        Op::Push29(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push30(a: &[u8]) -> Self {
+        Op::Push30(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push31(a: &[u8]) -> Self {
+        Op::Push31(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub(crate) fn push32(a: &[u8]) -> Self {
+        Op::Push32(Imm::Constant(a[1..].try_into().unwrap()))
+    }
+
+    pub fn from_slice(bytes: &[u8]) -> Self {
+        let specifier = Specifier::from(bytes[0]);
+        let sz = specifier.extra_len() as usize + 1;
+        if bytes.len() != sz {
+            panic!(
+                "got {} bytes for {}, expected {}",
+                bytes.len(),
+                specifier,
+                sz
+            );
+        }
+
+        match specifier {
+            Specifier::Stop => Op::Stop,
+            Specifier::Add => Op::Add,
+            Specifier::Mul => Op::Mul,
+            Specifier::Sub => Op::Sub,
+            Specifier::Div => Op::Div,
+            Specifier::SDiv => Op::SDiv,
+            Specifier::Mod => Op::Mod,
+            Specifier::SMod => Op::SMod,
+            Specifier::AddMod => Op::AddMod,
+            Specifier::MulMod => Op::MulMod,
+            Specifier::Exp => Op::Exp,
+            Specifier::SignExtend => Op::SignExtend,
+
+            Specifier::Invalid0c => Op::Invalid0c,
+            Specifier::Invalid0d => Op::Invalid0d,
+            Specifier::Invalid0e => Op::Invalid0e,
+            Specifier::Invalid0f => Op::Invalid0f,
+
+            Specifier::Lt => Op::Lt,
+            Specifier::Gt => Op::Gt,
+            Specifier::SLt => Op::SLt,
+            Specifier::SGt => Op::SGt,
+            Specifier::Eq => Op::Eq,
+            Specifier::IsZero => Op::IsZero,
+            Specifier::And => Op::And,
+            Specifier::Or => Op::Or,
+            Specifier::Xor => Op::Xor,
+            Specifier::Not => Op::Not,
+            Specifier::Byte => Op::Byte,
+            Specifier::Shl => Op::Shl,
+            Specifier::Shr => Op::Shr,
+            Specifier::Sar => Op::Sar,
+
+            Specifier::Invalid1e => Op::Invalid1e,
+            Specifier::Invalid1f => Op::Invalid1f,
+
+            Specifier::Keccak256 => Op::Keccak256,
+
+            Specifier::Invalid21 => Op::Invalid21,
+            Specifier::Invalid22 => Op::Invalid22,
+            Specifier::Invalid23 => Op::Invalid23,
+            Specifier::Invalid24 => Op::Invalid24,
+            Specifier::Invalid25 => Op::Invalid25,
+            Specifier::Invalid26 => Op::Invalid26,
+            Specifier::Invalid27 => Op::Invalid27,
+            Specifier::Invalid28 => Op::Invalid28,
+            Specifier::Invalid29 => Op::Invalid29,
+            Specifier::Invalid2a => Op::Invalid2a,
+            Specifier::Invalid2b => Op::Invalid2b,
+            Specifier::Invalid2c => Op::Invalid2c,
+            Specifier::Invalid2d => Op::Invalid2d,
+            Specifier::Invalid2e => Op::Invalid2e,
+            Specifier::Invalid2f => Op::Invalid2f,
+
+            Specifier::Address => Op::Address,
+            Specifier::Balance => Op::Balance,
+            Specifier::Origin => Op::Origin,
+            Specifier::Caller => Op::Caller,
+            Specifier::CallValue => Op::CallValue,
+            Specifier::CallDataLoad => Op::CallDataLoad,
+            Specifier::CallDataSize => Op::CallDataSize,
+            Specifier::CallDataCopy => Op::CallDataCopy,
+            Specifier::CodeSize => Op::CodeSize,
+            Specifier::CodeCopy => Op::CodeCopy,
+            Specifier::GasPrice => Op::GasPrice,
+            Specifier::ExtCodeSize => Op::ExtCodeSize,
+            Specifier::ExtCodeCopy => Op::ExtCodeCopy,
+            Specifier::ReturnDataSize => Op::ReturnDataSize,
+            Specifier::ReturnDataCopy => Op::ReturnDataCopy,
+            Specifier::ExtCodeHash => Op::ExtCodeHash,
+            Specifier::BlockHash => Op::BlockHash,
+            Specifier::Coinbase => Op::Coinbase,
+            Specifier::Timestamp => Op::Timestamp,
+            Specifier::Number => Op::Number,
+            Specifier::Difficulty => Op::Difficulty,
+            Specifier::GasLimit => Op::GasLimit,
+            Specifier::ChainId => Op::ChainId,
+
+            Specifier::Invalid47 => Op::Invalid47,
+            Specifier::Invalid48 => Op::Invalid48,
+            Specifier::Invalid49 => Op::Invalid49,
+            Specifier::Invalid4a => Op::Invalid4a,
+            Specifier::Invalid4b => Op::Invalid4b,
+            Specifier::Invalid4c => Op::Invalid4c,
+            Specifier::Invalid4d => Op::Invalid4d,
+            Specifier::Invalid4e => Op::Invalid4e,
+            Specifier::Invalid4f => Op::Invalid4f,
+
+            Specifier::Pop => Op::Pop,
+            Specifier::MLoad => Op::MLoad,
+            Specifier::MStore => Op::MStore,
+            Specifier::MStore8 => Op::MStore8,
+            Specifier::SLoad => Op::SLoad,
+            Specifier::SStore => Op::SStore,
+            Specifier::Jump => Op::Jump,
+            Specifier::JumpI => Op::JumpI,
+            Specifier::GetPc => Op::GetPc,
+            Specifier::MSize => Op::MSize,
+            Specifier::Gas => Op::Gas,
+            Specifier::JumpDest => Op::JumpDest(None),
+
+            Specifier::Invalid5c => Op::Invalid5c,
+            Specifier::Invalid5d => Op::Invalid5d,
+            Specifier::Invalid5e => Op::Invalid5e,
+            Specifier::Invalid5f => Op::Invalid5f,
+
+            Specifier::Push1 => Op::push1(bytes),
+            Specifier::Push2 => Op::push2(bytes),
+            Specifier::Push3 => Op::push3(bytes),
+            Specifier::Push4 => Op::push4(bytes),
+            Specifier::Push5 => Op::push5(bytes),
+            Specifier::Push6 => Op::push6(bytes),
+            Specifier::Push7 => Op::push7(bytes),
+            Specifier::Push8 => Op::push8(bytes),
+            Specifier::Push9 => Op::push9(bytes),
+            Specifier::Push10 => Op::push10(bytes),
+            Specifier::Push11 => Op::push11(bytes),
+            Specifier::Push12 => Op::push12(bytes),
+            Specifier::Push13 => Op::push13(bytes),
+            Specifier::Push14 => Op::push14(bytes),
+            Specifier::Push15 => Op::push15(bytes),
+            Specifier::Push16 => Op::push16(bytes),
+            Specifier::Push17 => Op::push17(bytes),
+            Specifier::Push18 => Op::push18(bytes),
+            Specifier::Push19 => Op::push19(bytes),
+            Specifier::Push20 => Op::push20(bytes),
+            Specifier::Push21 => Op::push21(bytes),
+            Specifier::Push22 => Op::push22(bytes),
+            Specifier::Push23 => Op::push23(bytes),
+            Specifier::Push24 => Op::push24(bytes),
+            Specifier::Push25 => Op::push25(bytes),
+            Specifier::Push26 => Op::push26(bytes),
+            Specifier::Push27 => Op::push27(bytes),
+            Specifier::Push28 => Op::push28(bytes),
+            Specifier::Push29 => Op::push29(bytes),
+            Specifier::Push30 => Op::push30(bytes),
+            Specifier::Push31 => Op::push31(bytes),
+            Specifier::Push32 => Op::push32(bytes),
+            Specifier::Dup1 => Op::Dup1,
+            Specifier::Dup2 => Op::Dup2,
+            Specifier::Dup3 => Op::Dup3,
+            Specifier::Dup4 => Op::Dup4,
+            Specifier::Dup5 => Op::Dup5,
+            Specifier::Dup6 => Op::Dup6,
+            Specifier::Dup7 => Op::Dup7,
+            Specifier::Dup8 => Op::Dup8,
+            Specifier::Dup9 => Op::Dup9,
+            Specifier::Dup10 => Op::Dup10,
+            Specifier::Dup11 => Op::Dup11,
+            Specifier::Dup12 => Op::Dup12,
+            Specifier::Dup13 => Op::Dup13,
+            Specifier::Dup14 => Op::Dup14,
+            Specifier::Dup15 => Op::Dup15,
+            Specifier::Dup16 => Op::Dup16,
+            Specifier::Swap1 => Op::Swap1,
+            Specifier::Swap2 => Op::Swap2,
+            Specifier::Swap3 => Op::Swap3,
+            Specifier::Swap4 => Op::Swap4,
+            Specifier::Swap5 => Op::Swap5,
+            Specifier::Swap6 => Op::Swap6,
+            Specifier::Swap7 => Op::Swap7,
+            Specifier::Swap8 => Op::Swap8,
+            Specifier::Swap9 => Op::Swap9,
+            Specifier::Swap10 => Op::Swap10,
+            Specifier::Swap11 => Op::Swap11,
+            Specifier::Swap12 => Op::Swap12,
+            Specifier::Swap13 => Op::Swap13,
+            Specifier::Swap14 => Op::Swap14,
+            Specifier::Swap15 => Op::Swap15,
+            Specifier::Swap16 => Op::Swap16,
+            Specifier::Log0 => Op::Log0,
+            Specifier::Log1 => Op::Log1,
+            Specifier::Log2 => Op::Log2,
+            Specifier::Log3 => Op::Log3,
+            Specifier::Log4 => Op::Log4,
+
+            Specifier::InvalidA5 => Op::InvalidA5,
+            Specifier::InvalidA6 => Op::InvalidA6,
+            Specifier::InvalidA7 => Op::InvalidA7,
+            Specifier::InvalidA8 => Op::InvalidA8,
+            Specifier::InvalidA9 => Op::InvalidA9,
+            Specifier::InvalidAa => Op::InvalidAa,
+            Specifier::InvalidAb => Op::InvalidAb,
+            Specifier::InvalidAc => Op::InvalidAc,
+            Specifier::InvalidAd => Op::InvalidAd,
+            Specifier::InvalidAe => Op::InvalidAe,
+            Specifier::InvalidAf => Op::InvalidAf,
+
+            Specifier::JumpTo => Op::JumpTo,
+            Specifier::JumpIf => Op::JumpIf,
+            Specifier::JumpSub => Op::JumpSub,
+
+            Specifier::InvalidB3 => Op::InvalidB3,
+
+            Specifier::JumpSubV => Op::JumpSubV,
+            Specifier::BeginSub => Op::BeginSub,
+            Specifier::BeginData => Op::BeginData,
+
+            Specifier::InvalidB7 => Op::InvalidB7,
+
+            Specifier::ReturnSub => Op::ReturnSub,
+            Specifier::PutLocal => Op::PutLocal,
+            Specifier::GetLocal => Op::GetLocal,
+
+            Specifier::InvalidBb => Op::InvalidBb,
+            Specifier::InvalidBc => Op::InvalidBc,
+            Specifier::InvalidBd => Op::InvalidBd,
+            Specifier::InvalidBe => Op::InvalidBe,
+            Specifier::InvalidBf => Op::InvalidBf,
+            Specifier::InvalidC0 => Op::InvalidC0,
+            Specifier::InvalidC1 => Op::InvalidC1,
+            Specifier::InvalidC2 => Op::InvalidC2,
+            Specifier::InvalidC3 => Op::InvalidC3,
+            Specifier::InvalidC4 => Op::InvalidC4,
+            Specifier::InvalidC5 => Op::InvalidC5,
+            Specifier::InvalidC6 => Op::InvalidC6,
+            Specifier::InvalidC7 => Op::InvalidC7,
+            Specifier::InvalidC8 => Op::InvalidC8,
+            Specifier::InvalidC9 => Op::InvalidC9,
+            Specifier::InvalidCa => Op::InvalidCa,
+            Specifier::InvalidCb => Op::InvalidCb,
+            Specifier::InvalidCc => Op::InvalidCc,
+            Specifier::InvalidCd => Op::InvalidCd,
+            Specifier::InvalidCe => Op::InvalidCe,
+            Specifier::InvalidCf => Op::InvalidCf,
+            Specifier::InvalidD0 => Op::InvalidD0,
+            Specifier::InvalidD1 => Op::InvalidD1,
+            Specifier::InvalidD2 => Op::InvalidD2,
+            Specifier::InvalidD3 => Op::InvalidD3,
+            Specifier::InvalidD4 => Op::InvalidD4,
+            Specifier::InvalidD5 => Op::InvalidD5,
+            Specifier::InvalidD6 => Op::InvalidD6,
+            Specifier::InvalidD7 => Op::InvalidD7,
+            Specifier::InvalidD8 => Op::InvalidD8,
+            Specifier::InvalidD9 => Op::InvalidD9,
+            Specifier::InvalidDa => Op::InvalidDa,
+            Specifier::InvalidDb => Op::InvalidDb,
+            Specifier::InvalidDc => Op::InvalidDc,
+            Specifier::InvalidDd => Op::InvalidDd,
+            Specifier::InvalidDe => Op::InvalidDe,
+            Specifier::InvalidDf => Op::InvalidDf,
+            Specifier::InvalidE0 => Op::InvalidE0,
+
+            Specifier::SLoadBytes => Op::SLoadBytes,
+            Specifier::SStoreBytes => Op::SStoreBytes,
+            Specifier::SSize => Op::SSize,
+
+            Specifier::InvalidE4 => Op::InvalidE4,
+            Specifier::InvalidE5 => Op::InvalidE5,
+            Specifier::InvalidE6 => Op::InvalidE6,
+            Specifier::InvalidE7 => Op::InvalidE7,
+            Specifier::InvalidE8 => Op::InvalidE8,
+            Specifier::InvalidE9 => Op::InvalidE9,
+            Specifier::InvalidEa => Op::InvalidEa,
+            Specifier::InvalidEb => Op::InvalidEb,
+            Specifier::InvalidEc => Op::InvalidEc,
+            Specifier::InvalidEd => Op::InvalidEd,
+            Specifier::InvalidEe => Op::InvalidEe,
+            Specifier::InvalidEf => Op::InvalidEf,
+
+            Specifier::Create => Op::Create,
+            Specifier::Call => Op::Call,
+            Specifier::CallCode => Op::CallCode,
+            Specifier::Return => Op::Return,
+            Specifier::DelegateCall => Op::DelegateCall,
+            Specifier::Create2 => Op::Create2,
+
+            Specifier::InvalidF6 => Op::InvalidF6,
+            Specifier::InvalidF7 => Op::InvalidF7,
+            Specifier::InvalidF8 => Op::InvalidF8,
+            Specifier::InvalidF9 => Op::InvalidF9,
+
+            Specifier::StaticCall => Op::StaticCall,
+
+            Specifier::InvalidFb => Op::InvalidFb,
+
+            Specifier::TxExecGas => Op::TxExecGas,
+            Specifier::Revert => Op::Revert,
+            Specifier::Invalid => Op::Invalid,
+            Specifier::SelfDestruct => Op::SelfDestruct,
+        }
+    }
+
     pub(crate) fn realize(&self, address: u32) -> Result<Self, TryFromIntError> {
         let res = match self {
             Op::Push1(Imm::Label(_)) => Op::Push1(address.try_into()?),
@@ -656,6 +1194,120 @@ impl Op {
             Op::Revert => Specifier::Revert,
             Op::Invalid => Specifier::Invalid,
             Op::SelfDestruct => Specifier::SelfDestruct,
+
+            Op::Invalid0c => Specifier::Invalid0c,
+            Op::Invalid0d => Specifier::Invalid0d,
+            Op::Invalid0e => Specifier::Invalid0e,
+            Op::Invalid0f => Specifier::Invalid0f,
+
+            Op::Invalid1e => Specifier::Invalid1e,
+            Op::Invalid1f => Specifier::Invalid1f,
+
+            Op::Invalid21 => Specifier::Invalid21,
+            Op::Invalid22 => Specifier::Invalid22,
+            Op::Invalid23 => Specifier::Invalid23,
+            Op::Invalid24 => Specifier::Invalid24,
+            Op::Invalid25 => Specifier::Invalid25,
+            Op::Invalid26 => Specifier::Invalid26,
+            Op::Invalid27 => Specifier::Invalid27,
+            Op::Invalid28 => Specifier::Invalid28,
+            Op::Invalid29 => Specifier::Invalid29,
+            Op::Invalid2a => Specifier::Invalid2a,
+            Op::Invalid2b => Specifier::Invalid2b,
+            Op::Invalid2c => Specifier::Invalid2c,
+            Op::Invalid2d => Specifier::Invalid2d,
+            Op::Invalid2e => Specifier::Invalid2e,
+            Op::Invalid2f => Specifier::Invalid2f,
+
+            Op::Invalid47 => Specifier::Invalid47,
+            Op::Invalid48 => Specifier::Invalid48,
+            Op::Invalid49 => Specifier::Invalid49,
+            Op::Invalid4a => Specifier::Invalid4a,
+            Op::Invalid4b => Specifier::Invalid4b,
+            Op::Invalid4c => Specifier::Invalid4c,
+            Op::Invalid4d => Specifier::Invalid4d,
+            Op::Invalid4e => Specifier::Invalid4e,
+            Op::Invalid4f => Specifier::Invalid4f,
+
+            Op::Invalid5c => Specifier::Invalid5c,
+            Op::Invalid5d => Specifier::Invalid5d,
+            Op::Invalid5e => Specifier::Invalid5e,
+            Op::Invalid5f => Specifier::Invalid5f,
+
+            Op::InvalidA5 => Specifier::InvalidA5,
+            Op::InvalidA6 => Specifier::InvalidA6,
+            Op::InvalidA7 => Specifier::InvalidA7,
+            Op::InvalidA8 => Specifier::InvalidA8,
+            Op::InvalidA9 => Specifier::InvalidA9,
+            Op::InvalidAa => Specifier::InvalidAa,
+            Op::InvalidAb => Specifier::InvalidAb,
+            Op::InvalidAc => Specifier::InvalidAc,
+            Op::InvalidAd => Specifier::InvalidAd,
+            Op::InvalidAe => Specifier::InvalidAe,
+            Op::InvalidAf => Specifier::InvalidAf,
+
+            Op::InvalidB3 => Specifier::InvalidB3,
+
+            Op::InvalidB7 => Specifier::InvalidB7,
+
+            Op::InvalidBb => Specifier::InvalidBb,
+            Op::InvalidBc => Specifier::InvalidBc,
+            Op::InvalidBd => Specifier::InvalidBd,
+            Op::InvalidBe => Specifier::InvalidBe,
+            Op::InvalidBf => Specifier::InvalidBf,
+            Op::InvalidC0 => Specifier::InvalidC0,
+            Op::InvalidC1 => Specifier::InvalidC1,
+            Op::InvalidC2 => Specifier::InvalidC2,
+            Op::InvalidC3 => Specifier::InvalidC3,
+            Op::InvalidC4 => Specifier::InvalidC4,
+            Op::InvalidC5 => Specifier::InvalidC5,
+            Op::InvalidC6 => Specifier::InvalidC6,
+            Op::InvalidC7 => Specifier::InvalidC7,
+            Op::InvalidC8 => Specifier::InvalidC8,
+            Op::InvalidC9 => Specifier::InvalidC9,
+            Op::InvalidCa => Specifier::InvalidCa,
+            Op::InvalidCb => Specifier::InvalidCb,
+            Op::InvalidCc => Specifier::InvalidCc,
+            Op::InvalidCd => Specifier::InvalidCd,
+            Op::InvalidCe => Specifier::InvalidCe,
+            Op::InvalidCf => Specifier::InvalidCf,
+            Op::InvalidD0 => Specifier::InvalidD0,
+            Op::InvalidD1 => Specifier::InvalidD1,
+            Op::InvalidD2 => Specifier::InvalidD2,
+            Op::InvalidD3 => Specifier::InvalidD3,
+            Op::InvalidD4 => Specifier::InvalidD4,
+            Op::InvalidD5 => Specifier::InvalidD5,
+            Op::InvalidD6 => Specifier::InvalidD6,
+            Op::InvalidD7 => Specifier::InvalidD7,
+            Op::InvalidD8 => Specifier::InvalidD8,
+            Op::InvalidD9 => Specifier::InvalidD9,
+            Op::InvalidDa => Specifier::InvalidDa,
+            Op::InvalidDb => Specifier::InvalidDb,
+            Op::InvalidDc => Specifier::InvalidDc,
+            Op::InvalidDd => Specifier::InvalidDd,
+            Op::InvalidDe => Specifier::InvalidDe,
+            Op::InvalidDf => Specifier::InvalidDf,
+            Op::InvalidE0 => Specifier::InvalidE0,
+
+            Op::InvalidE4 => Specifier::InvalidE4,
+            Op::InvalidE5 => Specifier::InvalidE5,
+            Op::InvalidE6 => Specifier::InvalidE6,
+            Op::InvalidE7 => Specifier::InvalidE7,
+            Op::InvalidE8 => Specifier::InvalidE8,
+            Op::InvalidE9 => Specifier::InvalidE9,
+            Op::InvalidEa => Specifier::InvalidEa,
+            Op::InvalidEb => Specifier::InvalidEb,
+            Op::InvalidEc => Specifier::InvalidEc,
+            Op::InvalidEd => Specifier::InvalidEd,
+            Op::InvalidEe => Specifier::InvalidEe,
+            Op::InvalidEf => Specifier::InvalidEf,
+
+            Op::InvalidF6 => Specifier::InvalidF6,
+            Op::InvalidF7 => Specifier::InvalidF7,
+            Op::InvalidF8 => Specifier::InvalidF8,
+            Op::InvalidF9 => Specifier::InvalidF9,
+
+            Op::InvalidFb => Specifier::InvalidFb,
         }
     }
 
@@ -800,7 +1452,7 @@ impl fmt::Display for Op {
     }
 }
 
-#[derive(Debug, Clone, Copy, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, IntoPrimitive, FromPrimitive, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Specifier {
     Stop = 0x00,
@@ -815,6 +1467,11 @@ pub enum Specifier {
     MulMod = 0x09,
     Exp = 0x0a,
     SignExtend = 0x0b,
+
+    Invalid0c = 0x0c,
+    Invalid0d = 0x0d,
+    Invalid0e = 0x0e,
+    Invalid0f = 0x0f,
 
     Lt = 0x10,
     Gt = 0x11,
@@ -831,7 +1488,26 @@ pub enum Specifier {
     Shr = 0x1c,
     Sar = 0x1d,
 
+    Invalid1e = 0x1e,
+    Invalid1f = 0x1f,
+
     Keccak256 = 0x20,
+
+    Invalid21 = 0x21,
+    Invalid22 = 0x22,
+    Invalid23 = 0x23,
+    Invalid24 = 0x24,
+    Invalid25 = 0x25,
+    Invalid26 = 0x26,
+    Invalid27 = 0x27,
+    Invalid28 = 0x28,
+    Invalid29 = 0x29,
+    Invalid2a = 0x2a,
+    Invalid2b = 0x2b,
+    Invalid2c = 0x2c,
+    Invalid2d = 0x2d,
+    Invalid2e = 0x2e,
+    Invalid2f = 0x2f,
 
     Address = 0x30,
     Balance = 0x31,
@@ -857,6 +1533,16 @@ pub enum Specifier {
     GasLimit = 0x45,
     ChainId = 0x46,
 
+    Invalid47 = 0x47,
+    Invalid48 = 0x48,
+    Invalid49 = 0x49,
+    Invalid4a = 0x4a,
+    Invalid4b = 0x4b,
+    Invalid4c = 0x4c,
+    Invalid4d = 0x4d,
+    Invalid4e = 0x4e,
+    Invalid4f = 0x4f,
+
     Pop = 0x50,
     MLoad = 0x51,
     MStore = 0x52,
@@ -869,6 +1555,11 @@ pub enum Specifier {
     MSize = 0x59,
     Gas = 0x5a,
     JumpDest = 0x5b,
+
+    Invalid5c = 0x5c,
+    Invalid5d = 0x5d,
+    Invalid5e = 0x5e,
+    Invalid5f = 0x5f,
 
     Push1 = 0x60,
     Push2 = 0x61,
@@ -940,20 +1631,89 @@ pub enum Specifier {
     Log3 = 0xa3,
     Log4 = 0xa4,
 
+    InvalidA5 = 0xA5,
+    InvalidA6 = 0xA6,
+    InvalidA7 = 0xA7,
+    InvalidA8 = 0xA8,
+    InvalidA9 = 0xA9,
+    InvalidAa = 0xAa,
+    InvalidAb = 0xAb,
+    InvalidAc = 0xAc,
+    InvalidAd = 0xAd,
+    InvalidAe = 0xAe,
+    InvalidAf = 0xAf,
+
     JumpTo = 0xb0,
     JumpIf = 0xb1,
     JumpSub = 0xb2,
+
+    InvalidB3 = 0xB3,
+
     JumpSubV = 0xb4,
     BeginSub = 0xb5,
     BeginData = 0xb6,
+
+    InvalidB7 = 0xB7,
 
     ReturnSub = 0xb8,
     PutLocal = 0xb9,
     GetLocal = 0xba,
 
+    InvalidBb = 0xBb,
+    InvalidBc = 0xBc,
+    InvalidBd = 0xBd,
+    InvalidBe = 0xBe,
+    InvalidBf = 0xBf,
+    InvalidC0 = 0xC0,
+    InvalidC1 = 0xC1,
+    InvalidC2 = 0xC2,
+    InvalidC3 = 0xC3,
+    InvalidC4 = 0xC4,
+    InvalidC5 = 0xC5,
+    InvalidC6 = 0xC6,
+    InvalidC7 = 0xC7,
+    InvalidC8 = 0xC8,
+    InvalidC9 = 0xC9,
+    InvalidCa = 0xCA,
+    InvalidCb = 0xCB,
+    InvalidCc = 0xCC,
+    InvalidCd = 0xCD,
+    InvalidCe = 0xCE,
+    InvalidCf = 0xCF,
+    InvalidD0 = 0xD0,
+    InvalidD1 = 0xD1,
+    InvalidD2 = 0xD2,
+    InvalidD3 = 0xD3,
+    InvalidD4 = 0xD4,
+    InvalidD5 = 0xD5,
+    InvalidD6 = 0xD6,
+    InvalidD7 = 0xD7,
+    InvalidD8 = 0xD8,
+    InvalidD9 = 0xD9,
+    InvalidDa = 0xDA,
+    InvalidDb = 0xDB,
+    InvalidDc = 0xDC,
+    InvalidDd = 0xDD,
+    InvalidDe = 0xDE,
+    InvalidDf = 0xDF,
+    InvalidE0 = 0xE0,
+
     SLoadBytes = 0xe1,
     SStoreBytes = 0xe2,
     SSize = 0xe3,
+
+    InvalidE4 = 0xE4,
+    InvalidE5 = 0xE5,
+    InvalidE6 = 0xE6,
+    InvalidE7 = 0xE7,
+    InvalidE8 = 0xE8,
+    InvalidE9 = 0xE9,
+    InvalidEa = 0xEa,
+    InvalidEb = 0xEb,
+    InvalidEc = 0xEc,
+    InvalidEd = 0xEd,
+    InvalidEe = 0xEe,
+    InvalidEf = 0xEf,
 
     Create = 0xf0,
     Call = 0xf1,
@@ -962,10 +1722,18 @@ pub enum Specifier {
     DelegateCall = 0xf4,
     Create2 = 0xf5,
 
+    InvalidF6 = 0xF6,
+    InvalidF7 = 0xF7,
+    InvalidF8 = 0xF8,
+    InvalidF9 = 0xF9,
+
     StaticCall = 0xfa,
+
+    InvalidFb = 0xFb,
 
     TxExecGas = 0xfc,
     Revert = 0xfd,
+    #[num_enum(default)]
     Invalid = 0xfe,
     SelfDestruct = 0xff,
 }
@@ -1188,6 +1956,109 @@ impl fmt::Display for Specifier {
             Specifier::Revert => "REVERT",
             Specifier::Invalid => "INVALID",
             Specifier::SelfDestruct => "SELFDESTRUCT",
+
+            Specifier::Invalid0c => "INVALID_0C",
+            Specifier::Invalid0d => "INVALID_0D",
+            Specifier::Invalid0e => "INVALID_0E",
+            Specifier::Invalid0f => "INVALID_0F",
+            Specifier::Invalid1e => "INVALID_1E",
+            Specifier::Invalid1f => "INVALID_1F",
+            Specifier::Invalid21 => "INVALID_21",
+            Specifier::Invalid22 => "INVALID_22",
+            Specifier::Invalid23 => "INVALID_23",
+            Specifier::Invalid24 => "INVALID_24",
+            Specifier::Invalid25 => "INVALID_25",
+            Specifier::Invalid26 => "INVALID_26",
+            Specifier::Invalid27 => "INVALID_27",
+            Specifier::Invalid28 => "INVALID_28",
+            Specifier::Invalid29 => "INVALID_29",
+            Specifier::Invalid2a => "INVALID_2A",
+            Specifier::Invalid2b => "INVALID_2B",
+            Specifier::Invalid2c => "INVALID_2C",
+            Specifier::Invalid2d => "INVALID_2D",
+            Specifier::Invalid2e => "INVALID_2E",
+            Specifier::Invalid2f => "INVALID_2F",
+            Specifier::Invalid47 => "INVALID_47",
+            Specifier::Invalid48 => "INVALID_48",
+            Specifier::Invalid49 => "INVALID_49",
+            Specifier::Invalid4a => "INVALID_4A",
+            Specifier::Invalid4b => "INVALID_4B",
+            Specifier::Invalid4c => "INVALID_4C",
+            Specifier::Invalid4d => "INVALID_4D",
+            Specifier::Invalid4e => "INVALID_4E",
+            Specifier::Invalid4f => "INVALID_4F",
+            Specifier::Invalid5c => "INVALID_5C",
+            Specifier::Invalid5d => "INVALID_5D",
+            Specifier::Invalid5e => "INVALID_5E",
+            Specifier::Invalid5f => "INVALID_5F",
+            Specifier::InvalidA5 => "INVALID_A5",
+            Specifier::InvalidA6 => "INVALID_A6",
+            Specifier::InvalidA7 => "INVALID_A7",
+            Specifier::InvalidA8 => "INVALID_A8",
+            Specifier::InvalidA9 => "INVALID_A9",
+            Specifier::InvalidAa => "INVALID_AA",
+            Specifier::InvalidAb => "INVALID_AB",
+            Specifier::InvalidAc => "INVALID_AC",
+            Specifier::InvalidAd => "INVALID_AD",
+            Specifier::InvalidAe => "INVALID_AE",
+            Specifier::InvalidAf => "INVALID_AF",
+            Specifier::InvalidB3 => "INVALID_B3",
+            Specifier::InvalidB7 => "INVALID_B7",
+            Specifier::InvalidBb => "INVALID_BB",
+            Specifier::InvalidBc => "INVALID_BC",
+            Specifier::InvalidBd => "INVALID_BD",
+            Specifier::InvalidBe => "INVALID_BE",
+            Specifier::InvalidBf => "INVALID_BF",
+            Specifier::InvalidC0 => "INVALID_C0",
+            Specifier::InvalidC1 => "INVALID_C1",
+            Specifier::InvalidC2 => "INVALID_C2",
+            Specifier::InvalidC3 => "INVALID_C3",
+            Specifier::InvalidC4 => "INVALID_C4",
+            Specifier::InvalidC5 => "INVALID_C5",
+            Specifier::InvalidC6 => "INVALID_C6",
+            Specifier::InvalidC7 => "INVALID_C7",
+            Specifier::InvalidC8 => "INVALID_C8",
+            Specifier::InvalidC9 => "INVALID_C9",
+            Specifier::InvalidCa => "INVALID_CA",
+            Specifier::InvalidCb => "INVALID_CB",
+            Specifier::InvalidCc => "INVALID_CC",
+            Specifier::InvalidCd => "INVALID_CD",
+            Specifier::InvalidCe => "INVALID_CE",
+            Specifier::InvalidCf => "INVALID_CF",
+            Specifier::InvalidD0 => "INVALID_D0",
+            Specifier::InvalidD1 => "INVALID_D1",
+            Specifier::InvalidD2 => "INVALID_D2",
+            Specifier::InvalidD3 => "INVALID_D3",
+            Specifier::InvalidD4 => "INVALID_D4",
+            Specifier::InvalidD5 => "INVALID_D5",
+            Specifier::InvalidD6 => "INVALID_D6",
+            Specifier::InvalidD7 => "INVALID_D7",
+            Specifier::InvalidD8 => "INVALID_D8",
+            Specifier::InvalidD9 => "INVALID_D9",
+            Specifier::InvalidDa => "INVALID_DA",
+            Specifier::InvalidDb => "INVALID_DB",
+            Specifier::InvalidDc => "INVALID_DC",
+            Specifier::InvalidDd => "INVALID_DD",
+            Specifier::InvalidDe => "INVALID_DE",
+            Specifier::InvalidDf => "INVALID_DF",
+            Specifier::InvalidE0 => "INVALID_E0",
+            Specifier::InvalidE4 => "INVALID_E4",
+            Specifier::InvalidE5 => "INVALID_E5",
+            Specifier::InvalidE6 => "INVALID_E6",
+            Specifier::InvalidE7 => "INVALID_E7",
+            Specifier::InvalidE8 => "INVALID_E8",
+            Specifier::InvalidE9 => "INVALID_E9",
+            Specifier::InvalidEa => "INVALID_EA",
+            Specifier::InvalidEb => "INVALID_EB",
+            Specifier::InvalidEc => "INVALID_EC",
+            Specifier::InvalidEd => "INVALID_ED",
+            Specifier::InvalidEe => "INVALID_EE",
+            Specifier::InvalidEf => "INVALID_EF",
+            Specifier::InvalidF6 => "INVALID_F6",
+            Specifier::InvalidF7 => "INVALID_F7",
+            Specifier::InvalidF8 => "INVALID_F8",
+            Specifier::InvalidF9 => "INVALID_F9",
+            Specifier::InvalidFb => "INVALID_FB",
         };
         write!(f, "{}", txt)
     }
@@ -1253,5 +2124,17 @@ mod tests {
                 0x89, 0xab, 0xcd, 0xef,
             ])
         );
+    }
+
+    #[test]
+    fn specifier_from_u8() {
+        for ii in 0..u8::MAX {
+            let parsed = Specifier::try_from(ii).unwrap();
+            if ii == 0xfe {
+                assert_eq!(Specifier::Invalid, parsed);
+            } else {
+                assert_ne!(Specifier::Invalid, parsed);
+            }
+        }
     }
 }
