@@ -1,6 +1,4 @@
-use crate::ops::{Imm, Op, TryFromSliceError};
-
-use std::convert::TryFrom;
+use crate::ops::{Op, TryFromSliceError};
 
 use pest::Parser;
 use pest_derive::Parser;
@@ -41,61 +39,26 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
                 let mut pair = pair.into_inner();
                 let size: usize = pair.next().unwrap().as_str().parse().unwrap();
 
-                let imm = match pair.clone().next().unwrap().as_rule() {
+                let op = match pair.clone().next().unwrap().as_rule() {
                     Rule::imm => {
                         let mut raw = pair.as_str().to_string();
                         if raw.len() == 1 {
                             raw = format!("0{}", raw);
                         }
-                        hex::decode(raw).unwrap()
+                        let imm = hex::decode(raw).unwrap();
+                        Op::push_with_immediate(size, imm.as_slice())?
                     }
                     Rule::selector => {
                         let raw = pair.next().unwrap().into_inner().next().unwrap().as_str();
                         let mut hasher = Keccak256::new();
                         hasher.update(raw.as_bytes());
-                        let mut result = hasher.finalize().to_vec();
-                        result.truncate(4);
-                        result
+                        Op::push_with_immediate(size, &hasher.finalize()[0..4])?
+                    }
+                    Rule::label => {
+                        let label = pair.as_str()[1..].to_string();
+                        Op::push_with_label(size, label)
                     }
                     r => unreachable!(format!("{:?}", r)),
-                };
-                let imm = imm.as_slice();
-
-                let op = match size {
-                    1 => Op::Push1(Imm::try_from(imm)?),
-                    2 => Op::Push2(Imm::try_from(imm)?),
-                    3 => Op::Push3(Imm::try_from(imm)?),
-                    4 => Op::Push4(Imm::try_from(imm)?),
-                    5 => Op::Push5(Imm::try_from(imm)?),
-                    6 => Op::Push6(Imm::try_from(imm)?),
-                    7 => Op::Push7(Imm::try_from(imm)?),
-                    8 => Op::Push8(Imm::try_from(imm)?),
-                    9 => Op::Push9(Imm::try_from(imm)?),
-                    10 => Op::Push10(Imm::try_from(imm)?),
-                    11 => Op::Push11(Imm::try_from(imm)?),
-                    12 => Op::Push12(Imm::try_from(imm)?),
-                    13 => Op::Push13(Imm::try_from(imm)?),
-                    14 => Op::Push14(Imm::try_from(imm)?),
-                    15 => Op::Push15(Imm::try_from(imm)?),
-                    16 => Op::Push16(Imm::try_from(imm)?),
-                    17 => Op::Push17(Imm::try_from(imm)?),
-                    18 => Op::Push18(Imm::try_from(imm)?),
-                    19 => Op::Push19(Imm::try_from(imm)?),
-                    20 => Op::Push20(Imm::try_from(imm)?),
-                    21 => Op::Push21(Imm::try_from(imm)?),
-                    22 => Op::Push22(Imm::try_from(imm)?),
-                    23 => Op::Push23(Imm::try_from(imm)?),
-                    24 => Op::Push24(Imm::try_from(imm)?),
-                    25 => Op::Push25(Imm::try_from(imm)?),
-                    26 => Op::Push26(Imm::try_from(imm)?),
-                    27 => Op::Push27(Imm::try_from(imm)?),
-                    28 => Op::Push28(Imm::try_from(imm)?),
-                    29 => Op::Push29(Imm::try_from(imm)?),
-                    30 => Op::Push30(Imm::try_from(imm)?),
-                    31 => Op::Push31(Imm::try_from(imm)?),
-                    32 => Op::Push32(Imm::try_from(imm)?),
-
-                    _ => unreachable!(),
                 };
 
                 ops.push(op);
@@ -221,6 +184,7 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ops::Imm;
     use hex_literal::hex;
 
     #[test]
@@ -232,13 +196,6 @@ mod tests {
             xor
         "#;
         let expected = vec![Op::Stop, Op::GetPc, Op::Gas, Op::Xor];
-        assert_eq!(parse_asm(asm), Ok(expected));
-    }
-
-    #[test]
-    fn parse_jumpdest_label() {
-        let asm = "jumpdest .start";
-        let expected = vec![Op::JumpDest(Some(String::from("start")))];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 
@@ -296,6 +253,20 @@ mod tests {
             Op::Log0,
             Op::Log4,
         ];
+        assert_eq!(parse_asm(asm), Ok(expected));
+    }
+
+    #[test]
+    fn parse_jumpdest_label() {
+        let asm = "jumpdest .start";
+        let expected = vec![Op::JumpDest(Some(String::from("start")))];
+        assert_eq!(parse_asm(asm), Ok(expected));
+    }
+
+    #[test]
+    fn parse_push_label() {
+        let asm = "push2 .snake_case";
+        let expected = vec![Op::Push2(Imm::from("snake_case"))];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 

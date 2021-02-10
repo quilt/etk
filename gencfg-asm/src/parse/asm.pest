@@ -19,7 +19,7 @@ op = @{
 	"staticcall" | "revert" | "selfdestruct"
 }
 
-push = { "push" ~  word_size ~ (imm | selector)}
+push = { "push" ~  word_size ~ (imm | selector | label) }
 swap = { "swap" ~ half_word_size }
 dup  = { "dup" ~ half_word_size }
 log = { "log" ~ '0'..'4' }
@@ -30,7 +30,7 @@ imm = { (ASCII_HEX_DIGIT)+ }
 selector = { "selector(\"" ~ function_declaration ~ "\")" }
 function_declaration = { ASCII_ALPHANUMERIC+ ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
 	
-label = @{ "." ~ (ASCII_ALPHA_LOWER)* }
+label = @{ "." ~ (ASCII_ALPHA_LOWER ~ "_"*)* }
 jumpdest = { "jumpdest" ~ label }
 
 WHITESPACE = _{ " " | "\t" }

@@ -411,6 +411,86 @@ impl Op {
         Ok(res)
     }
 
+    pub fn push_with_immediate(size: usize, imm: &[u8]) -> Result<Op, TryFromSliceError> {
+        let op = match size {
+            1 => Op::Push1(Imm::try_from(imm)?),
+            2 => Op::Push2(Imm::try_from(imm)?),
+            3 => Op::Push3(Imm::try_from(imm)?),
+            4 => Op::Push4(Imm::try_from(imm)?),
+            5 => Op::Push5(Imm::try_from(imm)?),
+            6 => Op::Push6(Imm::try_from(imm)?),
+            7 => Op::Push7(Imm::try_from(imm)?),
+            8 => Op::Push8(Imm::try_from(imm)?),
+            9 => Op::Push9(Imm::try_from(imm)?),
+            10 => Op::Push10(Imm::try_from(imm)?),
+            11 => Op::Push11(Imm::try_from(imm)?),
+            12 => Op::Push12(Imm::try_from(imm)?),
+            13 => Op::Push13(Imm::try_from(imm)?),
+            14 => Op::Push14(Imm::try_from(imm)?),
+            15 => Op::Push15(Imm::try_from(imm)?),
+            16 => Op::Push16(Imm::try_from(imm)?),
+            17 => Op::Push17(Imm::try_from(imm)?),
+            18 => Op::Push18(Imm::try_from(imm)?),
+            19 => Op::Push19(Imm::try_from(imm)?),
+            20 => Op::Push20(Imm::try_from(imm)?),
+            21 => Op::Push21(Imm::try_from(imm)?),
+            22 => Op::Push22(Imm::try_from(imm)?),
+            23 => Op::Push23(Imm::try_from(imm)?),
+            24 => Op::Push24(Imm::try_from(imm)?),
+            25 => Op::Push25(Imm::try_from(imm)?),
+            26 => Op::Push26(Imm::try_from(imm)?),
+            27 => Op::Push27(Imm::try_from(imm)?),
+            28 => Op::Push28(Imm::try_from(imm)?),
+            29 => Op::Push29(Imm::try_from(imm)?),
+            30 => Op::Push30(Imm::try_from(imm)?),
+            31 => Op::Push31(Imm::try_from(imm)?),
+            32 => Op::Push32(Imm::try_from(imm)?),
+            _ => panic!("push size must be between 1 and 32"),
+        };
+
+        Ok(op)
+    }
+
+    pub fn push_with_label(size: usize, label: String) -> Op {
+        let op = match size {
+            1 => Op::Push1(Imm::from(label)),
+            2 => Op::Push2(Imm::from(label)),
+            3 => Op::Push3(Imm::from(label)),
+            4 => Op::Push4(Imm::from(label)),
+            5 => Op::Push5(Imm::from(label)),
+            6 => Op::Push6(Imm::from(label)),
+            7 => Op::Push7(Imm::from(label)),
+            8 => Op::Push8(Imm::from(label)),
+            9 => Op::Push9(Imm::from(label)),
+            10 => Op::Push10(Imm::from(label)),
+            11 => Op::Push11(Imm::from(label)),
+            12 => Op::Push12(Imm::from(label)),
+            13 => Op::Push13(Imm::from(label)),
+            14 => Op::Push14(Imm::from(label)),
+            15 => Op::Push15(Imm::from(label)),
+            16 => Op::Push16(Imm::from(label)),
+            17 => Op::Push17(Imm::from(label)),
+            18 => Op::Push18(Imm::from(label)),
+            19 => Op::Push19(Imm::from(label)),
+            20 => Op::Push20(Imm::from(label)),
+            21 => Op::Push21(Imm::from(label)),
+            22 => Op::Push22(Imm::from(label)),
+            23 => Op::Push23(Imm::from(label)),
+            24 => Op::Push24(Imm::from(label)),
+            25 => Op::Push25(Imm::from(label)),
+            26 => Op::Push26(Imm::from(label)),
+            27 => Op::Push27(Imm::from(label)),
+            28 => Op::Push28(Imm::from(label)),
+            29 => Op::Push29(Imm::from(label)),
+            30 => Op::Push30(Imm::from(label)),
+            31 => Op::Push31(Imm::from(label)),
+            32 => Op::Push32(Imm::from(label)),
+            _ => panic!("push size must be between 1 and 32"),
+        };
+
+        op
+    }
+
     pub const fn specifier(&self) -> Specifier {
         match self {
             Op::Stop => Specifier::Stop,
