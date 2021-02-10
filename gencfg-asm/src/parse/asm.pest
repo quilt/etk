@@ -19,7 +19,7 @@ op = @{
 	"staticcall" | "revert" | "selfdestruct"
 }
 
-push = { "push" ~  word_size ~ imm }
+push = { "push" ~  word_size ~ (imm | selector)}
 swap = { "swap" ~ half_word_size }
 dup  = { "dup" ~ half_word_size }
 log = { "log" ~ '0'..'4' }
@@ -27,6 +27,8 @@ log = { "log" ~ '0'..'4' }
 word_size = @{ ('1'..'2' ~ '0'..'9') | ("3" ~ '0'..'2') | '1'..'9' }
 half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
 imm = { (ASCII_HEX_DIGIT)+ }
+selector = { "selector(\"" ~ function_declaration ~ "\")" }
+function_declaration = { ASCII_ALPHANUMERIC+ ~ "(" ~ (ASCII_ALPHANUMERIC)+ ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
 	
 label = @{ "." ~ (ASCII_ALPHA_LOWER)* }
 jumpdest = { "jumpdest" ~ label }

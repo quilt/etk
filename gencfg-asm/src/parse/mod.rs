@@ -4,6 +4,7 @@ use std::convert::TryFrom;
 
 use pest::Parser;
 use pest_derive::Parser;
+use sha3::{Digest, Keccak256};
 
 #[derive(Parser)]
 #[grammar = "parse/asm.pest"]
@@ -40,12 +41,25 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
                 let mut pair = pair.into_inner();
                 let size: usize = pair.next().unwrap().as_str().parse().unwrap();
 
-                let mut raw = pair.next().unwrap().as_str().to_string();
-                if raw.len() == 1 {
-                    raw = format!("0{}", raw);
-                }
-
-                let imm = &hex::decode(raw).unwrap()[..];
+                let imm = match pair.clone().next().unwrap().as_rule() {
+                    Rule::imm => {
+                        let mut raw = pair.as_str().to_string();
+                        if raw.len() == 1 {
+                            raw = format!("0{}", raw);
+                        }
+                        hex::decode(raw).unwrap()
+                    }
+                    Rule::selector => {
+                        let raw = pair.next().unwrap().into_inner().next().unwrap().as_str();
+                        let mut hasher = Keccak256::new();
+                        hasher.update(raw.as_bytes());
+                        let mut result = hasher.finalize().to_vec();
+                        result.truncate(4);
+                        result
+                    }
+                    r => unreachable!(format!("{:?}", r)),
+                };
+                let imm = imm.as_slice();
 
                 let op = match size {
                     1 => Op::Push1(Imm::try_from(imm)?),
@@ -282,6 +296,13 @@ mod tests {
             Op::Log0,
             Op::Log4,
         ];
+        assert_eq!(parse_asm(asm), Ok(expected));
+    }
+
+    #[test]
+    fn parse_selector() {
+        let asm = r#"push4 selector("transfer(address,uint256)")"#;
+        let expected = vec![Op::Push4(Imm::from(hex!("a9059cbb")))];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 }

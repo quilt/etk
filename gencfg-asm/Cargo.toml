@@ -11,6 +11,7 @@ num_enum = "0.5.1"
 hex = "0.4.2"
 pest = "2.1"
 pest_derive = "2.1"
+sha3 = "0.9.1"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
