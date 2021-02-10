@@ -19,5 +19,7 @@ fn main() {
     };
     let mut assembler = Assembler::new();
     assembler.push_all(parsed).unwrap();
-    println!("{}", hex::encode(assembler.take()));
+    let output = assembler.take();
+    assembler.finish().unwrap();
+    println!("{}", hex::encode(output));
 }

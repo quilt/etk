@@ -6,6 +6,8 @@ use std::collections::{hash_map, HashMap, VecDeque};
 pub enum Error {
     DuplicateLabel,
     LabelTooLarge,
+    UndefinedLabel(String),
+    NotEmpty,
 }
 
 impl From<TryFromIntError> for Error {
@@ -25,6 +27,19 @@ pub struct Assembler {
 impl Assembler {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn finish(self) -> Result<(), Error> {
+        if let Some(undef) = self.pending.front() {
+            let label = undef.immediate_label().unwrap();
+            return Err(Error::UndefinedLabel(label.to_owned()));
+        }
+
+        if !self.ready.is_empty() {
+            return Err(Error::NotEmpty);
+        }
+
+        Ok(())
     }
 
     pub fn take(&mut self) -> Vec<u8> {
