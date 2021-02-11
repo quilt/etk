@@ -614,6 +614,10 @@ impl Op {
         Op::Push32(Imm::Constant(a[1..].try_into().unwrap()))
     }
 
+    pub fn is_jump(&self) -> bool {
+        self.specifier().is_jump()
+    }
+
     pub fn from_slice(bytes: &[u8]) -> Self {
         let specifier = Specifier::from(bytes[0]);
         let sz = specifier.extra_len() as usize + 1;
@@ -1739,6 +1743,18 @@ pub enum Specifier {
 }
 
 impl Specifier {
+    pub const fn is_jump(self) -> bool {
+        match self {
+            Specifier::Jump
+            | Specifier::JumpSubV
+            | Specifier::JumpSub
+            | Specifier::JumpIf
+            | Specifier::JumpTo
+            | Specifier::JumpI => true,
+            _ => false,
+        }
+    }
+
     pub const fn extra_len(self) -> u32 {
         match self {
             Specifier::Push1 => 1,

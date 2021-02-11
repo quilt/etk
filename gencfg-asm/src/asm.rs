@@ -7,7 +7,6 @@ pub enum Error {
     DuplicateLabel,
     LabelTooLarge,
     UndefinedLabel(String),
-    NotEmpty,
 }
 
 impl From<TryFromIntError> for Error {
@@ -36,7 +35,7 @@ impl Assembler {
         }
 
         if !self.ready.is_empty() {
-            return Err(Error::NotEmpty);
+            panic!("not all assembled bytecode has been taken");
         }
 
         Ok(())
