@@ -1,5 +1,5 @@
 [workspace]
-members = ["gencfg-asm", "gencfg-cli"]
+members = ["gencfg-asm", "gencfg-analyze", "gencfg-cli"]
 
 [package]
 name = "gencfg"
@@ -9,9 +9,10 @@ edition = "2018"
 
 [features]
 default = ["cli"]
-cli = ["gencfg-asm/cli"]
+cli = ["gencfg-asm/cli", "gencfg-analyze/cli"]
 
 [dependencies]
 hex = "0.4.2"
 structopt = "0.3"
-gencfg-asm = { version = "0.1", path = "gencfg-asm" }
+gencfg-asm = { path = "gencfg-asm" }
+gencfg-analyze = { path = "gencfg-analyze" }

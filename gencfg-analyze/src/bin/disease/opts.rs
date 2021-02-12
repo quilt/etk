@@ -16,4 +16,3 @@ pub struct Opts {
     )]
     pub out_file: Option<PathBuf>,
 }
-
