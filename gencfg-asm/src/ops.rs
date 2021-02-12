@@ -614,6 +614,18 @@ impl Op {
         Op::Push32(Imm::Constant(a[1..].try_into().unwrap()))
     }
 
+    pub fn is_exit(&self) -> bool {
+        self.specifier().is_exit()
+    }
+
+    pub fn is_jump(&self) -> bool {
+        self.specifier().is_jump()
+    }
+
+    pub fn is_jump_target(&self) -> bool {
+        self.specifier().is_jump_target()
+    }
+
     pub fn from_slice(bytes: &[u8]) -> Self {
         let specifier = Specifier::from(bytes[0]);
         let sz = specifier.extra_len() as usize + 1;
@@ -1739,6 +1751,139 @@ pub enum Specifier {
 }
 
 impl Specifier {
+    pub const fn is_exit(self) -> bool {
+        match self {
+            Specifier::SelfDestruct
+            | Specifier::Stop
+            | Specifier::Revert
+            | Specifier::Return
+            | Specifier::Invalid
+            | Specifier::Invalid0c
+            | Specifier::Invalid0d
+            | Specifier::Invalid0e
+            | Specifier::Invalid0f
+            | Specifier::Invalid1e
+            | Specifier::Invalid1f
+            | Specifier::Invalid21
+            | Specifier::Invalid22
+            | Specifier::Invalid23
+            | Specifier::Invalid24
+            | Specifier::Invalid25
+            | Specifier::Invalid26
+            | Specifier::Invalid27
+            | Specifier::Invalid28
+            | Specifier::Invalid29
+            | Specifier::Invalid2a
+            | Specifier::Invalid2b
+            | Specifier::Invalid2c
+            | Specifier::Invalid2d
+            | Specifier::Invalid2e
+            | Specifier::Invalid2f
+            | Specifier::Invalid47
+            | Specifier::Invalid48
+            | Specifier::Invalid49
+            | Specifier::Invalid4a
+            | Specifier::Invalid4b
+            | Specifier::Invalid4c
+            | Specifier::Invalid4d
+            | Specifier::Invalid4e
+            | Specifier::Invalid4f
+            | Specifier::Invalid5c
+            | Specifier::Invalid5d
+            | Specifier::Invalid5e
+            | Specifier::Invalid5f
+            | Specifier::InvalidA5
+            | Specifier::InvalidA6
+            | Specifier::InvalidA7
+            | Specifier::InvalidA8
+            | Specifier::InvalidA9
+            | Specifier::InvalidAa
+            | Specifier::InvalidAb
+            | Specifier::InvalidAc
+            | Specifier::InvalidAd
+            | Specifier::InvalidAe
+            | Specifier::InvalidAf
+            | Specifier::InvalidB3
+            | Specifier::InvalidB7
+            | Specifier::InvalidBb
+            | Specifier::InvalidBc
+            | Specifier::InvalidBd
+            | Specifier::InvalidBe
+            | Specifier::InvalidBf
+            | Specifier::InvalidC0
+            | Specifier::InvalidC1
+            | Specifier::InvalidC2
+            | Specifier::InvalidC3
+            | Specifier::InvalidC4
+            | Specifier::InvalidC5
+            | Specifier::InvalidC6
+            | Specifier::InvalidC7
+            | Specifier::InvalidC8
+            | Specifier::InvalidC9
+            | Specifier::InvalidCa
+            | Specifier::InvalidCb
+            | Specifier::InvalidCc
+            | Specifier::InvalidCd
+            | Specifier::InvalidCe
+            | Specifier::InvalidCf
+            | Specifier::InvalidD0
+            | Specifier::InvalidD1
+            | Specifier::InvalidD2
+            | Specifier::InvalidD3
+            | Specifier::InvalidD4
+            | Specifier::InvalidD5
+            | Specifier::InvalidD6
+            | Specifier::InvalidD7
+            | Specifier::InvalidD8
+            | Specifier::InvalidD9
+            | Specifier::InvalidDa
+            | Specifier::InvalidDb
+            | Specifier::InvalidDc
+            | Specifier::InvalidDd
+            | Specifier::InvalidDe
+            | Specifier::InvalidDf
+            | Specifier::InvalidE0
+            | Specifier::InvalidE4
+            | Specifier::InvalidE5
+            | Specifier::InvalidE6
+            | Specifier::InvalidE7
+            | Specifier::InvalidE8
+            | Specifier::InvalidE9
+            | Specifier::InvalidEa
+            | Specifier::InvalidEb
+            | Specifier::InvalidEc
+            | Specifier::InvalidEd
+            | Specifier::InvalidEe
+            | Specifier::InvalidEf
+            | Specifier::InvalidF6
+            | Specifier::InvalidF7
+            | Specifier::InvalidF8
+            | Specifier::InvalidF9
+            | Specifier::InvalidFb => true,
+            _ => false,
+        }
+    }
+
+    pub const fn is_jump_target(self) -> bool {
+        match self {
+            Specifier::JumpDest | Specifier::BeginSub => true,
+            _ => false,
+        }
+    }
+
+    pub const fn is_jump(self) -> bool {
+        match self {
+            Specifier::Jump
+            | Specifier::ReturnSub
+            | Specifier::JumpSubV
+            | Specifier::JumpSub
+            | Specifier::JumpIf
+            | Specifier::JumpTo
+            | Specifier::JumpI => true,
+            _ => false,
+        }
+    }
+
     pub const fn extra_len(self) -> u32 {
         match self {
             Specifier::Push1 => 1,

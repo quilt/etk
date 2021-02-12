@@ -16,7 +16,7 @@ pub struct Offset<T> {
 }
 
 impl<T> Offset<T> {
-    const fn new(offset: usize, item: T) -> Self {
+    pub const fn new(offset: usize, item: T) -> Self {
         Self { offset, item }
     }
 }

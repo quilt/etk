@@ -3,7 +3,9 @@ mod opts;
 
 use crate::opts::Opts;
 
-use gencfg_asm::disasm::Disassembler;
+use gencfg_analyze::basic_block::Separator;
+
+use gencfg_asm::disasm::{Disassembler, Offset};
 
 use std::fs::File;
 use std::io::Write;
@@ -44,8 +46,26 @@ fn run() -> Result<(), Error> {
         None => Box::new(std::io::stdout()),
     };
 
-    for op in disasm.ops() {
-        writeln!(out, "{}", op)?;
+    let mut separator = Separator::new();
+
+    separator.push_all(disasm.ops());
+
+    let basic_blocks = separator
+        .take()
+        .into_iter()
+        .chain(separator.finish().into_iter());
+
+    for block in basic_blocks {
+        let mut offset = block.offset;
+        for op in block.ops {
+            let len = op.specifier().extra_len() + 1;
+            let off = Offset::new(offset, op);
+            offset += len as usize;
+
+            writeln!(out, "{}", off)?;
+        }
+
+        writeln!(out)?;
     }
 
     Ok(())

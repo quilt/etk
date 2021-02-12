@@ -1,4 +1,4 @@
-use gencfg_asm::cli::Hex;
+use crate::parse::Hex;
 
 use std::fs::File;
 use std::io;
@@ -153,19 +153,6 @@ where
 
         Ok(out_sz)
     }
-}
-
-#[derive(Debug, StructOpt)]
-pub struct Opts {
-    #[structopt(flatten)]
-    pub src: InputSource,
-
-    #[structopt(
-        short = "o",
-        long = "out-file",
-        help = "path to output file (defaults to stdout)"
-    )]
-    pub out_file: Option<PathBuf>,
 }
 
 #[cfg(test)]
