@@ -1,11 +1,15 @@
 [workspace]
-members = ["gencfg-asm"]
+members = ["gencfg-asm", "gencfg-cli"]
 
 [package]
 name = "gencfg"
 version = "0.1.0"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>"]
 edition = "2018"
+
+[features]
+default = ["cli"]
+cli = ["gencfg-asm/cli"]
 
 [dependencies]
 hex = "0.4.2"

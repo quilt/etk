@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-cli = ["structopt"]
+cli = ["structopt", "gencfg-cli"]
 
 [dependencies]
 num_enum = "0.5.1"
@@ -16,6 +16,7 @@ pest = "2.1"
 pest_derive = "2.1"
 sha3 = "0.9.1"
 structopt = { optional = true, version = "0.3.21" }
+gencfg-cli = { optional = true, path = "../gencfg-cli" }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
@@ -23,4 +24,8 @@ hex-literal = "0.3.1"
 
 [[bin]]
 name = "disease"
+required-features = ["cli"]
+
+[[bin]]
+name = "ease"
 required-features = ["cli"]

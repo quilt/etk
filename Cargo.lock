@@ -145,12 +145,22 @@ name = "gencfg-asm"
 version = "0.1.0"
 dependencies = [
  "assert_matches",
+ "gencfg-cli",
  "hex",
  "hex-literal",
  "num_enum",
  "pest",
  "pest_derive",
  "sha3",
+ "structopt",
+]
+
+[[package]]
+name = "gencfg-cli"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "hex-literal",
  "structopt",
 ]
 
