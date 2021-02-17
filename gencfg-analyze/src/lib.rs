@@ -1,2 +1,2 @@
-pub mod basic_block;
+pub mod blocks;
 mod sym;

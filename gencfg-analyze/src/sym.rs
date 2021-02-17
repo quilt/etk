@@ -1,6 +1,27 @@
+use std::convert::TryInto;
 use std::fmt;
+use std::num::NonZeroU16;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct Var(NonZeroU16);
+
+impl Var {
+    pub fn with_id<T>(id: T) -> Self
+    where
+        T: TryInto<NonZeroU16>,
+        T::Error: std::fmt::Debug,
+    {
+        Var(id.try_into().unwrap())
+    }
+}
+
+impl fmt::Display for Var {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "var{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Expr {
     ops: Vec<Sym>,
 }
@@ -8,6 +29,367 @@ pub struct Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.walk(&mut DisplayVisit(f))
+    }
+}
+
+impl From<Var> for Expr {
+    fn from(v: Var) -> Expr {
+        Self {
+            ops: vec![Sym::Var(v)],
+        }
+    }
+}
+
+impl Expr {
+    fn concat(op: Sym, args: &[&Self]) -> Self {
+        assert_eq!(op.children() as usize, args.len());
+
+        let capacity = 1 + args.iter().map(|x| x.ops.len()).sum::<usize>();
+        let mut ops = Vec::with_capacity(capacity);
+        ops.push(op);
+        for arg in args {
+            ops.extend_from_slice(&arg.ops);
+        }
+
+        Self { ops }
+    }
+
+    pub fn address() -> Self {
+        Self {
+            ops: vec![Sym::Address],
+        }
+    }
+
+    pub fn balance() -> Self {
+        Self {
+            ops: vec![Sym::Balance],
+        }
+    }
+
+    pub fn origin() -> Self {
+        Self {
+            ops: vec![Sym::Origin],
+        }
+    }
+
+    pub fn caller() -> Self {
+        Self {
+            ops: vec![Sym::Caller],
+        }
+    }
+
+    pub fn call_value() -> Self {
+        Self {
+            ops: vec![Sym::CallValue],
+        }
+    }
+
+    pub fn call_data_size() -> Self {
+        Self {
+            ops: vec![Sym::CallDataSize],
+        }
+    }
+
+    pub fn code_size() -> Self {
+        Self {
+            ops: vec![Sym::CodeSize],
+        }
+    }
+
+    pub fn gas_price() -> Self {
+        Self {
+            ops: vec![Sym::GasPrice],
+        }
+    }
+
+    pub fn return_data_size() -> Self {
+        Self {
+            ops: vec![Sym::ReturnDataSize],
+        }
+    }
+
+    pub fn block_hash() -> Self {
+        Self {
+            ops: vec![Sym::BlockHash],
+        }
+    }
+
+    pub fn coinbase() -> Self {
+        Self {
+            ops: vec![Sym::Coinbase],
+        }
+    }
+
+    pub fn timestamp() -> Self {
+        Self {
+            ops: vec![Sym::Timestamp],
+        }
+    }
+
+    pub fn number() -> Self {
+        Self {
+            ops: vec![Sym::Number],
+        }
+    }
+
+    pub fn difficulty() -> Self {
+        Self {
+            ops: vec![Sym::Difficulty],
+        }
+    }
+
+    pub fn gas_limit() -> Self {
+        Self {
+            ops: vec![Sym::GasLimit],
+        }
+    }
+
+    pub fn chain_id() -> Self {
+        Self {
+            ops: vec![Sym::ChainId],
+        }
+    }
+
+    pub fn pc(offset: u16) -> Self {
+        Self {
+            ops: vec![Sym::GetPc(offset)],
+        }
+    }
+
+    pub fn m_size() -> Self {
+        Self {
+            ops: vec![Sym::MSize],
+        }
+    }
+
+    pub fn gas() -> Self {
+        Self {
+            ops: vec![Sym::Gas],
+        }
+    }
+
+    pub fn create(value: &Self, offset: &Self, length: &Self) -> Self {
+        Self::concat(Sym::Create, &[value, offset, length])
+    }
+
+    pub fn create2(value: &Self, offset: &Self, length: &Self, salt: &Self) -> Self {
+        Self::concat(Sym::Create2, &[value, offset, length, salt])
+    }
+
+    pub fn ext_code_copy(addr: &Self, dest_offset: &Self, offset: &Self, length: &Self) -> Self {
+        Self::concat(Sym::ExtCodeCopy, &[addr, dest_offset, offset, length])
+    }
+
+    pub fn call_code(
+        gas: &Self,
+        addr: &Self,
+        value: &Self,
+        args_offset: &Self,
+        args_len: &Self,
+        ret_offset: &Self,
+        ret_len: &Self,
+    ) -> Self {
+        Self::concat(
+            Sym::CallCode,
+            &[gas, addr, value, args_offset, args_len, ret_offset, ret_len],
+        )
+    }
+
+    pub fn call(
+        gas: &Self,
+        addr: &Self,
+        value: &Self,
+        args_offset: &Self,
+        args_len: &Self,
+        ret_offset: &Self,
+        ret_len: &Self,
+    ) -> Self {
+        Self::concat(
+            Sym::Call,
+            &[gas, addr, value, args_offset, args_len, ret_offset, ret_len],
+        )
+    }
+
+    pub fn static_call(
+        gas: &Self,
+        addr: &Self,
+        args_offset: &Self,
+        args_len: &Self,
+        ret_offset: &Self,
+        ret_len: &Self,
+    ) -> Self {
+        Self::concat(
+            Sym::StaticCall,
+            &[gas, addr, args_offset, args_len, ret_offset, ret_len],
+        )
+    }
+
+    pub fn delegate_call(
+        gas: &Self,
+        addr: &Self,
+        args_offset: &Self,
+        args_len: &Self,
+        ret_offset: &Self,
+        ret_len: &Self,
+    ) -> Self {
+        Self::concat(
+            Sym::DelegateCall,
+            &[gas, addr, args_offset, args_len, ret_offset, ret_len],
+        )
+    }
+
+    pub fn add(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Add, &[self, rhs])
+    }
+
+    pub fn sub(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Sub, &[self, rhs])
+    }
+
+    pub fn mul(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Mul, &[self, rhs])
+    }
+
+    pub fn div(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Div, &[self, rhs])
+    }
+
+    pub fn s_div(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::SDiv, &[self, rhs])
+    }
+
+    pub fn modulo(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Mod, &[self, rhs])
+    }
+
+    pub fn s_modulo(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::SMod, &[self, rhs])
+    }
+
+    pub fn add_mod(&self, add: &Self, modulo: &Self) -> Self {
+        Self::concat(Sym::AddMod, &[self, add, modulo])
+    }
+
+    pub fn mul_mod(&self, mul: &Self, modulo: &Self) -> Self {
+        Self::concat(Sym::MulMod, &[self, mul, modulo])
+    }
+
+    pub fn exp(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Exp, &[self, rhs])
+    }
+
+    pub fn lt(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Lt, &[self, rhs])
+    }
+
+    pub fn gt(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Gt, &[self, rhs])
+    }
+
+    pub fn s_lt(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::SLt, &[self, rhs])
+    }
+
+    pub fn s_gt(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::SGt, &[self, rhs])
+    }
+
+    pub fn is_eq(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Eq, &[self, rhs])
+    }
+
+    pub fn and(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::And, &[self, rhs])
+    }
+
+    pub fn or(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Or, &[self, rhs])
+    }
+
+    pub fn xor(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Xor, &[self, rhs])
+    }
+
+    pub fn byte(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Byte, &[self, rhs])
+    }
+
+    pub fn shl(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Shl, &[self, rhs])
+    }
+
+    pub fn shr(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Shr, &[self, rhs])
+    }
+
+    pub fn sar(&self, rhs: &Self) -> Self {
+        Self::concat(Sym::Sar, &[self, rhs])
+    }
+
+    pub fn keccak256(offset: &Self, len: &Self) -> Self {
+        Self::concat(Sym::Keccak256, &[offset, len])
+    }
+
+    pub fn sign_extend(&self, b: &Self) -> Self {
+        Self::concat(Sym::SignExtend, &[self, b])
+    }
+
+    pub fn is_zero(&self) -> Self {
+        Self::concat(Sym::IsZero, &[self])
+    }
+
+    pub fn not(&self) -> Self {
+        Self::concat(Sym::Not, &[self])
+    }
+
+    pub fn call_data_load(&self) -> Self {
+        Self::concat(Sym::CallDataLoad, &[self])
+    }
+
+    pub fn ext_code_size(&self) -> Self {
+        Self::concat(Sym::ExtCodeSize, &[self])
+    }
+
+    pub fn ext_code_hash(&self) -> Self {
+        Self::concat(Sym::ExtCodeHash, &[self])
+    }
+
+    pub fn m_load(&self) -> Self {
+        Self::concat(Sym::MLoad, &[self])
+    }
+
+    pub fn s_load(&self) -> Self {
+        Self::concat(Sym::SLoad, &[self])
+    }
+
+    pub fn as_var(&self) -> Option<Var> {
+        match self.ops.as_slice() {
+            [Sym::Var(v)] => Some(*v),
+            _ => None,
+        }
+    }
+
+    pub fn constant<A>(arr: A) -> Self
+    where
+        A: AsRef<[u8]>,
+    {
+        let arr = arr.as_ref();
+        let mut buf = [0u8; 32];
+        let start = buf.len() - arr.len();
+        buf[start..].copy_from_slice(arr);
+        Self {
+            ops: vec![Sym::Const(buf.into())],
+        }
+    }
+
+    pub(crate) fn constant_offset<T: Into<u128>>(offset: T) -> Self {
+        let offset: u128 = offset.into();
+        let mut buf = [0u8; 32];
+        buf[16..].copy_from_slice(&offset.to_be_bytes());
+
+        Self {
+            ops: vec![Sym::Const(buf.into())],
+        }
     }
 }
 
@@ -75,7 +457,7 @@ impl<'a, 'b> Visit for DisplayVisit<'a, 'b> {
                 // TODO: Technically this should be in decimal, not hex.
                 write!(self.0, "0x{}", hex::encode(&**v))
             }
-            Sym::Var(v) => write!(self.0, "var{}", v),
+            Sym::Var(v) => write!(self.0, "{}", v),
             Sym::AddMod => write!(self.0, "(("),
             Sym::MulMod => write!(self.0, "(("),
             Sym::Keccak256 => write!(self.0, "keccak256("),
@@ -103,7 +485,7 @@ impl<'a, 'b> Visit for DisplayVisit<'a, 'b> {
             Sym::Difficulty => write!(self.0, "difficulty("),
             Sym::GasLimit => write!(self.0, "gaslimit("),
             Sym::ChainId => write!(self.0, "chainid("),
-            Sym::GetPc => write!(self.0, "pc("),
+            Sym::GetPc(pc) => write!(self.0, "pc({}", pc),
             Sym::MSize => write!(self.0, "msize("),
             Sym::Gas => write!(self.0, "gas("),
             Sym::Create => write!(self.0, "create("),
@@ -179,10 +561,10 @@ trait Visit {
 }
 
 // TODO: std::mem::size_of::<Sym>() is like 16 bytes. That's HUGE.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum Sym {
     Const(Box<[u8; 32]>),
-    Var(u16),
+    Var(Var),
 
     Add,
     Mul,
@@ -233,7 +615,7 @@ enum Sym {
     Difficulty,
     GasLimit,
     ChainId,
-    GetPc,
+    GetPc(u16),
     MSize,
     Gas,
 
@@ -272,10 +654,10 @@ impl Sym {
             | Sym::Shl
             | Sym::Shr
             | Sym::Sar
+            | Sym::SignExtend
             | Sym::Keccak256 => 2,
 
-            Sym::SignExtend
-            | Sym::IsZero
+            Sym::IsZero
             | Sym::Not
             | Sym::CallDataLoad
             | Sym::ExtCodeSize
@@ -299,7 +681,7 @@ impl Sym {
             | Sym::Difficulty
             | Sym::GasLimit
             | Sym::ChainId
-            | Sym::GetPc
+            | Sym::GetPc(_)
             | Sym::MSize
             | Sym::Gas
             | Sym::Const(_)
@@ -322,9 +704,10 @@ mod tests {
 
     #[test]
     fn expr_display_add_mod() {
-        let expected = "((caller() + origin()) ﹪ var0)";
+        let expected = "((caller() + origin()) ﹪ var1)";
+        let var = Var::with_id(NonZeroU16::new(1).unwrap());
         let input = Expr {
-            ops: vec![Sym::AddMod, Sym::Caller, Sym::Origin, Sym::Var(0)],
+            ops: vec![Sym::AddMod, Sym::Caller, Sym::Origin, Sym::Var(var)],
         };
 
         let actual = input.to_string();
@@ -333,7 +716,7 @@ mod tests {
 
     #[test]
     fn expr_display_call() {
-        let expected = "call(gas(), caller(), callvalue(), sload(pc()), mload(origin()), number(), timestamp())";
+        let expected = "call(gas(), caller(), callvalue(), sload(pc(3)), mload(origin()), number(), timestamp())";
         let input = Expr {
             ops: vec![
                 Sym::Call,
@@ -341,7 +724,7 @@ mod tests {
                 Sym::Caller,
                 Sym::CallValue,
                 Sym::SLoad,
-                Sym::GetPc,
+                Sym::GetPc(3),
                 Sym::MLoad,
                 Sym::Origin,
                 Sym::Number,
