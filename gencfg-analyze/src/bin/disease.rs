@@ -3,7 +3,7 @@ mod opts;
 
 use crate::opts::Opts;
 
-use gencfg_analyze::basic_block::Separator;
+use gencfg_analyze::blocks::basic::Separator;
 
 use gencfg_asm::disasm::{Disassembler, Offset};
 

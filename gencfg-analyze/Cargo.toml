@@ -8,6 +8,7 @@ edition = "2018"
 cli = ["structopt", "gencfg-cli"]
 
 [dependencies]
+hex = "0.4.2"
 gencfg-asm = { path = "../gencfg-asm" }
 structopt = { optional = true, version = "0.3.21" }
 gencfg-cli = { optional = true, path = "../gencfg-cli" }
