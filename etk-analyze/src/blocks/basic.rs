@@ -1,5 +1,5 @@
-use gencfg_asm::disasm::Offset;
-use gencfg_asm::ops::Op;
+use etk_asm::disasm::Offset;
+use etk_asm::ops::Op;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct BasicBlock {

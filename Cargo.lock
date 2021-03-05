@@ -126,37 +126,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "fake-simd"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
-
-[[package]]
-name = "gencfg"
+name = "etk"
 version = "0.1.0"
 dependencies = [
- "gencfg-analyze",
- "gencfg-asm",
+ "etk-analyze",
+ "etk-asm",
  "hex",
  "structopt",
 ]
 
 [[package]]
-name = "gencfg-analyze"
+name = "etk-analyze"
 version = "0.1.0"
 dependencies = [
- "gencfg-asm",
- "gencfg-cli",
+ "etk-asm",
+ "etk-cli",
  "hex",
  "structopt",
 ]
 
 [[package]]
-name = "gencfg-asm"
+name = "etk-asm"
 version = "0.1.0"
 dependencies = [
  "assert_matches",
- "gencfg-cli",
+ "etk-cli",
  "hex",
  "hex-literal",
  "num_enum",
@@ -167,13 +161,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "gencfg-cli"
+name = "etk-cli"
 version = "0.1.0"
 dependencies = [
  "hex",
  "hex-literal",
  "structopt",
 ]
+
+[[package]]
+name = "fake-simd"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 
 [[package]]
 name = "generic-array"

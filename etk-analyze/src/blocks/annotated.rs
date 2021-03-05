@@ -1,6 +1,6 @@
 use crate::sym::{Expr, Var};
 
-use gencfg_asm::ops::{Imm, Op};
+use etk_asm::ops::{Imm, Op};
 
 use std::collections::{HashMap, VecDeque};
 use std::convert::TryInto;

@@ -1,18 +1,19 @@
 [workspace]
-members = ["gencfg-asm", "gencfg-analyze", "gencfg-cli"]
+members = ["etk-asm", "etk-analyze", "etk-cli"]
 
 [package]
-name = "gencfg"
+name = "etk"
 version = "0.1.0"
-authors = ["Sam Wilson <sam.wilson@mesh.xyz>"]
+authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
 edition = "2018"
 
 [features]
 default = ["cli"]
-cli = ["gencfg-asm/cli", "gencfg-analyze/cli"]
+cli = ["etk-asm/cli", "etk-analyze/cli"]
 
 [dependencies]
 hex = "0.4.2"
 structopt = "0.3"
-gencfg-asm = { path = "gencfg-asm" }
-gencfg-analyze = { path = "gencfg-analyze" }
+etk-asm = { path = "etk-asm" }
+etk-analyze = { path = "etk-analyze" }
+

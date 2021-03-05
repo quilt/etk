@@ -1,0 +1,12 @@
+[package]
+name = "etk-cli"
+version = "0.1.0"
+authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+hex = "0.4.2"
+structopt = "0.3.21"
+
+[dev-dependencies]
+hex-literal = "0.3.1"
