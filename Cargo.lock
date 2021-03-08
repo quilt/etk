@@ -126,16 +126,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "etk"
-version = "0.1.0"
-dependencies = [
- "etk-analyze",
- "etk-asm",
- "hex",
- "structopt",
-]
-
-[[package]]
 name = "etk-analyze"
 version = "0.1.0"
 dependencies = [
