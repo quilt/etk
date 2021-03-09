@@ -1,5 +1,7 @@
 # EVM Toolkit (ETK)
 
+[![ci status](https://github.com/lightclient/eipv/workflows/ci/badge.svg)](https://github.com/quilt/etk/actions)
+
 ETK is a collection of tools for writing, reading, and analyzing EVM bytecode.
 
 ## Tools
