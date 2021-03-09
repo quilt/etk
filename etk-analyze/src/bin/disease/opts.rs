@@ -1,4 +1,4 @@
-use gencfg_cli::io::InputSource;
+use etk_cli::io::InputSource;
 
 use std::path::PathBuf;
 

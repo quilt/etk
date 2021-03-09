@@ -1,13 +1,11 @@
 [package]
-name = "gencfg-asm"
+name = "etk-asm"
 version = "0.1.0"
-authors = ["Sam Wilson <sam.wilson@mesh.xyz>"]
+authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
-cli = ["structopt", "gencfg-cli"]
+cli = ["structopt", "etk-cli"]
 
 [dependencies]
 num_enum = "0.5.1"
@@ -16,12 +14,12 @@ pest = "2.1"
 pest_derive = "2.1"
 sha3 = "0.9.1"
 structopt = { optional = true, version = "0.3.21" }
-gencfg-cli = { optional = true, path = "../gencfg-cli" }
+etk-cli = { optional = true, path = "../etk-cli" }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
 hex-literal = "0.3.1"
 
 [[bin]]
-name = "ease"
+name = "easm"
 required-features = ["cli"]

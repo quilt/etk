@@ -1,17 +1,17 @@
 [package]
-name = "gencfg-analyze"
+name = "etk-analyze"
 version = "0.1.0"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>"]
 edition = "2018"
 
 [features]
-cli = ["structopt", "gencfg-cli"]
+cli = ["structopt", "etk-cli"]
 
 [dependencies]
 hex = "0.4.2"
-gencfg-asm = { path = "../gencfg-asm" }
+etk-asm = { path = "../etk-asm" }
 structopt = { optional = true, version = "0.3.21" }
-gencfg-cli = { optional = true, path = "../gencfg-cli" }
+etk-cli = { optional = true, path = "../etk-cli" }
 
 [[bin]]
 name = "disease"

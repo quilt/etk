@@ -3,9 +3,9 @@ mod opts;
 
 use crate::opts::Opts;
 
-use gencfg_analyze::blocks::basic::Separator;
+use etk_analyze::blocks::basic::Separator;
 
-use gencfg_asm::disasm::{Disassembler, Offset};
+use etk_asm::disasm::{Disassembler, Offset};
 
 use std::fs::File;
 use std::io::Write;
