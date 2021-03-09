@@ -2,6 +2,7 @@
 name = "etk-analyze"
 version = "0.1.0"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>"]
+license = "MIT OR Apache-2.0"
 edition = "2018"
 
 [features]

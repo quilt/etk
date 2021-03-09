@@ -1,5 +1,6 @@
 # EVM Toolkit (ETK)
 
+[![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](https://github.com/quilt/etk)
 [![ci status](https://github.com/lightclient/eipv/workflows/ci/badge.svg)](https://github.com/quilt/etk/actions)
 
 ETK is a collection of tools for writing, reading, and analyzing EVM bytecode.
