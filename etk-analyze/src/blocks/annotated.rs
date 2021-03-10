@@ -271,7 +271,7 @@ impl<'a> Annotator<'a> {
                     self.push(lhs.xor(&rhs));
                 }
                 Op::Not => {
-                    let arg = self.pop().is_zero();
+                    let arg = self.pop().not();
                     self.push(arg);
                 }
                 Op::Byte => {
