@@ -1,19 +1,2 @@
 [workspace]
 members = ["etk-asm", "etk-analyze", "etk-cli"]
-
-[package]
-name = "etk"
-version = "0.1.0"
-authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
-edition = "2018"
-
-[features]
-default = ["cli"]
-cli = ["etk-asm/cli", "etk-analyze/cli"]
-
-[dependencies]
-hex = "0.4.2"
-structopt = "0.3"
-etk-asm = { path = "etk-asm" }
-etk-analyze = { path = "etk-analyze" }
-
