@@ -28,40 +28,12 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
     for pair in pairs {
         match pair.as_rule() {
             Rule::jumpdest => {
-                let label = pair
-                    .into_inner()
-                    .next()
-                    .expect("jumpdest must have label")
-                    .as_str();
-                ops.push(Op::JumpDest(Some(label[1..].to_string())));
+                let mut pair = pair.into_inner();
+                let label = pair.next().unwrap();
+                ops.push(Op::JumpDest(Some(label.as_str()[1..].to_string())));
             }
             Rule::push => {
-                let mut pair = pair.into_inner();
-                let size: usize = pair.next().unwrap().as_str().parse().unwrap();
-
-                let op = match pair.clone().next().unwrap().as_rule() {
-                    Rule::imm => {
-                        let mut raw = pair.as_str().to_string();
-                        if raw.len() == 1 {
-                            raw = format!("0{}", raw);
-                        }
-                        let imm = hex::decode(raw).unwrap();
-                        Op::push_with_immediate(size, imm.as_slice())?
-                    }
-                    Rule::selector => {
-                        let raw = pair.next().unwrap().into_inner().next().unwrap().as_str();
-                        let mut hasher = Keccak256::new();
-                        hasher.update(raw.as_bytes());
-                        Op::push_with_immediate(size, &hasher.finalize()[0..4])?
-                    }
-                    Rule::label => {
-                        let label = pair.as_str()[1..].to_string();
-                        Op::push_with_label(size, label)
-                    }
-                    r => unreachable!(format!("{:?}", r)),
-                };
-
-                ops.push(op);
+                ops.push(parse_push(pair)?);
             }
             Rule::op => {
                 let op: Op = match pair.as_str() {
@@ -181,6 +153,49 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
     Ok(ops)
 }
 
+fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
+    let mut pair = pair.into_inner();
+    let size = pair.next().unwrap();
+    let size: usize = size.as_str().parse().unwrap();
+    let operand = pair.next().unwrap();
+
+    let op = match operand.as_rule() {
+        Rule::hex => {
+            let raw = operand.as_str();
+            let imm = hex::decode(&raw[2..]).unwrap();
+            Op::push_with_immediate(size, imm.as_slice())?
+        }
+        Rule::decimal => {
+            let raw = operand.as_str();
+            let imm: u128 = raw.parse().map_err(|_| ParseError::ImmediateTooLarge)?;
+
+            let msb = 128 - imm.leading_zeros();
+            let mut len = (msb / 8) as usize;
+            if msb % 8 != 0 {
+                len += 1;
+            }
+
+            Op::push_with_immediate(size, &imm.to_be_bytes()[16 - len..])?
+        }
+        Rule::binary => {
+            unimplemented!()
+        }
+        Rule::selector => {
+            let raw = operand.into_inner().next().unwrap().as_str();
+            let mut hasher = Keccak256::new();
+            hasher.update(raw.as_bytes());
+            Op::push_with_immediate(size, &hasher.finalize()[0..4])?
+        }
+        Rule::label => {
+            let label = operand.as_str()[1..].to_string();
+            Op::push_with_label(size, label)
+        }
+        r => unreachable!(format!("{:?}", r)),
+    };
+
+    Ok(op)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,16 +215,16 @@ mod tests {
     }
 
     #[test]
-    fn parse_push() {
+    fn parse_push_hex() {
         let asm = r#"
-            push1 1 ; comment
-            push1 42
-            push2 0102
-            push4 01020304
-            push8 0102030405060708
-            push16 0102030405060708090a0b0c0d0e0f10
-            push24 0102030405060708090a0b0c0d0e0f101112131415161718
-            push32 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
+            push1 0x01 ; comment
+            push1 0x42
+            push2 0x0102
+            push4 0x01020304
+            push8 0x0102030405060708
+            push16 0x0102030405060708090a0b0c0d0e0f10
+            push24 0x0102030405060708090a0b0c0d0e0f101112131415161718
+            push32 0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
         "#;
         let expected = vec![
             Op::Push1(Imm::from(hex!("01"))),
@@ -227,8 +242,32 @@ mod tests {
         ];
         assert_eq!(parse_asm(asm), Ok(expected));
 
-        let asm = "push2 010203";
+        let asm = "push2 0x010203";
         assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
+    }
+
+    #[test]
+    fn parse_push_decimal() {
+        let asm = r#"
+            push1 1
+            push1 42
+            push2 256
+            push4 4294967295
+            push8 18446744073709551615
+            push16 340282366920938463463374607431768211455
+        "#;
+        let expected = vec![
+            Op::Push1(Imm::from([1])),
+            Op::Push1(Imm::from([42])),
+            Op::Push2(Imm::from(hex!("0100"))),
+            Op::Push4(Imm::from(hex!("ffffffff"))),
+            Op::Push8(Imm::from(hex!("ffffffffffffffff"))),
+            Op::Push16(Imm::from(hex!("ffffffffffffffffffffffffffffffff"))),
+        ];
+        assert_eq!(parse_asm(asm), Ok(expected));
+
+        // let asm = "push2 0x010203";
+        // assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
     }
 
     #[test]
