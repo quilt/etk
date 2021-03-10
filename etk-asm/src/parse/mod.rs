@@ -160,20 +160,25 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
     let operand = pair.next().unwrap();
 
     let op = match operand.as_rule() {
-        Rule::hex => {
+        Rule::binary => {
             let raw = operand.as_str();
-            let imm = hex::decode(&raw[2..]).unwrap();
-            Op::push_with_immediate(size, imm.as_slice())?
+            let imm = radix_str_to_vec(&raw[2..], 2, size)?;
+            Op::push_with_immediate(size, imm.as_ref())?
+        }
+        Rule::octal => {
+            let raw = operand.as_str();
+            let imm = radix_str_to_vec(&raw[2..], 8, size)?;
+            Op::push_with_immediate(size, imm.as_ref())?
         }
         Rule::decimal => {
             let raw = operand.as_str();
             let imm = radix_str_to_vec(raw, 10, size)?;
             Op::push_with_immediate(size, imm.as_ref())?
         }
-        Rule::binary => {
+        Rule::hex => {
             let raw = operand.as_str();
-            let imm = radix_str_to_vec(&raw[2..], 2, size)?;
-            Op::push_with_immediate(size, imm.as_ref())?
+            let imm = hex::decode(&raw[2..]).unwrap();
+            Op::push_with_immediate(size, imm.as_slice())?
         }
         Rule::selector => {
             let raw = operand.into_inner().next().unwrap().as_str();
@@ -224,35 +229,30 @@ mod tests {
     }
 
     #[test]
-    fn parse_push_hex() {
+    fn parse_push_binary() {
         let asm = r#"
-            push1 0x01 ; comment
-            push1 0x42 
-            push2 0x0102
-            push4 0x01020304
-            push8 0x0102030405060708
-            push16 0x0102030405060708090a0b0c0d0e0f10
-            push24 0x0102030405060708090a0b0c0d0e0f101112131415161718
-            push32 0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
+            ; simple cases
+            push1 0b0
+            push1 0b1
+        "#;
+        let expected = vec![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
+        assert_eq!(parse_asm(asm), Ok(expected));
+    }
+
+    #[test]
+    fn parse_push_octal() {
+        let asm = r#"
+            ; simple cases
+            push1 0o0
+            push1 0o7
+            push2 0o400
         "#;
         let expected = vec![
-            Op::Push1(Imm::from(hex!("01"))),
-            Op::Push1(Imm::from(hex!("42"))),
-            Op::Push2(Imm::from(hex!("0102"))),
-            Op::Push4(Imm::from(hex!("01020304"))),
-            Op::Push8(Imm::from(hex!("0102030405060708"))),
-            Op::Push16(Imm::from(hex!("0102030405060708090a0b0c0d0e0f10"))),
-            Op::Push24(Imm::from(hex!(
-                "0102030405060708090a0b0c0d0e0f101112131415161718"
-            ))),
-            Op::Push32(Imm::from(hex!(
-                "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
-            ))),
+            Op::Push1(Imm::from([0])),
+            Op::Push1(Imm::from([7])),
+            Op::Push2(Imm::from([1, 0])),
         ];
         assert_eq!(parse_asm(asm), Ok(expected));
-
-        let asm = "push2 0x010203";
-        assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
     }
 
     #[test]
@@ -285,14 +285,35 @@ mod tests {
     }
 
     #[test]
-    fn parse_push_binary() {
+    fn parse_push_hex() {
         let asm = r#"
-            ; simple cases
-            push1 0b0
-            push1 0b1
+            push1 0x01 ; comment
+            push1 0x42 
+            push2 0x0102
+            push4 0x01020304
+            push8 0x0102030405060708
+            push16 0x0102030405060708090a0b0c0d0e0f10
+            push24 0x0102030405060708090a0b0c0d0e0f101112131415161718
+            push32 0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
         "#;
-        let expected = vec![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
+        let expected = vec![
+            Op::Push1(Imm::from(hex!("01"))),
+            Op::Push1(Imm::from(hex!("42"))),
+            Op::Push2(Imm::from(hex!("0102"))),
+            Op::Push4(Imm::from(hex!("01020304"))),
+            Op::Push8(Imm::from(hex!("0102030405060708"))),
+            Op::Push16(Imm::from(hex!("0102030405060708090a0b0c0d0e0f10"))),
+            Op::Push24(Imm::from(hex!(
+                "0102030405060708090a0b0c0d0e0f101112131415161718"
+            ))),
+            Op::Push32(Imm::from(hex!(
+                "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+            ))),
+        ];
         assert_eq!(parse_asm(asm), Ok(expected));
+
+        let asm = "push2 0x010203";
+        assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
     }
 
     #[test]
