@@ -269,8 +269,8 @@ mod tests {
         ];
         assert_eq!(parse_asm(asm), Ok(expected));
 
-        // let asm = "push2 0x010203";
-        // assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
+        let asm = "push1 256";
+        assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
     }
 
     #[test]
