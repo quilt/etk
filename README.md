@@ -82,7 +82,7 @@ calldatacopy                    ; []
 ; Extract only the function selector
 push1 0                         ; [selector_ptr]
 mload                           ; [dirty_selector]
-push1 e0                        ; [dirty_selector, 28*8]
+push1 0xe0                      ; [dirty_selector, 28*8]
 shr                             ; [selector]
 
 ; Jump to the coresponding function.
@@ -108,7 +108,7 @@ sload                           ; [flag]
 push1 0                         ; [flag, 0]
 mstore                          ; []
 push1 0                         ; [0]
-push1 20                        ; [0, 32] 
+push1 32                        ; [0, 32] 
 return
 
 ; set the flat to "1"
