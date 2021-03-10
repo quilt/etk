@@ -167,19 +167,14 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
         }
         Rule::decimal => {
             let raw = operand.as_str();
-            let imm: u128 = raw.parse().map_err(|_| ParseError::ImmediateTooLarge)?;
-
-            let msb = 128 - imm.leading_zeros();
-            let mut len = (msb / 8) as usize;
-            if msb % 8 != 0 {
-                len += 1;
-            }
-            len = std::cmp::max(len, size);
-
-            Op::push_with_immediate(size, &imm.to_be_bytes()[16 - len..])?
+            let imm = radix_str_to_vec(raw, 10, size).map_err(|_| ParseError::ImmediateTooLarge)?;
+            Op::push_with_immediate(size, imm.as_ref())?
         }
         Rule::binary => {
-            unimplemented!()
+            let raw = operand.as_str();
+            let imm =
+                radix_str_to_vec(&raw[2..], 2, size).map_err(|_| ParseError::ImmediateTooLarge)?;
+            Op::push_with_immediate(size, imm.as_ref())?
         }
         Rule::selector => {
             let raw = operand.into_inner().next().unwrap().as_str();
@@ -195,6 +190,20 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
     };
 
     Ok(op)
+}
+
+fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, std::num::ParseIntError> {
+    let n = u128::from_str_radix(s, radix)?;
+
+    let msb = 128 - n.leading_zeros();
+    let mut len = (msb / 8) as usize;
+    if msb % 8 != 0 {
+        len += 1;
+    }
+
+    len = std::cmp::max(len, min);
+
+    Ok(n.to_be_bytes()[16 - len..].to_vec())
 }
 
 #[cfg(test)]
@@ -219,7 +228,7 @@ mod tests {
     fn parse_push_hex() {
         let asm = r#"
             push1 0x01 ; comment
-            push1 0x42
+            push1 0x42 
             push2 0x0102
             push4 0x01020304
             push8 0x0102030405060708
@@ -250,27 +259,41 @@ mod tests {
     #[test]
     fn parse_push_decimal() {
         let asm = r#"
+            ; simple cases
+            push1 0     
             push1 1
-            push1 42
+
+            ; left-pad values too small
             push2 42
+
+            ; barely enough for 2 bytes
             push2 256
+
+            ; just enough for 4 bytes
             push4 4294967295
-            push8 18446744073709551615
-            push16 340282366920938463463374607431768211455
         "#;
         let expected = vec![
+            Op::Push1(Imm::from([0])),
             Op::Push1(Imm::from([1])),
-            Op::Push1(Imm::from([42])),
             Op::Push2(Imm::from([0, 42])),
             Op::Push2(Imm::from(hex!("0100"))),
             Op::Push4(Imm::from(hex!("ffffffff"))),
-            Op::Push8(Imm::from(hex!("ffffffffffffffff"))),
-            Op::Push16(Imm::from(hex!("ffffffffffffffffffffffffffffffff"))),
         ];
         assert_eq!(parse_asm(asm), Ok(expected));
 
         let asm = "push1 256";
         assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
+    }
+
+    #[test]
+    fn parse_push_binary() {
+        let asm = r#"
+            ; simple cases
+            push1 0b0
+            push1 0b1
+        "#;
+        let expected = vec![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
+        assert_eq!(parse_asm(asm), Ok(expected));
     }
 
     #[test]
