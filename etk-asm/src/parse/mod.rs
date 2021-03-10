@@ -167,13 +167,12 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
         }
         Rule::decimal => {
             let raw = operand.as_str();
-            let imm = radix_str_to_vec(raw, 10, size).map_err(|_| ParseError::ImmediateTooLarge)?;
+            let imm = radix_str_to_vec(raw, 10, size)?;
             Op::push_with_immediate(size, imm.as_ref())?
         }
         Rule::binary => {
             let raw = operand.as_str();
-            let imm =
-                radix_str_to_vec(&raw[2..], 2, size).map_err(|_| ParseError::ImmediateTooLarge)?;
+            let imm = radix_str_to_vec(&raw[2..], 2, size)?;
             Op::push_with_immediate(size, imm.as_ref())?
         }
         Rule::selector => {
@@ -192,8 +191,8 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
     Ok(op)
 }
 
-fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, std::num::ParseIntError> {
-    let n = u128::from_str_radix(s, radix)?;
+fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, ParseError> {
+    let n = u128::from_str_radix(s, radix).map_err(|_| ParseError::ImmediateTooLarge)?;
 
     let msb = 128 - n.leading_zeros();
     let mut len = (msb / 8) as usize;
