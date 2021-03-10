@@ -174,6 +174,7 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
             if msb % 8 != 0 {
                 len += 1;
             }
+            len = std::cmp::max(len, size);
 
             Op::push_with_immediate(size, &imm.to_be_bytes()[16 - len..])?
         }
@@ -251,6 +252,7 @@ mod tests {
         let asm = r#"
             push1 1
             push1 42
+            push2 42
             push2 256
             push4 4294967295
             push8 18446744073709551615
@@ -259,6 +261,7 @@ mod tests {
         let expected = vec![
             Op::Push1(Imm::from([1])),
             Op::Push1(Imm::from([42])),
+            Op::Push2(Imm::from([0, 42])),
             Op::Push2(Imm::from(hex!("0100"))),
             Op::Push4(Imm::from(hex!("ffffffff"))),
             Op::Push8(Imm::from(hex!("ffffffffffffffff"))),
