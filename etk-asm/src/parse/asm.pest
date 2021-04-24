@@ -2,7 +2,7 @@ program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+)* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
-expr = _{ jumpdest | op | push | include }
+expr = _{ jumpdest | op | push | include | include_asm }
 
 op = @{ 
 	"origin" | "stop" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
@@ -39,6 +39,7 @@ label = @{ "." ~ (ASCII_ALPHA_LOWER ~ "_"*)+ }
 jumpdest = { "jumpdest" ~ label }
 
 include = { "include(\"" ~ path ~ "\")" }
+include_asm = { "include_asm(\"" ~ path ~ "\")" }
 path = @{ (ASCII_ALPHANUMERIC | "/" | ".")+ }
 
 WHITESPACE = _{ " " | "\t" }

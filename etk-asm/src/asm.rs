@@ -1,6 +1,8 @@
-use crate::ops::{Op, TryFromIntError};
+use crate::ast::Node;
+use crate::ops::TryFromIntError;
 
 use std::collections::{hash_map, HashMap, VecDeque};
+use std::fmt;
 
 #[derive(Debug)]
 pub enum Error {
@@ -9,29 +11,50 @@ pub enum Error {
     UndefinedLabel(String),
 }
 
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let msg = match self {
+            Self::DuplicateLabel => "duplicate label".to_string(),
+            Self::LabelTooLarge => "label too large".to_string(),
+            Self::UndefinedLabel(l) => format!("undefined label: {}", l),
+        };
+        write!(f, "{}", msg)
+    }
+}
+
 impl From<TryFromIntError> for Error {
     fn from(_: TryFromIntError) -> Self {
         Error::LabelTooLarge
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Assembler {
     ready: Vec<u8>,
-    pending: VecDeque<Op>,
+    pending: VecDeque<Node>,
     code_len: u32,
     labels: HashMap<String, u32>,
 }
 
 impl Assembler {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            ready: Vec::new(),
+            pending: VecDeque::new(),
+            code_len: 0,
+            labels: HashMap::new(),
+        }
     }
 
     pub fn finish(self) -> Result<(), Error> {
         if let Some(undef) = self.pending.front() {
-            let label = undef.immediate_label().unwrap();
-            return Err(Error::UndefinedLabel(label.to_owned()));
+            return match undef {
+                Node::Op(op) => {
+                    let label = op.immediate_label().unwrap();
+                    Err(Error::UndefinedLabel(label.to_owned()))
+                }
+                _ => unreachable!(),
+            };
         }
 
         if !self.ready.is_empty() {
@@ -48,7 +71,7 @@ impl Assembler {
     pub fn push_all<I, O>(&mut self, ops: I) -> Result<usize, Error>
     where
         I: IntoIterator<Item = O>,
-        O: Into<Op>,
+        O: Into<Node>,
     {
         let ops = ops.into_iter().map(Into::into);
 
@@ -59,68 +82,85 @@ impl Assembler {
         Ok(self.ready.len())
     }
 
-    pub fn push(&mut self, op: Op) -> Result<usize, Error> {
-        let specifier = op.specifier();
+    pub fn push(&mut self, node: Node) -> Result<usize, Error> {
+        match &node {
+            Node::Op(op) => {
+                let specifier = op.specifier();
 
-        if let Some(label) = op.label() {
-            match self.labels.entry(label.to_owned()) {
-                hash_map::Entry::Occupied(_) => return Err(Error::DuplicateLabel),
-                hash_map::Entry::Vacant(v) => {
-                    v.insert(self.code_len);
+                if let Some(label) = op.label() {
+                    match self.labels.entry(label.to_owned()) {
+                        hash_map::Entry::Occupied(_) => return Err(Error::DuplicateLabel),
+                        hash_map::Entry::Vacant(v) => {
+                            v.insert(self.code_len);
+                        }
+                    }
                 }
+
+                if self.pending.is_empty() {
+                    self.push_ready(node)?;
+                } else {
+                    self.push_pending(node)?;
+                }
+
+                self.code_len += 1 + specifier.extra_len();
+                Ok(self.ready.len())
             }
+            _ => unimplemented!(),
         }
-
-        if self.pending.is_empty() {
-            self.push_ready(op)?;
-        } else {
-            self.push_pending(op)?;
-        }
-
-        self.code_len += 1 + specifier.extra_len();
-        Ok(self.ready.len())
     }
 
-    fn push_ready(&mut self, mut op: Op) -> Result<(), Error> {
-        if let Some(label) = op.immediate_label() {
-            match self.labels.get(label) {
-                Some(addr) => op = op.realize(*addr)?,
-                None => {
-                    self.pending.push_back(op);
-                    return Ok(());
+    fn push_ready(&mut self, mut node: Node) -> Result<(), Error> {
+        match node.clone() {
+            Node::Op(op) => {
+                if let Some(label) = op.immediate_label() {
+                    match self.labels.get(label) {
+                        Some(addr) => {
+                            node = op.realize(*addr)?.into();
+                        }
+                        None => {
+                            self.pending.push_back(node.clone());
+                            return Ok(());
+                        }
+                    }
                 }
+
+                node.assemble(&mut self.ready);
+
+                Ok(())
             }
+            _ => unimplemented!(),
         }
-
-        op.assemble(&mut self.ready);
-
-        Ok(())
     }
 
-    fn push_pending(&mut self, op: Op) -> Result<(), Error> {
-        self.pending.push_back(op);
+    fn push_pending(&mut self, node: Node) -> Result<(), Error> {
+        self.pending.push_back(node);
 
         while let Some(next) = self.pending.front() {
             let mut address = None;
 
-            if let Some(label) = next.immediate_label() {
-                match self.labels.get(label) {
-                    Some(addr) => address = Some(*addr),
-                    None => break,
+            match next {
+                Node::Op(op) => {
+                    if let Some(label) = op.immediate_label() {
+                        match self.labels.get(label) {
+                            Some(addr) => address = Some(*addr),
+                            None => break,
+                        }
+                    }
+
+                    let popped = match address {
+                        Some(s) => {
+                            // Don't modify `self.pending` if realize returns an error.
+                            let realized = op.realize(s)?;
+                            self.pending.pop_front();
+                            Node::Op(realized)
+                        }
+                        None => self.pending.pop_front().unwrap(),
+                    };
+
+                    popped.assemble(&mut self.ready);
                 }
+                _ => unimplemented!(),
             }
-
-            let popped = match address {
-                Some(s) => {
-                    // Don't modify `self.pending` if realize returns an error.
-                    let realized = next.realize(s)?;
-                    self.pending.pop_front();
-                    realized
-                }
-                None => self.pending.pop_front().unwrap(),
-            };
-
-            popped.assemble(&mut self.ready);
         }
 
         Ok(())
@@ -129,9 +169,9 @@ impl Assembler {
 
 #[cfg(test)]
 mod tests {
-    use hex_literal::hex;
-
     use super::*;
+    use crate::ops::Op;
+    use hex_literal::hex;
 
     #[test]
     fn assemble_jumpdest_no_label() -> Result<(), Error> {

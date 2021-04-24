@@ -1,3 +1,4 @@
+use crate::ast::Node;
 use crate::ops::{Op, TryFromSliceError};
 
 use pest::Parser;
@@ -14,6 +15,7 @@ pub enum ParseError {
     ImmediateTooLarge,
     LexerError(String),
     IncludeError(String),
+    IncludeAsmError(String),
 }
 
 impl From<TryFromSliceError> for ParseError {
@@ -22,8 +24,8 @@ impl From<TryFromSliceError> for ParseError {
     }
 }
 
-pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
-    let mut ops: Vec<Op> = Vec::new();
+pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
+    let mut program: Vec<Node> = Vec::new();
 
     let pairs =
         AsmParser::parse(Rule::program, asm).map_err(|e| ParseError::LexerError(e.to_string()))?;
@@ -32,18 +34,21 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
             Rule::include => {
                 let mut pair = pair.into_inner();
                 let path = pair.next().unwrap().as_str();
-                let asm = fs::read_to_string(path)
+                let raw = fs::read_to_string(path)
                     .map_err(|e| ParseError::IncludeError(e.to_string()))?;
-                let parsed = parse_asm(&asm)?;
-                ops.extend(parsed.into_iter());
+                let parsed = parse_asm(&raw)?;
+                program.extend(parsed.into_iter());
+            }
+            Rule::include_asm => {
+                unimplemented!()
             }
             Rule::jumpdest => {
                 let mut pair = pair.into_inner();
                 let label = pair.next().unwrap();
-                ops.push(Op::JumpDest(Some(label.as_str()[1..].to_string())));
+                program.push(Op::JumpDest(Some(label.as_str()[1..].to_string())).into());
             }
             Rule::push => {
-                ops.push(parse_push(pair)?);
+                program.push(parse_push(pair)?.into());
             }
             Rule::op => {
                 let op: Op = match pair.as_str() {
@@ -154,13 +159,13 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
                     "log4" => Op::Log4,
                     _ => unreachable!(),
                 };
-                ops.push(op);
+                program.push(op.into());
             }
             _ => continue,
         }
     }
 
-    Ok(ops)
+    Ok(program)
 }
 
 fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
@@ -240,6 +245,16 @@ mod tests {
         }};
     }
 
+    macro_rules! nodes {
+        ($($x:expr),+ $(,)?) => (
+            vec![$(Node::from($x)),+]
+        );
+    }
+
+    fn nodes(ops: Vec<Op>) -> Vec<Node> {
+        ops.into_iter().map(Node::from).collect()
+    }
+
     #[test]
     fn parse_ops() {
         let asm = r#"
@@ -248,7 +263,7 @@ mod tests {
             gas
             xor
         "#;
-        let expected = vec![Op::Stop, Op::GetPc, Op::Gas, Op::Xor];
+        let expected = nodes![Op::Stop, Op::GetPc, Op::Gas, Op::Xor];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 
@@ -259,7 +274,7 @@ mod tests {
             push1 0b0
             push1 0b1
         "#;
-        let expected = vec![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
+        let expected = nodes![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 
@@ -271,7 +286,7 @@ mod tests {
             push1 0o7
             push2 0o400
         "#;
-        let expected = vec![
+        let expected = nodes![
             Op::Push1(Imm::from([0])),
             Op::Push1(Imm::from([7])),
             Op::Push2(Imm::from([1, 0])),
@@ -295,7 +310,7 @@ mod tests {
             ; just enough for 4 bytes
             push4 4294967295
         "#;
-        let expected = vec![
+        let expected = nodes![
             Op::Push1(Imm::from([0])),
             Op::Push1(Imm::from([1])),
             Op::Push2(Imm::from([0, 42])),
@@ -320,7 +335,7 @@ mod tests {
             push24 0x0102030405060708090a0b0c0d0e0f101112131415161718
             push32 0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
         "#;
-        let expected = vec![
+        let expected = nodes(vec![
             Op::Push1(Imm::from(hex!("01"))),
             Op::Push1(Imm::from(hex!("42"))),
             Op::Push2(Imm::from(hex!("0102"))),
@@ -333,7 +348,7 @@ mod tests {
             Op::Push32(Imm::from(hex!(
                 "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
             ))),
-        ];
+        ]);
         assert_eq!(parse_asm(asm), Ok(expected));
 
         let asm = "push2 0x010203";
@@ -352,7 +367,7 @@ mod tests {
             log0
             log4
         "#;
-        let expected = vec![
+        let expected = nodes![
             Op::Swap1,
             Op::Swap4,
             Op::Swap16,
@@ -368,7 +383,7 @@ mod tests {
     #[test]
     fn parse_jumpdest_label() {
         let asm = "jumpdest .start";
-        let expected = vec![Op::JumpDest(Some(String::from("start")))];
+        let expected = nodes![Op::JumpDest(Some(String::from("start")))];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 
@@ -378,7 +393,7 @@ mod tests {
             push2 .snake_case
             jumpi
         "#;
-        let expected = vec![Op::Push2(Imm::from("snake_case")), Op::JumpI];
+        let expected = nodes![Op::Push2(Imm::from("snake_case")), Op::JumpI];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 
@@ -390,7 +405,7 @@ mod tests {
             push4 selector("transfer(address,uint256)")
 
         "#;
-        let expected = vec![
+        let expected = nodes![
             Op::Push4(Imm::from(hex!("06fdde03"))),
             Op::Push4(Imm::from(hex!("70a08231"))),
             Op::Push4(Imm::from(hex!("a9059cbb"))),
@@ -409,7 +424,7 @@ mod tests {
             "#,
             f.path().display()
         );
-        let expected = vec![
+        let expected = nodes![
             Op::Push1(Imm::from(1)),
             Op::Push1(Imm::from(42)),
             Op::Push1(Imm::from(2)),
