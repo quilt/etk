@@ -4,6 +4,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     Op(Op),
+    Raw(Vec<u8>),
     Include(PathBuf),
     IncludeAsm(PathBuf),
 }

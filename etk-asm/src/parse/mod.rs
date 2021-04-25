@@ -4,7 +4,11 @@ use crate::ops::{Op, TryFromSliceError};
 use pest::Parser;
 use pest_derive::Parser;
 use sha3::{Digest, Keccak256};
-use std::fs;
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 #[derive(Parser)]
 #[grammar = "parse/asm.pest"]
@@ -14,14 +18,25 @@ struct AsmParser;
 pub enum ParseError {
     ImmediateTooLarge,
     LexerError(String),
-    IncludeError(String),
-    IncludeAsmError(String),
+    InvalidPath(String),
+    IoError(io::ErrorKind),
 }
 
 impl From<TryFromSliceError> for ParseError {
     fn from(_: TryFromSliceError) -> Self {
         ParseError::ImmediateTooLarge
     }
+}
+
+impl From<io::Error> for ParseError {
+    fn from(e: io::Error) -> Self {
+        ParseError::IoError(e.kind())
+    }
+}
+
+pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, ParseError> {
+    let asm = fs::read_to_string(path)?;
+    parse_asm(&asm)
 }
 
 pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
@@ -34,13 +49,16 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
             Rule::include => {
                 let mut pair = pair.into_inner();
                 let path = pair.next().unwrap().as_str();
-                let raw = fs::read_to_string(path)
-                    .map_err(|e| ParseError::IncludeError(e.to_string()))?;
-                let parsed = parse_asm(&raw)?;
-                program.extend(parsed.into_iter());
+                let path = PathBuf::from_str(path)
+                    .map_err(|_| ParseError::InvalidPath(path.to_string()))?;
+                program.push(Node::Include(path));
             }
             Rule::include_asm => {
-                unimplemented!()
+                let mut pair = pair.into_inner();
+                let path = pair.next().unwrap().as_str();
+                let path = PathBuf::from_str(path)
+                    .map_err(|_| ParseError::InvalidPath(path.to_string()))?;
+                program.push(Node::IncludeAsm(path));
             }
             Rule::jumpdest => {
                 let mut pair = pair.into_inner();
@@ -230,29 +248,11 @@ mod tests {
     use super::*;
     use crate::ops::Imm;
     use hex_literal::hex;
-    use std::io::{self, Write};
-    use tempfile::NamedTempFile;
-
-    macro_rules! new_file {
-        ($s:expr) => {{
-            match NamedTempFile::new() {
-                Ok(mut f) => {
-                    writeln!(f, $s).expect("unable to write tmp file");
-                    f
-                }
-                Err(e) => panic!("{}", e),
-            }
-        }};
-    }
 
     macro_rules! nodes {
         ($($x:expr),+ $(,)?) => (
             vec![$(Node::from($x)),+]
         );
-    }
-
-    fn nodes(ops: Vec<Op>) -> Vec<Node> {
-        ops.into_iter().map(Node::from).collect()
     }
 
     #[test]
@@ -335,7 +335,7 @@ mod tests {
             push24 0x0102030405060708090a0b0c0d0e0f101112131415161718
             push32 0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
         "#;
-        let expected = nodes(vec![
+        let expected = nodes![
             Op::Push1(Imm::from(hex!("01"))),
             Op::Push1(Imm::from(hex!("42"))),
             Op::Push2(Imm::from(hex!("0102"))),
@@ -348,7 +348,7 @@ mod tests {
             Op::Push32(Imm::from(hex!(
                 "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
             ))),
-        ]);
+        ];
         assert_eq!(parse_asm(asm), Ok(expected));
 
         let asm = "push2 0x010203";
@@ -414,24 +414,19 @@ mod tests {
     }
 
     #[test]
-    fn parse_include() -> Result<(), io::Error> {
-        let f = new_file!("push1 42");
+    fn parse_include() {
         let asm = format!(
             r#"
             push1 1
-            include("{}")
+            include("foo.asm")
             push1 2
             "#,
-            f.path().display()
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
-            Op::Push1(Imm::from(42)),
+            Node::Include(Path::new("foo.asm").to_owned()),
             Op::Push1(Imm::from(2)),
         ];
-
-        assert_eq!(parse_asm(&asm), Ok(expected));
-
-        Ok(())
+        assert_eq!(parse_asm(&asm), Ok(expected))
     }
 }

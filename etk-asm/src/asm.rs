@@ -1,14 +1,17 @@
 use crate::ast::Node;
 use crate::ops::TryFromIntError;
+use crate::parse::parse_file;
 
 use std::collections::{hash_map, HashMap, VecDeque};
 use std::fmt;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum Error {
     DuplicateLabel,
     LabelTooLarge,
     UndefinedLabel(String),
+    IncludeError(PathBuf),
 }
 
 impl fmt::Display for Error {
@@ -17,6 +20,7 @@ impl fmt::Display for Error {
             Self::DuplicateLabel => "duplicate label".to_string(),
             Self::LabelTooLarge => "label too large".to_string(),
             Self::UndefinedLabel(l) => format!("undefined label: {}", l),
+            Self::IncludeError(p) => format!("include error: {}", p.display()),
         };
         write!(f, "{}", msg)
     }
@@ -96,16 +100,38 @@ impl Assembler {
                     }
                 }
 
-                if self.pending.is_empty() {
-                    self.push_ready(node)?;
-                } else {
-                    self.push_pending(node)?;
-                }
+                self.push_unchecked(node)?;
 
                 self.code_len += 1 + specifier.extra_len();
                 Ok(self.ready.len())
             }
+            Node::Include(path) => {
+                let parsed = parse_file(path).map_err(|_| Error::IncludeError(path.clone()))?;
+                self.push_all(parsed)
+            }
+            Node::IncludeAsm(path) => {
+                let parsed = parse_file(path).map_err(|_| Error::IncludeError(path.clone()))?;
+
+                let mut asm = Self::new();
+                asm.push_all(parsed)?;
+
+                let raw = asm.take();
+                self.code_len += raw.len() as u32;
+                asm.finish()?;
+
+                self.push_unchecked(Node::Raw(raw))?;
+
+                Ok(self.ready.len())
+            }
             _ => unimplemented!(),
+        }
+    }
+
+    fn push_unchecked(&mut self, node: Node) -> Result<(), Error> {
+        if self.pending.is_empty() {
+            self.push_ready(node)
+        } else {
+            self.push_pending(node)
         }
     }
 
@@ -126,6 +152,10 @@ impl Assembler {
 
                 node.assemble(&mut self.ready);
 
+                Ok(())
+            }
+            Node::Raw(raw) => {
+                self.ready.extend(raw);
                 Ok(())
             }
             _ => unimplemented!(),
@@ -170,8 +200,28 @@ impl Assembler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ops::Op;
+    use crate::ops::{Imm, Op};
     use hex_literal::hex;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    macro_rules! new_file {
+        ($s:expr) => {{
+            match NamedTempFile::new() {
+                Ok(mut f) => {
+                    writeln!(f, $s).expect("unable to write tmp file");
+                    f
+                }
+                Err(e) => panic!("{}", e),
+            }
+        }};
+    }
+
+    macro_rules! nodes {
+        ($($x:expr),+ $(,)?) => (
+            vec![$(Node::from($x)),+]
+        );
+    }
 
     #[test]
     fn assemble_jumpdest_no_label() -> Result<(), Error> {
@@ -216,6 +266,45 @@ mod tests {
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 3);
         assert_eq!(asm.take(), hex!("60025b"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_include() -> Result<(), Error> {
+        let f = new_file!("push1 42");
+        let nodes = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::Include(f.path().to_owned()),
+            Op::Push1(Imm::from(2)),
+        ];
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(nodes)?;
+        assert_eq!(sz, 6);
+        assert_eq!(asm.take(), hex!("6001602a6002"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_include_asm() -> Result<(), Error> {
+        let f = new_file!(
+            r#"
+                jumpdest .a
+                pc
+                push1 .a
+                jump
+            "#
+        );
+        let nodes = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::IncludeAsm(f.path().to_owned()),
+            Op::Push1(Imm::from(2)),
+        ];
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(nodes)?;
+        assert_eq!(sz, 9);
+        assert_eq!(asm.take(), hex!("60015b586000566002"));
 
         Ok(())
     }
