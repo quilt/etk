@@ -323,6 +323,28 @@ mod tests {
     }
 
     #[test]
+    fn assemble_include_twice() -> Result<(), Error> {
+        let f = new_file!(
+            r#"
+                jumpdest .a
+                push1 .a
+            "#
+        );
+        let nodes = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::Include(f.path().to_owned()),
+            Node::Include(f.path().to_owned()),
+            Op::Push1(Imm::from(2)),
+        ];
+        let mut asm = Assembler::new();
+        let err = asm.push_all(nodes).unwrap_err();
+
+        assert!(matches!(err, Error::DuplicateLabel));
+
+        Ok(())
+    }
+
+    #[test]
     fn assemble_include_hex() -> Result<(), Error> {
         let f = new_file!("deadbeef0102f6");
         let nodes = nodes![
@@ -334,6 +356,24 @@ mod tests {
         let sz = asm.push_all(nodes)?;
         assert_eq!(sz, 11);
         assert_eq!(asm.take(), hex!("6001deadbeef0102f66002"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_include_hex_label() -> Result<(), Error> {
+        let f = new_file!("deadbeef0102f6");
+        let nodes = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::IncludeHex(f.path().to_owned()),
+            Op::JumpDest(Some("a".into())),
+            Op::Push1(Imm::Label("a".into())),
+            Op::Push1(Imm::from(0xff)),
+        ];
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(nodes)?;
+        assert_eq!(sz, 14);
+        assert_eq!(asm.take(), hex!("6001deadbeef0102f65b600960ff"));
 
         Ok(())
     }
