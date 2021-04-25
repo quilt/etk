@@ -1,9 +1,14 @@
+use crate::ast::Node;
 use crate::ops::{Op, TryFromSliceError};
 
 use pest::Parser;
 use pest_derive::Parser;
 use sha3::{Digest, Keccak256};
-use std::fs;
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 #[derive(Parser)]
 #[grammar = "parse/asm.pest"]
@@ -13,7 +18,8 @@ struct AsmParser;
 pub enum ParseError {
     ImmediateTooLarge,
     LexerError(String),
-    IncludeError(String),
+    InvalidPath(String),
+    IoError(io::ErrorKind),
 }
 
 impl From<TryFromSliceError> for ParseError {
@@ -22,28 +28,35 @@ impl From<TryFromSliceError> for ParseError {
     }
 }
 
-pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
-    let mut ops: Vec<Op> = Vec::new();
+impl From<io::Error> for ParseError {
+    fn from(e: io::Error) -> Self {
+        ParseError::IoError(e.kind())
+    }
+}
+
+pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, ParseError> {
+    let asm = fs::read_to_string(path)?;
+    parse_asm(&asm)
+}
+
+pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
+    let mut program: Vec<Node> = Vec::new();
 
     let pairs =
         AsmParser::parse(Rule::program, asm).map_err(|e| ParseError::LexerError(e.to_string()))?;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::include => {
-                let mut pair = pair.into_inner();
-                let path = pair.next().unwrap().as_str();
-                let asm = fs::read_to_string(path)
-                    .map_err(|e| ParseError::IncludeError(e.to_string()))?;
-                let parsed = parse_asm(&asm)?;
-                ops.extend(parsed.into_iter());
+            Rule::include | Rule::include_asm | Rule::include_hex => {
+                let node = parse_include(pair)?;
+                program.push(node);
             }
             Rule::jumpdest => {
                 let mut pair = pair.into_inner();
                 let label = pair.next().unwrap();
-                ops.push(Op::JumpDest(Some(label.as_str()[1..].to_string())));
+                program.push(Op::JumpDest(Some(label.as_str()[1..].to_string())).into());
             }
             Rule::push => {
-                ops.push(parse_push(pair)?);
+                program.push(parse_push(pair)?.into());
             }
             Rule::op => {
                 let op: Op = match pair.as_str() {
@@ -154,13 +167,13 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
                     "log4" => Op::Log4,
                     _ => unreachable!(),
                 };
-                ops.push(op);
+                program.push(op.into());
             }
             _ => continue,
         }
     }
 
-    Ok(ops)
+    Ok(program)
 }
 
 fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
@@ -206,6 +219,21 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
     Ok(op)
 }
 
+fn parse_include(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
+    let rule = pair.as_rule();
+    let mut pair = pair.into_inner();
+    let path = pair.next().unwrap().as_str();
+    let path = PathBuf::from_str(path).map_err(|_| ParseError::InvalidPath(path.to_string()))?;
+
+    let node = match rule {
+        Rule::include => Node::Include(path),
+        Rule::include_asm => Node::IncludeAsm(path),
+        Rule::include_hex => Node::IncludeHex(path),
+        _ => unreachable!(),
+    };
+    Ok(node)
+}
+
 fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, ParseError> {
     let n = u128::from_str_radix(s, radix).map_err(|_| ParseError::ImmediateTooLarge)?;
 
@@ -225,19 +253,11 @@ mod tests {
     use super::*;
     use crate::ops::Imm;
     use hex_literal::hex;
-    use std::io::{self, Write};
-    use tempfile::NamedTempFile;
 
-    macro_rules! new_file {
-        ($s:expr) => {{
-            match NamedTempFile::new() {
-                Ok(mut f) => {
-                    writeln!(f, $s).expect("unable to write tmp file");
-                    f
-                }
-                Err(e) => panic!("{}", e),
-            }
-        }};
+    macro_rules! nodes {
+        ($($x:expr),+ $(,)?) => (
+            vec![$(Node::from($x)),+]
+        );
     }
 
     #[test]
@@ -248,7 +268,7 @@ mod tests {
             gas
             xor
         "#;
-        let expected = vec![Op::Stop, Op::GetPc, Op::Gas, Op::Xor];
+        let expected = nodes![Op::Stop, Op::GetPc, Op::Gas, Op::Xor];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 
@@ -259,7 +279,7 @@ mod tests {
             push1 0b0
             push1 0b1
         "#;
-        let expected = vec![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
+        let expected = nodes![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 
@@ -271,7 +291,7 @@ mod tests {
             push1 0o7
             push2 0o400
         "#;
-        let expected = vec![
+        let expected = nodes![
             Op::Push1(Imm::from([0])),
             Op::Push1(Imm::from([7])),
             Op::Push2(Imm::from([1, 0])),
@@ -295,7 +315,7 @@ mod tests {
             ; just enough for 4 bytes
             push4 4294967295
         "#;
-        let expected = vec![
+        let expected = nodes![
             Op::Push1(Imm::from([0])),
             Op::Push1(Imm::from([1])),
             Op::Push2(Imm::from([0, 42])),
@@ -320,7 +340,7 @@ mod tests {
             push24 0x0102030405060708090a0b0c0d0e0f101112131415161718
             push32 0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
         "#;
-        let expected = vec![
+        let expected = nodes![
             Op::Push1(Imm::from(hex!("01"))),
             Op::Push1(Imm::from(hex!("42"))),
             Op::Push2(Imm::from(hex!("0102"))),
@@ -352,7 +372,7 @@ mod tests {
             log0
             log4
         "#;
-        let expected = vec![
+        let expected = nodes![
             Op::Swap1,
             Op::Swap4,
             Op::Swap16,
@@ -368,7 +388,7 @@ mod tests {
     #[test]
     fn parse_jumpdest_label() {
         let asm = "jumpdest .start";
-        let expected = vec![Op::JumpDest(Some(String::from("start")))];
+        let expected = nodes![Op::JumpDest(Some(String::from("start")))];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 
@@ -378,7 +398,7 @@ mod tests {
             push2 .snake_case
             jumpi
         "#;
-        let expected = vec![Op::Push2(Imm::from("snake_case")), Op::JumpI];
+        let expected = nodes![Op::Push2(Imm::from("snake_case")), Op::JumpI];
         assert_eq!(parse_asm(asm), Ok(expected));
     }
 
@@ -390,7 +410,7 @@ mod tests {
             push4 selector("transfer(address,uint256)")
 
         "#;
-        let expected = vec![
+        let expected = nodes![
             Op::Push4(Imm::from(hex!("06fdde03"))),
             Op::Push4(Imm::from(hex!("70a08231"))),
             Op::Push4(Imm::from(hex!("a9059cbb"))),
@@ -399,24 +419,19 @@ mod tests {
     }
 
     #[test]
-    fn parse_include() -> Result<(), io::Error> {
-        let f = new_file!("push1 42");
+    fn parse_include() {
         let asm = format!(
             r#"
             push1 1
-            include("{}")
+            include("foo.asm")
             push1 2
             "#,
-            f.path().display()
         );
-        let expected = vec![
+        let expected = nodes![
             Op::Push1(Imm::from(1)),
-            Op::Push1(Imm::from(42)),
+            Node::Include(Path::new("foo.asm").to_owned()),
             Op::Push1(Imm::from(2)),
         ];
-
-        assert_eq!(parse_asm(&asm), Ok(expected));
-
-        Ok(())
+        assert_eq!(parse_asm(&asm), Ok(expected))
     }
 }
