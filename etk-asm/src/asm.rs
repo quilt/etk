@@ -35,7 +35,7 @@ impl From<TryFromIntError> for Error {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Assembler {
     ready: Vec<u8>,
     pending: VecDeque<Node>,
@@ -45,12 +45,7 @@ pub struct Assembler {
 
 impl Assembler {
     pub fn new() -> Self {
-        Self {
-            ready: Vec::new(),
-            pending: VecDeque::new(),
-            code_len: 0,
-            labels: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn finish(self) -> Result<(), Error> {
@@ -129,9 +124,9 @@ impl Assembler {
             Node::IncludeHex(path) => {
                 let file =
                     fs::read_to_string(path).map_err(|_| Error::IncludeError(path.clone()))?;
-                dbg!(&file);
                 let raw = hex::decode(file)
                     .map_err(|e| Error::InvalidHex((path.clone(), e.to_string())))?;
+                self.code_len += raw.len() as u32;
                 self.push_unchecked(Node::Raw(raw))?;
 
                 Ok(self.ready.len())
@@ -181,28 +176,25 @@ impl Assembler {
         while let Some(next) = self.pending.front() {
             let mut address = None;
 
-            match next {
-                Node::Op(op) => {
-                    if let Some(label) = op.immediate_label() {
-                        match self.labels.get(label) {
-                            Some(addr) => address = Some(*addr),
-                            None => break,
-                        }
+            if let Node::Op(op) = next {
+                if let Some(label) = op.immediate_label() {
+                    match self.labels.get(label) {
+                        Some(addr) => address = Some(*addr),
+                        None => break,
                     }
-
-                    let popped = match address {
-                        Some(s) => {
-                            // Don't modify `self.pending` if realize returns an error.
-                            let realized = op.realize(s)?;
-                            self.pending.pop_front();
-                            Node::Op(realized)
-                        }
-                        None => self.pending.pop_front().unwrap(),
-                    };
-
-                    popped.assemble(&mut self.ready);
                 }
-                _ => unimplemented!(),
+
+                let popped = match address {
+                    Some(s) => {
+                        // Don't modify `self.pending` if realize returns an error.
+                        let realized = op.realize(s)?;
+                        self.pending.pop_front();
+                        Node::Op(realized)
+                    }
+                    None => self.pending.pop_front().unwrap(),
+                };
+
+                popped.assemble(&mut self.ready);
             }
         }
 
