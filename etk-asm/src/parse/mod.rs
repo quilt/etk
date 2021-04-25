@@ -3,6 +3,7 @@ use crate::ops::{Op, TryFromSliceError};
 use pest::Parser;
 use pest_derive::Parser;
 use sha3::{Digest, Keccak256};
+use std::fs;
 
 #[derive(Parser)]
 #[grammar = "parse/asm.pest"]
@@ -12,6 +13,7 @@ struct AsmParser;
 pub enum ParseError {
     ImmediateTooLarge,
     LexerError(String),
+    IncludeError(String),
 }
 
 impl From<TryFromSliceError> for ParseError {
@@ -27,6 +29,14 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Op>, ParseError> {
         AsmParser::parse(Rule::program, asm).map_err(|e| ParseError::LexerError(e.to_string()))?;
     for pair in pairs {
         match pair.as_rule() {
+            Rule::include => {
+                let mut pair = pair.into_inner();
+                let path = pair.next().unwrap().as_str();
+                let asm = fs::read_to_string(path)
+                    .map_err(|e| ParseError::IncludeError(e.to_string()))?;
+                let parsed = parse_asm(&asm)?;
+                ops.extend(parsed.into_iter());
+            }
             Rule::jumpdest => {
                 let mut pair = pair.into_inner();
                 let label = pair.next().unwrap();
@@ -215,6 +225,20 @@ mod tests {
     use super::*;
     use crate::ops::Imm;
     use hex_literal::hex;
+    use std::io::{self, Write};
+    use tempfile::NamedTempFile;
+
+    macro_rules! new_file {
+        ($s:expr) => {{
+            match NamedTempFile::new() {
+                Ok(mut f) => {
+                    writeln!(f, $s).expect("unable to write tmp file");
+                    f
+                }
+                Err(e) => panic!("{}", e),
+            }
+        }};
+    }
 
     #[test]
     fn parse_ops() {
@@ -372,5 +396,27 @@ mod tests {
             Op::Push4(Imm::from(hex!("a9059cbb"))),
         ];
         assert_eq!(parse_asm(asm), Ok(expected));
+    }
+
+    #[test]
+    fn parse_include() -> Result<(), io::Error> {
+        let f = new_file!("push1 42");
+        let asm = format!(
+            r#"
+            push1 1
+            include("{}")
+            push1 2
+            "#,
+            f.path().display()
+        );
+        let expected = vec![
+            Op::Push1(Imm::from(1)),
+            Op::Push1(Imm::from(42)),
+            Op::Push1(Imm::from(2)),
+        ];
+
+        assert_eq!(parse_asm(&asm), Ok(expected));
+
+        Ok(())
     }
 }
