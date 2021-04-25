@@ -46,19 +46,9 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
         AsmParser::parse(Rule::program, asm).map_err(|e| ParseError::LexerError(e.to_string()))?;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::include => {
-                let mut pair = pair.into_inner();
-                let path = pair.next().unwrap().as_str();
-                let path = PathBuf::from_str(path)
-                    .map_err(|_| ParseError::InvalidPath(path.to_string()))?;
-                program.push(Node::Include(path));
-            }
-            Rule::include_asm => {
-                let mut pair = pair.into_inner();
-                let path = pair.next().unwrap().as_str();
-                let path = PathBuf::from_str(path)
-                    .map_err(|_| ParseError::InvalidPath(path.to_string()))?;
-                program.push(Node::IncludeAsm(path));
+            Rule::include | Rule::include_asm | Rule::include_hex => {
+                let node = parse_include(pair)?;
+                program.push(node);
             }
             Rule::jumpdest => {
                 let mut pair = pair.into_inner();
@@ -227,6 +217,21 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
     };
 
     Ok(op)
+}
+
+fn parse_include(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
+    let rule = pair.as_rule();
+    let mut pair = pair.into_inner();
+    let path = pair.next().unwrap().as_str();
+    let path = PathBuf::from_str(path).map_err(|_| ParseError::InvalidPath(path.to_string()))?;
+
+    let node = match rule {
+        Rule::include => Node::Include(path),
+        Rule::include_asm => Node::IncludeAsm(path),
+        Rule::include_hex => Node::IncludeHex(path),
+        _ => unreachable!(),
+    };
+    Ok(node)
 }
 
 fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, ParseError> {

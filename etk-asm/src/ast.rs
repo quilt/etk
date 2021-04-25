@@ -7,6 +7,7 @@ pub enum Node {
     Raw(Vec<u8>),
     Include(PathBuf),
     IncludeAsm(PathBuf),
+    IncludeHex(PathBuf),
 }
 
 impl Node {

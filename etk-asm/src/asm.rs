@@ -4,6 +4,7 @@ use crate::parse::parse_file;
 
 use std::collections::{hash_map, HashMap, VecDeque};
 use std::fmt;
+use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -12,6 +13,7 @@ pub enum Error {
     LabelTooLarge,
     UndefinedLabel(String),
     IncludeError(PathBuf),
+    InvalidHex((PathBuf, String)),
 }
 
 impl fmt::Display for Error {
@@ -21,6 +23,7 @@ impl fmt::Display for Error {
             Self::LabelTooLarge => "label too large".to_string(),
             Self::UndefinedLabel(l) => format!("undefined label: {}", l),
             Self::IncludeError(p) => format!("include error: {}", p.display()),
+            Self::InvalidHex((p, e)) => format!("invalid hex in {}: {}", p.display(), e),
         };
         write!(f, "{}", msg)
     }
@@ -123,6 +126,16 @@ impl Assembler {
 
                 Ok(self.ready.len())
             }
+            Node::IncludeHex(path) => {
+                let file =
+                    fs::read_to_string(path).map_err(|_| Error::IncludeError(path.clone()))?;
+                dbg!(&file);
+                let raw = hex::decode(file)
+                    .map_err(|e| Error::InvalidHex((path.clone(), e.to_string())))?;
+                self.push_unchecked(Node::Raw(raw))?;
+
+                Ok(self.ready.len())
+            }
             _ => unimplemented!(),
         }
     }
@@ -209,7 +222,7 @@ mod tests {
         ($s:expr) => {{
             match NamedTempFile::new() {
                 Ok(mut f) => {
-                    writeln!(f, $s).expect("unable to write tmp file");
+                    write!(f, $s).expect("unable to write tmp file");
                     f
                 }
                 Err(e) => panic!("{}", e),
@@ -305,6 +318,22 @@ mod tests {
         let sz = asm.push_all(nodes)?;
         assert_eq!(sz, 9);
         assert_eq!(asm.take(), hex!("60015b586000566002"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_include_hex() -> Result<(), Error> {
+        let f = new_file!("deadbeef0102f6");
+        let nodes = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::IncludeHex(f.path().to_owned()),
+            Op::Push1(Imm::from(2)),
+        ];
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(nodes)?;
+        assert_eq!(sz, 11);
+        assert_eq!(asm.take(), hex!("6001deadbeef0102f66002"));
 
         Ok(())
     }
