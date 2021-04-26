@@ -19,7 +19,7 @@ op = @{
 	"staticcall" | "revert" | "selfdestruct"
 }
 
-push = { "push" ~  word_size ~ (hex | octal | binary | decimal | selector | label) }
+push = ${ "push" ~  word_size ~ WHITESPACE ~ (hex | octal | binary | decimal | selector | label) }
 swap = { "swap" ~ half_word_size }
 dup  = { "dup" ~ half_word_size }
 log = { "log" ~ '0'..'4' }
