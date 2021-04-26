@@ -54,8 +54,11 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
         AsmParser::parse(Rule::program, asm).map_err(|e| ParseError::LexerError(e.to_string()))?;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::include | Rule::include_asm | Rule::include_hex => {
-                let node = parse_include(pair)?;
+            Rule::inst_macro => {
+                let mut pairs = pair.into_inner();
+                let inst_macro = pairs.next().unwrap();
+                assert!(pairs.next().is_none());
+                let node = parse_include(inst_macro)?;
                 program.push(node);
             }
             Rule::jumpdest => {
@@ -437,7 +440,7 @@ mod tests {
         let asm = format!(
             r#"
             push1 1
-            include("foo.asm")
+            %include("foo.asm")
             push1 2
             "#,
         );
@@ -453,9 +456,7 @@ mod tests {
     fn parse_include_extra_argument() {
         let asm = format!(
             r#"
-            push1 1
-            include("foo.asm", "bar.asm")
-            push1 2
+            %include("foo.asm", "bar.asm")
             "#,
         );
         assert!(matches!(
@@ -468,9 +469,7 @@ mod tests {
     fn parse_include_missing_argument() {
         let asm = format!(
             r#"
-            push1 1
-            include()
-            push1 2
+            %include()
             "#,
         );
         assert!(matches!(
@@ -486,9 +485,7 @@ mod tests {
     fn parse_include_argument_type() {
         let asm = format!(
             r#"
-            push1 1
-            include(0x44)
-            push1 2
+            %include(0x44)
             "#,
         );
         assert!(matches!(parse_asm(&asm), Err(ParseError::ArgumentType)))
@@ -499,7 +496,7 @@ mod tests {
         let asm = format!(
             r#"
             push1 1
-            include( "hello.asm" )
+            %include( "hello.asm" )
             push1 2
             "#,
         );

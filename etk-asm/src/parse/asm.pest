@@ -2,7 +2,7 @@ program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+)* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
-expr = _{ jumpdest | op | push | include | include_asm }
+expr = _{ jumpdest | op | push | inst_macro }
 
 op = @{
 	"origin" | "stop" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
@@ -47,9 +47,11 @@ arguments_list = _{ ( argument ~ "," )* ~ argument? }
 argument = _{ string | numeric_argument }
 numeric_argument = _{ number | label | selector }
 
-include = { "include" ~ arguments }
-include_asm = { "include_asm" ~ arguments }
-include_hex = { "include_hex" ~ arguments }
+inst_macro = ${ "%" ~ ( include | include_asm | include_hex ) }
+
+include = !{ "include" ~ arguments }
+include_asm = !{ "include_asm" ~ arguments }
+include_hex = !{ "include_hex" ~ arguments }
 
 WHITESPACE = _{ " " | "\t" }
 COMMENT = _{ ";" ~ (!"\n" ~ ANY)* }
