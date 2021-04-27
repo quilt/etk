@@ -1,4 +1,5 @@
 mod args;
+pub(crate) mod error;
 mod parser {
     #![allow(clippy::upper_case_acronyms)]
 
@@ -10,53 +11,34 @@ mod parser {
 }
 
 use crate::ast::Node;
-use crate::ops::{Op, Specifier, TryFromSliceError};
+use crate::ops::{Op, Specifier};
 
 use pest::Parser;
 
 use self::args::Signature;
+pub use self::error::ParseError;
 use self::parser::{AsmParser, Rule};
 
 use sha3::{Digest, Keccak256};
 
+use snafu::{OptionExt, ResultExt};
+
 use std::{
-    fs, io,
+    fs,
     path::{Path, PathBuf},
 };
 
-#[derive(Debug, Eq, PartialEq)]
-#[non_exhaustive]
-pub enum ParseError {
-    ImmediateTooLarge,
-    LexerError(String),
-    IoError(io::ErrorKind),
-    MissingArgument { expected: usize, got: usize },
-    ExtraArgument { expected: usize },
-    ArgumentType,
-}
-
-impl From<TryFromSliceError> for ParseError {
-    fn from(_: TryFromSliceError) -> Self {
-        ParseError::ImmediateTooLarge
-    }
-}
-
-impl From<io::Error> for ParseError {
-    fn from(e: io::Error) -> Self {
-        ParseError::IoError(e.kind())
-    }
-}
-
 pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, ParseError> {
-    let asm = fs::read_to_string(path)?;
+    let asm = fs::read_to_string(path.as_ref()).with_context(|| error::Io {
+        path: path.as_ref().to_owned(),
+    })?;
     parse_asm(&asm)
 }
 
 pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let mut program: Vec<Node> = Vec::new();
 
-    let pairs =
-        AsmParser::parse(Rule::program, asm).map_err(|e| ParseError::LexerError(e.to_string()))?;
+    let pairs = AsmParser::parse(Rule::program, asm)?;
     for pair in pairs {
         match pair.as_rule() {
             Rule::inst_macro => {
@@ -96,28 +78,38 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
         Rule::binary => {
             let raw = operand.as_str();
             let imm = radix_str_to_vec(&raw[2..], 2, size)?;
-            Op::push_with_immediate(size, imm.as_ref())?
+            Op::push_with_immediate(size, imm.as_ref())
+                .ok()
+                .context(error::ImmediateTooLarge)?
         }
         Rule::octal => {
             let raw = operand.as_str();
             let imm = radix_str_to_vec(&raw[2..], 8, size)?;
-            Op::push_with_immediate(size, imm.as_ref())?
+            Op::push_with_immediate(size, imm.as_ref())
+                .ok()
+                .context(error::ImmediateTooLarge)?
         }
         Rule::decimal => {
             let raw = operand.as_str();
             let imm = radix_str_to_vec(raw, 10, size)?;
-            Op::push_with_immediate(size, imm.as_ref())?
+            Op::push_with_immediate(size, imm.as_ref())
+                .ok()
+                .context(error::ImmediateTooLarge)?
         }
         Rule::hex => {
             let raw = operand.as_str();
             let imm = hex::decode(&raw[2..]).unwrap();
-            Op::push_with_immediate(size, imm.as_slice())?
+            Op::push_with_immediate(size, imm.as_ref())
+                .ok()
+                .context(error::ImmediateTooLarge)?
         }
         Rule::selector => {
             let raw = operand.into_inner().next().unwrap().as_str();
             let mut hasher = Keccak256::new();
             hasher.update(raw.as_bytes());
-            Op::push_with_immediate(size, &hasher.finalize()[0..4])?
+            Op::push_with_immediate(size, &hasher.finalize()[0..4])
+                .ok()
+                .context(error::ImmediateTooLarge)?
         }
         Rule::label => {
             let label = operand.as_str()[1..].to_string();
@@ -143,7 +135,9 @@ fn parse_include(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> 
 }
 
 fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, ParseError> {
-    let n = u128::from_str_radix(s, radix).map_err(|_| ParseError::ImmediateTooLarge)?;
+    let n = u128::from_str_radix(s, radix)
+        .ok()
+        .context(error::ImmediateTooLarge)?;
 
     let msb = 128 - n.leading_zeros();
     let mut len = (msb / 8) as usize;
@@ -158,9 +152,13 @@ fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, ParseErr
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use assert_matches::assert_matches;
+
     use crate::ops::Imm;
+
     use hex_literal::hex;
+
+    use super::*;
 
     macro_rules! nodes {
         ($($x:expr),+ $(,)?) => (
@@ -177,7 +175,7 @@ mod tests {
             xor
         "#;
         let expected = nodes![Op::Stop, Op::GetPc, Op::Gas, Op::Xor];
-        assert_eq!(parse_asm(asm), Ok(expected));
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
     #[test]
@@ -188,7 +186,7 @@ mod tests {
             push1 0b1
         "#;
         let expected = nodes![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
-        assert_eq!(parse_asm(asm), Ok(expected));
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
     #[test]
@@ -204,14 +202,14 @@ mod tests {
             Op::Push1(Imm::from([7])),
             Op::Push2(Imm::from([1, 0])),
         ];
-        assert_eq!(parse_asm(asm), Ok(expected));
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
     #[test]
     fn parse_push_decimal() {
         let asm = r#"
             ; simple cases
-            push1 0     
+            push1 0
             push1 1
 
             ; left-pad values too small
@@ -230,17 +228,17 @@ mod tests {
             Op::Push2(Imm::from(hex!("0100"))),
             Op::Push4(Imm::from(hex!("ffffffff"))),
         ];
-        assert_eq!(parse_asm(asm), Ok(expected));
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
 
         let asm = "push1 256";
-        assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
+        assert_matches!(parse_asm(asm), Err(ParseError::ImmediateTooLarge { .. }));
     }
 
     #[test]
     fn parse_push_hex() {
         let asm = r#"
             push1 0x01 ; comment
-            push1 0x42 
+            push1 0x42
             push2 0x0102
             push4 0x01020304
             push8 0x0102030405060708
@@ -262,10 +260,10 @@ mod tests {
                 "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
             ))),
         ];
-        assert_eq!(parse_asm(asm), Ok(expected));
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
 
         let asm = "push2 0x010203";
-        assert_eq!(parse_asm(asm), Err(ParseError::ImmediateTooLarge));
+        assert_matches!(parse_asm(asm), Err(ParseError::ImmediateTooLarge { .. }));
     }
 
     #[test]
@@ -290,14 +288,14 @@ mod tests {
             Op::Log0,
             Op::Log4,
         ];
-        assert_eq!(parse_asm(asm), Ok(expected));
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
     #[test]
     fn parse_jumpdest_label() {
         let asm = "jumpdest .start";
         let expected = nodes![Op::JumpDest(Some(String::from("start")))];
-        assert_eq!(parse_asm(asm), Ok(expected));
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
     #[test]
@@ -307,7 +305,7 @@ mod tests {
             jumpi
         "#;
         let expected = nodes![Op::Push2(Imm::from("snake_case")), Op::JumpI];
-        assert_eq!(parse_asm(asm), Ok(expected));
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
     #[test]
@@ -323,7 +321,7 @@ mod tests {
             Op::Push4(Imm::from(hex!("70a08231"))),
             Op::Push4(Imm::from(hex!("a9059cbb"))),
         ];
-        assert_eq!(parse_asm(asm), Ok(expected));
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
     #[test]
@@ -331,7 +329,7 @@ mod tests {
         let asm = r#"
             push4 selector("name( )")
         "#;
-        assert!(matches!(parse_asm(asm), Err(ParseError::LexerError(_))));
+        assert_matches!(parse_asm(asm), Err(ParseError::Lexer { .. }));
     }
 
     #[test]
@@ -348,7 +346,7 @@ mod tests {
             Node::Include(PathBuf::from("foo.asm")),
             Op::Push1(Imm::from(2)),
         ];
-        assert_eq!(parse_asm(&asm), Ok(expected))
+        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
 
     #[test]
@@ -365,7 +363,7 @@ mod tests {
             Node::IncludeHex(PathBuf::from("foo.hex")),
             Op::Push1(Imm::from(2)),
         ];
-        assert_eq!(parse_asm(&asm), Ok(expected))
+        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
 
     #[test]
@@ -382,7 +380,7 @@ mod tests {
             Node::Import(PathBuf::from("foo.asm")),
             Op::Push1(Imm::from(2)),
         ];
-        assert_eq!(parse_asm(&asm), Ok(expected))
+        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
 
     #[test]
@@ -394,7 +392,10 @@ mod tests {
         );
         assert!(matches!(
             parse_asm(&asm),
-            Err(ParseError::ExtraArgument { expected: 1 })
+            Err(ParseError::ExtraArgument {
+                expected: 1,
+                backtrace: _
+            })
         ))
     }
 
@@ -409,7 +410,8 @@ mod tests {
             parse_asm(&asm),
             Err(ParseError::MissingArgument {
                 got: 0,
-                expected: 1
+                expected: 1,
+                backtrace: _,
             })
         ))
     }
@@ -421,7 +423,7 @@ mod tests {
             %import(0x44)
             "#,
         );
-        assert!(matches!(parse_asm(&asm), Err(ParseError::ArgumentType)))
+        assert_matches!(parse_asm(&asm), Err(ParseError::ArgumentType { .. }))
     }
 
     #[test]
@@ -438,6 +440,6 @@ mod tests {
             Node::Import(Path::new("hello.asm").to_owned()),
             Op::Push1(Imm::from(2)),
         ];
-        assert_eq!(parse_asm(&asm), Ok(expected))
+        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
 }
