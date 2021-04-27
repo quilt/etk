@@ -107,7 +107,7 @@ impl Assembler {
                 let parsed = parse_file(path).map_err(|_| Error::IncludeError(path.clone()))?;
                 self.push_all(parsed)
             }
-            Node::IncludeAsm(path) => {
+            Node::Include(path) => {
                 let parsed = parse_file(path).map_err(|_| Error::IncludeError(path.clone()))?;
 
                 let mut asm = Self::new();
@@ -292,7 +292,7 @@ mod tests {
     }
 
     #[test]
-    fn assemble_include_asm() -> Result<(), Error> {
+    fn assemble_include() -> Result<(), Error> {
         let f = new_file!(
             r#"
                 jumpdest .a
@@ -303,7 +303,7 @@ mod tests {
         );
         let nodes = nodes![
             Op::Push1(Imm::from(1)),
-            Node::IncludeAsm(f.path().to_owned()),
+            Node::Include(f.path().to_owned()),
             Op::Push1(Imm::from(2)),
         ];
         let mut asm = Assembler::new();

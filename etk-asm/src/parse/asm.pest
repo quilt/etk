@@ -47,10 +47,10 @@ arguments_list = _{ ( argument ~ "," )* ~ argument? }
 argument = _{ string | numeric_argument }
 numeric_argument = _{ number | label | selector }
 
-inst_macro = ${ "%" ~ ( import | include_asm | include_hex ) }
+inst_macro = ${ "%" ~ ( import | include | include_hex ) }
 
 import = !{ "import" ~ arguments }
-include_asm = !{ "include_asm" ~ arguments }
+include = !{ "include" ~ arguments }
 include_hex = !{ "include_hex" ~ arguments }
 
 WHITESPACE = _{ " " | "\t" }

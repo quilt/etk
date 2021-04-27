@@ -135,7 +135,7 @@ fn parse_include(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> 
 
     let node = match rule {
         Rule::import => Node::Import(args.0),
-        Rule::include_asm => Node::IncludeAsm(args.0),
+        Rule::include => Node::Include(args.0),
         Rule::include_hex => Node::IncludeHex(args.0),
         _ => unreachable!(),
     };
@@ -332,6 +332,40 @@ mod tests {
             push4 selector("name( )")
         "#;
         assert!(matches!(parse_asm(asm), Err(ParseError::LexerError(_))));
+    }
+
+    #[test]
+    fn parse_include() {
+        let asm = format!(
+            r#"
+            push1 1
+            %include("foo.asm")
+            push1 2
+            "#,
+        );
+        let expected = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::Include(PathBuf::from("foo.asm")),
+            Op::Push1(Imm::from(2)),
+        ];
+        assert_eq!(parse_asm(&asm), Ok(expected))
+    }
+
+    #[test]
+    fn parse_include_hex() {
+        let asm = format!(
+            r#"
+            push1 1
+            %include_hex("foo.hex")
+            push1 2
+            "#,
+        );
+        let expected = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::IncludeHex(PathBuf::from("foo.hex")),
+            Op::Push1(Imm::from(2)),
+        ];
+        assert_eq!(parse_asm(&asm), Ok(expected))
     }
 
     #[test]
