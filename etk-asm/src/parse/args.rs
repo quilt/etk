@@ -1,8 +1,10 @@
 use pest::iterators::{Pair, Pairs};
 
+use snafu::{ensure, OptionExt};
+
 use std::path::PathBuf;
 
-use super::{ParseError, Rule};
+use super::{error, ParseError, Rule};
 
 pub trait FromPair: Sized {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError>;
@@ -10,16 +12,15 @@ pub trait FromPair: Sized {
 
 impl FromPair for PathBuf {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError> {
-        if pair.as_rule() == Rule::string {
-            let txt = pair.as_str();
-            if txt.contains('\\') {
-                // TODO
-                panic!("backslashes in paths aren't implemented yet.");
-            }
-            Ok(txt[1..txt.len() - 1].into())
-        } else {
-            Err(ParseError::ArgumentType)
+        ensure!(pair.as_rule() == Rule::string, error::ArgumentType);
+
+        let txt = pair.as_str();
+        if txt.contains('\\') {
+            // TODO
+            panic!("backslashes in paths aren't implemented yet.");
         }
+
+        Ok(txt[1..txt.len() - 1].into())
     }
 }
 
@@ -32,7 +33,7 @@ fn arg<T>(pairs: &mut Pairs<Rule>, expected: usize, got: &mut usize) -> Result<T
 where
     T: FromPair,
 {
-    let pair = pairs.next().ok_or(ParseError::MissingArgument {
+    let pair = pairs.next().context(error::MissingArgument {
         got: *got,
         expected,
     })?;
@@ -45,7 +46,7 @@ impl Signature for () {
 
     fn parse_arguments(mut pairs: Pairs<Rule>) -> Result<Self, ParseError> {
         match pairs.next() {
-            Some(_) => Err(ParseError::ExtraArgument { expected: 0 }),
+            Some(_) => error::ExtraArgument { expected: 0usize }.fail(),
             None => Ok(()),
         }
     }
@@ -64,7 +65,7 @@ where
         let result = (arg::<T>(&mut pairs, expected, &mut got)?,);
 
         match pairs.next() {
-            Some(_) => Err(ParseError::ExtraArgument { expected }),
+            Some(_) => error::ExtraArgument { expected }.fail(),
             None => Ok(result),
         }
     }

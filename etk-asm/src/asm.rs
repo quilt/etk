@@ -1,39 +1,53 @@
+mod error {
+    use crate::ops::TryFromIntError;
+    use crate::parse::ParseError;
+
+    use snafu::{Backtrace, Snafu};
+
+    use std::path::PathBuf;
+
+    #[derive(Snafu, Debug)]
+    #[non_exhaustive]
+    #[snafu(visibility = "pub(super)")]
+    pub enum Error {
+        #[snafu(display("label `{}` declared multiple times", label))]
+        DuplicateLabel { label: String, backtrace: Backtrace },
+
+        #[snafu(display("value of label `{}` was too large for the given opcode", label))]
+        LabelTooLarge {
+            label: String,
+            #[snafu(backtrace)]
+            source: TryFromIntError,
+        },
+
+        #[snafu(display("label `{}` was never defined", label))]
+        UndefinedLabel { label: String, backtrace: Backtrace },
+
+        #[snafu(display("include or import failed to parse: {}", source))]
+        #[snafu(context(false))]
+        ParseInclude {
+            #[snafu(backtrace)]
+            source: ParseError,
+        },
+
+        #[snafu(display("included file `{}` is invalid hex: {}", path.to_string_lossy(), source))]
+        InvalidHex {
+            path: PathBuf,
+            source: Box<dyn std::error::Error>,
+            backtrace: Backtrace,
+        },
+    }
+}
+
 use crate::ast::Node;
-use crate::ops::TryFromIntError;
 use crate::parse::parse_file;
 
+pub use self::error::Error;
+
+use snafu::ResultExt;
+
 use std::collections::{hash_map, HashMap, VecDeque};
-use std::fmt;
 use std::fs;
-use std::path::PathBuf;
-
-#[derive(Debug)]
-pub enum Error {
-    DuplicateLabel,
-    LabelTooLarge,
-    UndefinedLabel(String),
-    IncludeError(PathBuf),
-    InvalidHex((PathBuf, String)),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let msg = match self {
-            Self::DuplicateLabel => "duplicate label".to_string(),
-            Self::LabelTooLarge => "label too large".to_string(),
-            Self::UndefinedLabel(l) => format!("undefined label: {}", l),
-            Self::IncludeError(p) => format!("include error: {}", p.display()),
-            Self::InvalidHex((p, e)) => format!("invalid hex in {}: {}", p.display(), e),
-        };
-        write!(f, "{}", msg)
-    }
-}
-
-impl From<TryFromIntError> for Error {
-    fn from(_: TryFromIntError) -> Self {
-        Error::LabelTooLarge
-    }
-}
 
 #[derive(Debug, Default)]
 pub struct Assembler {
@@ -53,7 +67,7 @@ impl Assembler {
             return match undef {
                 Node::Op(op) => {
                     let label = op.immediate_label().unwrap();
-                    Err(Error::UndefinedLabel(label.to_owned()))
+                    error::UndefinedLabel { label }.fail()
                 }
                 _ => unreachable!(),
             };
@@ -91,7 +105,9 @@ impl Assembler {
 
                 if let Some(label) = op.label() {
                     match self.labels.entry(label.to_owned()) {
-                        hash_map::Entry::Occupied(_) => return Err(Error::DuplicateLabel),
+                        hash_map::Entry::Occupied(_) => {
+                            return error::DuplicateLabel { label }.fail();
+                        }
                         hash_map::Entry::Vacant(v) => {
                             v.insert(self.code_len);
                         }
@@ -104,11 +120,11 @@ impl Assembler {
                 Ok(self.ready.len())
             }
             Node::Import(path) => {
-                let parsed = parse_file(path).map_err(|_| Error::IncludeError(path.clone()))?;
+                let parsed = parse_file(path)?;
                 self.push_all(parsed)
             }
             Node::Include(path) => {
-                let parsed = parse_file(path).map_err(|_| Error::IncludeError(path.clone()))?;
+                let parsed = parse_file(path)?;
 
                 let mut asm = Self::new();
                 asm.push_all(parsed)?;
@@ -123,9 +139,10 @@ impl Assembler {
             }
             Node::IncludeHex(path) => {
                 let file =
-                    fs::read_to_string(path).map_err(|_| Error::IncludeError(path.clone()))?;
+                    fs::read_to_string(path).with_context(|| crate::parse::error::Io { path })?;
                 let raw = hex::decode(file)
-                    .map_err(|e| Error::InvalidHex((path.clone(), e.to_string())))?;
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+                    .context(error::InvalidHex { path })?;
                 self.code_len += raw.len() as u32;
                 self.push_unchecked(Node::Raw(raw))?;
 
@@ -149,7 +166,10 @@ impl Assembler {
                 if let Some(label) = op.immediate_label() {
                     match self.labels.get(label) {
                         Some(addr) => {
-                            node = op.realize(*addr)?.into();
+                            node = op
+                                .realize(*addr)
+                                .context(error::LabelTooLarge { label })?
+                                .into();
                         }
                         None => {
                             self.pending.push_back(node);
@@ -175,11 +195,15 @@ impl Assembler {
 
         while let Some(next) = self.pending.front() {
             let mut address = None;
+            let mut label = None;
 
             if let Node::Op(op) = next {
-                if let Some(label) = op.immediate_label() {
-                    match self.labels.get(label) {
-                        Some(addr) => address = Some(*addr),
+                if let Some(lbl) = op.immediate_label() {
+                    match self.labels.get(lbl) {
+                        Some(addr) => {
+                            address = Some(*addr);
+                            label = Some(lbl);
+                        }
                         None => break,
                     }
                 }
@@ -187,7 +211,9 @@ impl Assembler {
                 let popped = match address {
                     Some(s) => {
                         // Don't modify `self.pending` if realize returns an error.
-                        let realized = op.realize(s)?;
+                        let realized = op.realize(s).with_context(|| error::LabelTooLarge {
+                            label: label.unwrap(),
+                        })?;
                         self.pending.pop_front();
                         Node::Op(realized)
                     }
@@ -204,10 +230,16 @@ impl Assembler {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use assert_matches::assert_matches;
+
     use crate::ops::{Imm, Op};
+
     use hex_literal::hex;
+
+    use super::*;
+
     use std::io::Write;
+
     use tempfile::NamedTempFile;
 
     macro_rules! new_file {
@@ -331,7 +363,7 @@ mod tests {
         let mut asm = Assembler::new();
         let err = asm.push_all(nodes).unwrap_err();
 
-        assert!(matches!(err, Error::DuplicateLabel));
+        assert_matches!(err, Error::DuplicateLabel { label, ..} if label == "a");
 
         Ok(())
     }
@@ -366,6 +398,41 @@ mod tests {
         let sz = asm.push_all(nodes)?;
         assert_eq!(sz, 14);
         assert_eq!(asm.take(), hex!("6001deadbeef0102f65b600960ff"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_label_too_large() {
+        let mut nodes = vec![Node::Op(Op::GetPc); 255];
+        nodes.push(Node::Op(Op::JumpDest(Some("b".into()))));
+        nodes.push(Node::Op(Op::JumpDest(Some("a".into()))));
+        nodes.push(Node::Op(Op::Push1(Imm::from("a"))));
+        let mut asm = Assembler::new();
+        let err = asm.push_all(nodes).unwrap_err();
+        assert_matches!(err, Error::LabelTooLarge { label, .. } if label == "a");
+    }
+
+    #[test]
+    fn assemble_label_just_right() -> Result<(), Error> {
+        let mut nodes = vec![Node::Op(Op::GetPc); 255];
+        nodes.push(Node::Op(Op::JumpDest(Some("b".into()))));
+        nodes.push(Node::Op(Op::JumpDest(Some("a".into()))));
+        nodes.push(Node::Op(Op::Push1(Imm::from("b"))));
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(nodes)?;
+        assert_eq!(sz, 259);
+
+        let assembled = asm.take();
+        asm.finish()?;
+
+        let mut expected = vec![0x58; 255];
+        expected.push(0x5b);
+        expected.push(0x5b);
+        expected.push(0x60);
+        expected.push(0xff);
+
+        assert_eq!(assembled, expected);
 
         Ok(())
     }

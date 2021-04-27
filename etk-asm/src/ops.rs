@@ -2,15 +2,21 @@ use hex::ToHex;
 
 use num_enum::{FromPrimitive, IntoPrimitive};
 
+use snafu::{Backtrace, Snafu};
+
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug, Clone)]
-pub struct TryFromIntError(pub(crate) ());
+#[derive(Snafu, Debug)]
+pub struct TryFromIntError {
+    backtrace: Backtrace,
+}
 
-#[derive(Debug, Clone)]
-pub struct TryFromSliceError(pub(crate) ());
+#[derive(Snafu, Debug)]
+pub struct TryFromSliceError {
+    backtrace: Backtrace,
+}
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum Imm<T> {
@@ -66,7 +72,7 @@ macro_rules! impl_try_from {
                 let max = <$ty>::pow(2, 8 * $ii);
 
                 if x >= max {
-                    return Err(TryFromIntError(()));
+                    return TryFromIntContext.fail();
                 }
 
                 let mut output = [0u8; $ii];
@@ -88,7 +94,7 @@ macro_rules! impl_try_from_slice {
 
             fn try_from(x: &[u8]) -> Result<Self, Self::Error> {
                 if x.len() > $ii {
-                    return Err(TryFromSliceError(()));
+                    return TryFromSliceContext.fail();
                 }
 
                 let mut output = [0u8; $ii];

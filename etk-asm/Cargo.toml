@@ -7,6 +7,7 @@ edition = "2018"
 
 [features]
 cli = ["structopt", "etk-cli"]
+backtraces = [ "snafu/backtraces" ]
 
 [dependencies]
 num_enum = "0.5.1"
@@ -16,6 +17,7 @@ pest_derive = "2.1"
 sha3 = "0.9.1"
 structopt = { optional = true, version = "0.3.21" }
 etk-cli = { optional = true, path = "../etk-cli" }
+snafu = { version = "0.6.10", default-features = false, features = [ "std" ] }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
