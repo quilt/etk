@@ -1,12 +1,21 @@
 mod args;
+mod parser {
+    #![allow(clippy::upper_case_acronyms)]
+
+    use pest_derive::Parser;
+
+    #[derive(Parser)]
+    #[grammar = "parse/asm.pest"]
+    pub struct AsmParser;
+}
 
 use crate::ast::Node;
 use crate::ops::{Op, Specifier, TryFromSliceError};
 
 use pest::Parser;
-use pest_derive::Parser;
 
 use self::args::Signature;
+use self::parser::{AsmParser, Rule};
 
 use sha3::{Digest, Keccak256};
 
@@ -14,10 +23,6 @@ use std::{
     fs, io,
     path::{Path, PathBuf},
 };
-
-#[derive(Parser)]
-#[grammar = "parse/asm.pest"]
-struct AsmParser;
 
 #[derive(Debug, Eq, PartialEq)]
 #[non_exhaustive]

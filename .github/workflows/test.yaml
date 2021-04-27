@@ -41,8 +41,12 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - run: rustup component add rustfmt
+      - run: rustup component add rustfmt clippy
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features

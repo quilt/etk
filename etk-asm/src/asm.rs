@@ -152,7 +152,7 @@ impl Assembler {
                             node = op.realize(*addr)?.into();
                         }
                         None => {
-                            self.pending.push_back(node.clone());
+                            self.pending.push_back(node);
                             return Ok(());
                         }
                     }
