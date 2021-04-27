@@ -47,9 +47,9 @@ arguments_list = _{ ( argument ~ "," )* ~ argument? }
 argument = _{ string | numeric_argument }
 numeric_argument = _{ number | label | selector }
 
-inst_macro = ${ "%" ~ ( include | include_asm | include_hex ) }
+inst_macro = ${ "%" ~ ( import | include_asm | include_hex ) }
 
-include = !{ "include" ~ arguments }
+import = !{ "import" ~ arguments }
 include_asm = !{ "include_asm" ~ arguments }
 include_hex = !{ "include_hex" ~ arguments }
 

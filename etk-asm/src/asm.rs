@@ -103,7 +103,7 @@ impl Assembler {
                 self.code_len += 1 + specifier.extra_len();
                 Ok(self.ready.len())
             }
-            Node::Include(path) => {
+            Node::Import(path) => {
                 let parsed = parse_file(path).map_err(|_| Error::IncludeError(path.clone()))?;
                 self.push_all(parsed)
             }
@@ -276,11 +276,11 @@ mod tests {
     }
 
     #[test]
-    fn assemble_include() -> Result<(), Error> {
+    fn assemble_import() -> Result<(), Error> {
         let f = new_file!("push1 42");
         let nodes = nodes![
             Op::Push1(Imm::from(1)),
-            Node::Include(f.path().to_owned()),
+            Node::Import(f.path().to_owned()),
             Op::Push1(Imm::from(2)),
         ];
         let mut asm = Assembler::new();
@@ -315,7 +315,7 @@ mod tests {
     }
 
     #[test]
-    fn assemble_include_twice() -> Result<(), Error> {
+    fn assemble_import_twice() -> Result<(), Error> {
         let f = new_file!(
             r#"
                 jumpdest .a
@@ -324,8 +324,8 @@ mod tests {
         );
         let nodes = nodes![
             Op::Push1(Imm::from(1)),
-            Node::Include(f.path().to_owned()),
-            Node::Include(f.path().to_owned()),
+            Node::Import(f.path().to_owned()),
+            Node::Import(f.path().to_owned()),
             Op::Push1(Imm::from(2)),
         ];
         let mut asm = Assembler::new();

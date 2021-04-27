@@ -5,7 +5,7 @@ use std::path::PathBuf;
 pub enum Node {
     Op(Op),
     Raw(Vec<u8>),
-    Include(PathBuf),
+    Import(PathBuf),
     IncludeAsm(PathBuf),
     IncludeHex(PathBuf),
 }

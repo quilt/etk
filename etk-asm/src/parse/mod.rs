@@ -134,7 +134,7 @@ fn parse_include(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> 
     let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
 
     let node = match rule {
-        Rule::include => Node::Include(args.0),
+        Rule::import => Node::Import(args.0),
         Rule::include_asm => Node::IncludeAsm(args.0),
         Rule::include_hex => Node::IncludeHex(args.0),
         _ => unreachable!(),
@@ -335,27 +335,27 @@ mod tests {
     }
 
     #[test]
-    fn parse_include() {
+    fn parse_import() {
         let asm = format!(
             r#"
             push1 1
-            %include("foo.asm")
+            %import("foo.asm")
             push1 2
             "#,
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
-            Node::Include(Path::new("foo.asm").to_owned()),
+            Node::Import(PathBuf::from("foo.asm")),
             Op::Push1(Imm::from(2)),
         ];
         assert_eq!(parse_asm(&asm), Ok(expected))
     }
 
     #[test]
-    fn parse_include_extra_argument() {
+    fn parse_import_extra_argument() {
         let asm = format!(
             r#"
-            %include("foo.asm", "bar.asm")
+            %import("foo.asm", "bar.asm")
             "#,
         );
         assert!(matches!(
@@ -365,10 +365,10 @@ mod tests {
     }
 
     #[test]
-    fn parse_include_missing_argument() {
+    fn parse_import_missing_argument() {
         let asm = format!(
             r#"
-            %include()
+            %import()
             "#,
         );
         assert!(matches!(
@@ -381,27 +381,27 @@ mod tests {
     }
 
     #[test]
-    fn parse_include_argument_type() {
+    fn parse_import_argument_type() {
         let asm = format!(
             r#"
-            %include(0x44)
+            %import(0x44)
             "#,
         );
         assert!(matches!(parse_asm(&asm), Err(ParseError::ArgumentType)))
     }
 
     #[test]
-    fn parse_include_spaces() {
+    fn parse_import_spaces() {
         let asm = format!(
             r#"
             push1 1
-            %include( "hello.asm" )
+            %import( "hello.asm" )
             push1 2
             "#,
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
-            Node::Include(Path::new("hello.asm").to_owned()),
+            Node::Import(Path::new("hello.asm").to_owned()),
             Op::Push1(Imm::from(2)),
         ];
         assert_eq!(parse_asm(&asm), Ok(expected))
