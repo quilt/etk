@@ -1,12 +1,21 @@
 mod args;
+mod parser {
+    #![allow(clippy::upper_case_acronyms)]
+
+    use pest_derive::Parser;
+
+    #[derive(Parser)]
+    #[grammar = "parse/asm.pest"]
+    pub struct AsmParser;
+}
 
 use crate::ast::Node;
-use crate::ops::{Op, TryFromSliceError};
+use crate::ops::{Op, Specifier, TryFromSliceError};
 
 use pest::Parser;
-use pest_derive::Parser;
 
 use self::args::Signature;
+use self::parser::{AsmParser, Rule};
 
 use sha3::{Digest, Keccak256};
 
@@ -14,10 +23,6 @@ use std::{
     fs, io,
     path::{Path, PathBuf},
 };
-
-#[derive(Parser)]
-#[grammar = "parse/asm.pest"]
-struct AsmParser;
 
 #[derive(Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -70,114 +75,8 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
                 program.push(parse_push(pair)?.into());
             }
             Rule::op => {
-                let op: Op = match pair.as_str() {
-                    "stop" => Op::Stop,
-                    "add" => Op::Add,
-                    "mul" => Op::Mul,
-                    "sub" => Op::Sub,
-                    "div" => Op::Div,
-                    "sdiv" => Op::SDiv,
-                    "mod" => Op::Mod,
-                    "smod" => Op::SMod,
-                    "addmod" => Op::AddMod,
-                    "mulmod" => Op::MulMod,
-                    "exp" => Op::Exp,
-                    "signextend" => Op::SignExtend,
-                    "lt" => Op::Lt,
-                    "gt" => Op::Gt,
-                    "slt" => Op::SLt,
-                    "sgt" => Op::SGt,
-                    "eq" => Op::Eq,
-                    "iszero" => Op::IsZero,
-                    "and" => Op::And,
-                    "or" => Op::Or,
-                    "xor" => Op::Xor,
-                    "not" => Op::Not,
-                    "shl" => Op::Shl,
-                    "shr" => Op::Shr,
-                    "sar" => Op::Sar,
-                    "sha3" => Op::Keccak256,
-                    "address" => Op::Address,
-                    "balance" => Op::Balance,
-                    "origin" => Op::Origin,
-                    "caller" => Op::Caller,
-                    "callvalue" => Op::CallValue,
-                    "calldataload" => Op::CallDataLoad,
-                    "calldatasize" => Op::CallDataSize,
-                    "calldatacopy" => Op::CallDataCopy,
-                    "codesize" => Op::CodeSize,
-                    "codecopy" => Op::CodeCopy,
-                    "gasprice" => Op::GasPrice,
-                    "extcodesize" => Op::ExtCodeSize,
-                    "extcodecopy" => Op::ExtCodeCopy,
-                    "returndatasize" => Op::ReturnDataSize,
-                    "returndatacopy" => Op::ReturnDataCopy,
-                    "extcodehash" => Op::ExtCodeHash,
-                    "blockhash" => Op::BlockHash,
-                    "coinbase" => Op::Coinbase,
-                    "timestamp" => Op::Timestamp,
-                    "number" => Op::Number,
-                    "difficulty" => Op::Difficulty,
-                    "gaslimit" => Op::GasLimit,
-                    "pop" => Op::Pop,
-                    "mload" => Op::MLoad,
-                    "mstore" => Op::MStore,
-                    "mstore8" => Op::MStore8,
-                    "sload" => Op::SLoad,
-                    "sstore" => Op::SStore,
-                    "jump" => Op::Jump,
-                    "jumpi" => Op::JumpI,
-                    "pc" => Op::GetPc,
-                    "msize" => Op::MSize,
-                    "gas" => Op::Gas,
-                    "create" => Op::Create,
-                    "call" => Op::Call,
-                    "callcode" => Op::CallCode,
-                    "return" => Op::Return,
-                    "delegatecall" => Op::DelegateCall,
-                    "create2" => Op::Create2,
-                    "staticcall" => Op::StaticCall,
-                    "revert" => Op::Revert,
-                    "selfdestruct" => Op::SelfDestruct,
-                    "dup1" => Op::Dup1,
-                    "dup2" => Op::Dup2,
-                    "dup3" => Op::Dup3,
-                    "dup4" => Op::Dup4,
-                    "dup5" => Op::Dup5,
-                    "dup6" => Op::Dup6,
-                    "dup7" => Op::Dup7,
-                    "dup8" => Op::Dup8,
-                    "dup9" => Op::Dup9,
-                    "dup10" => Op::Dup10,
-                    "dup11" => Op::Dup11,
-                    "dup12" => Op::Dup12,
-                    "dup13" => Op::Dup13,
-                    "dup14" => Op::Dup14,
-                    "dup15" => Op::Dup15,
-                    "dup16" => Op::Dup16,
-                    "swap1" => Op::Swap1,
-                    "swap2" => Op::Swap2,
-                    "swap3" => Op::Swap3,
-                    "swap4" => Op::Swap4,
-                    "swap5" => Op::Swap5,
-                    "swap6" => Op::Swap6,
-                    "swap7" => Op::Swap7,
-                    "swap8" => Op::Swap8,
-                    "swap9" => Op::Swap9,
-                    "swap10" => Op::Swap10,
-                    "swap11" => Op::Swap11,
-                    "swap12" => Op::Swap12,
-                    "swap13" => Op::Swap13,
-                    "swap14" => Op::Swap14,
-                    "swap15" => Op::Swap15,
-                    "swap16" => Op::Swap16,
-                    "log0" => Op::Log0,
-                    "log1" => Op::Log1,
-                    "log2" => Op::Log2,
-                    "log3" => Op::Log3,
-                    "log4" => Op::Log4,
-                    _ => unreachable!(),
-                };
+                let spec: Specifier = pair.as_str().parse().unwrap();
+                let op = Op::new(spec).unwrap();
                 program.push(op.into());
             }
             _ => continue,
@@ -235,8 +134,8 @@ fn parse_include(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> 
     let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
 
     let node = match rule {
+        Rule::import => Node::Import(args.0),
         Rule::include => Node::Include(args.0),
-        Rule::include_asm => Node::IncludeAsm(args.0),
         Rule::include_hex => Node::IncludeHex(args.0),
         _ => unreachable!(),
     };
@@ -446,17 +345,51 @@ mod tests {
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
-            Node::Include(Path::new("foo.asm").to_owned()),
+            Node::Include(PathBuf::from("foo.asm")),
             Op::Push1(Imm::from(2)),
         ];
         assert_eq!(parse_asm(&asm), Ok(expected))
     }
 
     #[test]
-    fn parse_include_extra_argument() {
+    fn parse_include_hex() {
         let asm = format!(
             r#"
-            %include("foo.asm", "bar.asm")
+            push1 1
+            %include_hex("foo.hex")
+            push1 2
+            "#,
+        );
+        let expected = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::IncludeHex(PathBuf::from("foo.hex")),
+            Op::Push1(Imm::from(2)),
+        ];
+        assert_eq!(parse_asm(&asm), Ok(expected))
+    }
+
+    #[test]
+    fn parse_import() {
+        let asm = format!(
+            r#"
+            push1 1
+            %import("foo.asm")
+            push1 2
+            "#,
+        );
+        let expected = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::Import(PathBuf::from("foo.asm")),
+            Op::Push1(Imm::from(2)),
+        ];
+        assert_eq!(parse_asm(&asm), Ok(expected))
+    }
+
+    #[test]
+    fn parse_import_extra_argument() {
+        let asm = format!(
+            r#"
+            %import("foo.asm", "bar.asm")
             "#,
         );
         assert!(matches!(
@@ -466,10 +399,10 @@ mod tests {
     }
 
     #[test]
-    fn parse_include_missing_argument() {
+    fn parse_import_missing_argument() {
         let asm = format!(
             r#"
-            %include()
+            %import()
             "#,
         );
         assert!(matches!(
@@ -482,27 +415,27 @@ mod tests {
     }
 
     #[test]
-    fn parse_include_argument_type() {
+    fn parse_import_argument_type() {
         let asm = format!(
             r#"
-            %include(0x44)
+            %import(0x44)
             "#,
         );
         assert!(matches!(parse_asm(&asm), Err(ParseError::ArgumentType)))
     }
 
     #[test]
-    fn parse_include_spaces() {
+    fn parse_import_spaces() {
         let asm = format!(
             r#"
             push1 1
-            %include( "hello.asm" )
+            %import( "hello.asm" )
             push1 2
             "#,
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
-            Node::Include(Path::new("hello.asm").to_owned()),
+            Node::Import(Path::new("hello.asm").to_owned()),
             Op::Push1(Imm::from(2)),
         ];
         assert_eq!(parse_asm(&asm), Ok(expected))

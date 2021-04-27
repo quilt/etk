@@ -84,7 +84,7 @@ where
         //       `buffer` to read from file, then decode into first third) but
         //       it doesn't seem worth the effort.
 
-        if 0 == buffer.len() {
+        if buffer.is_empty() {
             return Ok(0);
         }
 
