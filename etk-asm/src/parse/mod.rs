@@ -1,13 +1,18 @@
+mod args;
+
 use crate::ast::Node;
 use crate::ops::{Op, TryFromSliceError};
 
 use pest::Parser;
 use pest_derive::Parser;
+
+use self::args::Signature;
+
 use sha3::{Digest, Keccak256};
+
 use std::{
     fs, io,
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
 #[derive(Parser)]
@@ -15,11 +20,14 @@ use std::{
 struct AsmParser;
 
 #[derive(Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ParseError {
     ImmediateTooLarge,
     LexerError(String),
-    InvalidPath(String),
     IoError(io::ErrorKind),
+    MissingArgument { expected: usize, got: usize },
+    ExtraArgument { expected: usize },
+    ArgumentType,
 }
 
 impl From<TryFromSliceError> for ParseError {
@@ -46,8 +54,11 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
         AsmParser::parse(Rule::program, asm).map_err(|e| ParseError::LexerError(e.to_string()))?;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::include | Rule::include_asm | Rule::include_hex => {
-                let node = parse_include(pair)?;
+            Rule::inst_macro => {
+                let mut pairs = pair.into_inner();
+                let inst_macro = pairs.next().unwrap();
+                assert!(pairs.next().is_none());
+                let node = parse_include(inst_macro)?;
                 program.push(node);
             }
             Rule::jumpdest => {
@@ -221,14 +232,12 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
 
 fn parse_include(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
     let rule = pair.as_rule();
-    let mut pair = pair.into_inner();
-    let path = pair.next().unwrap().as_str();
-    let path = PathBuf::from_str(path).map_err(|_| ParseError::InvalidPath(path.to_string()))?;
+    let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
 
     let node = match rule {
-        Rule::include => Node::Include(path),
-        Rule::include_asm => Node::IncludeAsm(path),
-        Rule::include_hex => Node::IncludeHex(path),
+        Rule::include => Node::Include(args.0),
+        Rule::include_asm => Node::IncludeAsm(args.0),
+        Rule::include_hex => Node::IncludeHex(args.0),
         _ => unreachable!(),
     };
     Ok(node)
@@ -419,17 +428,81 @@ mod tests {
     }
 
     #[test]
+    fn parse_selector_with_spaces() {
+        let asm = r#"
+            push4 selector("name( )")
+        "#;
+        assert!(matches!(parse_asm(asm), Err(ParseError::LexerError(_))));
+    }
+
+    #[test]
     fn parse_include() {
         let asm = format!(
             r#"
             push1 1
-            include("foo.asm")
+            %include("foo.asm")
             push1 2
             "#,
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
             Node::Include(Path::new("foo.asm").to_owned()),
+            Op::Push1(Imm::from(2)),
+        ];
+        assert_eq!(parse_asm(&asm), Ok(expected))
+    }
+
+    #[test]
+    fn parse_include_extra_argument() {
+        let asm = format!(
+            r#"
+            %include("foo.asm", "bar.asm")
+            "#,
+        );
+        assert!(matches!(
+            parse_asm(&asm),
+            Err(ParseError::ExtraArgument { expected: 1 })
+        ))
+    }
+
+    #[test]
+    fn parse_include_missing_argument() {
+        let asm = format!(
+            r#"
+            %include()
+            "#,
+        );
+        assert!(matches!(
+            parse_asm(&asm),
+            Err(ParseError::MissingArgument {
+                got: 0,
+                expected: 1
+            })
+        ))
+    }
+
+    #[test]
+    fn parse_include_argument_type() {
+        let asm = format!(
+            r#"
+            %include(0x44)
+            "#,
+        );
+        assert!(matches!(parse_asm(&asm), Err(ParseError::ArgumentType)))
+    }
+
+    #[test]
+    fn parse_include_spaces() {
+        let asm = format!(
+            r#"
+            push1 1
+            %include( "hello.asm" )
+            push1 2
+            "#,
+        );
+        let expected = nodes![
+            Op::Push1(Imm::from(1)),
+            Node::Include(Path::new("hello.asm").to_owned()),
             Op::Push1(Imm::from(2)),
         ];
         assert_eq!(parse_asm(&asm), Ok(expected))

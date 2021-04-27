@@ -2,9 +2,9 @@ program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+)* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
-expr = _{ jumpdest | op | push | include | include_asm }
+expr = _{ jumpdest | op | push | inst_macro }
 
-op = @{ 
+op = @{
 	"origin" | "stop" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
 	"addmod" | "mulmod" | "exp" | "signextend" | "lt" | "gt" | "slt" |
 	"sgt" | "eq" | "iszero" | "and" | "or" | "xor" | "not" | "shl" | "shr" |
@@ -12,17 +12,20 @@ op = @{
 	"callvalue" | "calldataload" | "calldatasize" | "calldatacopy" |
 	"codesize" | "codecopy" | "gasprice" | "extcodesize" | "extcodecopy" |
 	"returndatasize" | "returndatacopy" | "extcodehash" | "blockhash" |
-	"coinbase" | "timestamp" | "number" | "difficulty" | "gaslimit" | 
+	"coinbase" | "timestamp" | "number" | "difficulty" | "gaslimit" |
 	"pop" | "mload" | "mstore" | "mstore8" | "sload" | "sstore" | "jumpi" |
 	"jump" | "pc" | "msize" | "gas" | swap | dup | log |
 	"create" | "call" | "callcode" | "return" | "delegatecall" | "create2" |
 	"staticcall" | "revert" | "selfdestruct"
 }
 
-push = { "push" ~  word_size ~ (hex | octal | binary | decimal | selector | label) }
+push = ${ "push" ~  word_size ~ WHITESPACE ~ numeric_argument }
 swap = { "swap" ~ half_word_size }
 dup  = { "dup" ~ half_word_size }
 log = { "log" ~ '0'..'4' }
+
+string = @{ "\"" ~ string_char* ~ "\"" }
+string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }
 
 word_size = @{ ('1'..'2' ~ '0'..'9') | ("3" ~ '0'..'2') | '1'..'9' }
 half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
@@ -31,17 +34,24 @@ binary = @{ "0b" ~ ASCII_BIN_DIGIT+ }
 octal = @{ "0o" ~ ASCII_OCT_DIGIT+ }
 decimal = @{ ASCII_DIGIT+ }
 hex = @{ "0x" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT+ }
+number = _{ binary | octal | hex | decimal }
 
 selector = { "selector(\"" ~ function_declaration ~ "\")" }
 function_declaration = { ASCII_ALPHANUMERIC+ ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
-	
+
 label = @{ "." ~ (ASCII_ALPHA_LOWER ~ "_"*)+ }
 jumpdest = { "jumpdest" ~ label }
 
-include = { "include(\"" ~ path ~ "\")" }
-include_asm = { "include_asm(\"" ~ path ~ "\")" }
-include_hex = { "include_hex(\"" ~ path ~ "\")" }
-path = @{ (ASCII_ALPHANUMERIC | "/" | ".")+ }
+arguments = _{ "(" ~ arguments_list? ~ ")" }
+arguments_list = _{ ( argument ~ "," )* ~ argument? }
+argument = _{ string | numeric_argument }
+numeric_argument = _{ number | label | selector }
+
+inst_macro = ${ "%" ~ ( include | include_asm | include_hex ) }
+
+include = !{ "include" ~ arguments }
+include_asm = !{ "include_asm" ~ arguments }
+include_hex = !{ "include_hex" ~ arguments }
 
 WHITESPACE = _{ " " | "\t" }
 COMMENT = _{ ";" ~ (!"\n" ~ ANY)* }
