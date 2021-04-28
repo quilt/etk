@@ -10,15 +10,6 @@ pub enum Node {
     IncludeHex(PathBuf),
 }
 
-impl Node {
-    pub(crate) fn assemble(&self, buf: &mut Vec<u8>) {
-        match self {
-            Self::Op(op) => op.assemble(buf),
-            _ => unimplemented!(),
-        }
-    }
-}
-
 impl From<Op> for Node {
     fn from(op: Op) -> Self {
         Node::Op(op)

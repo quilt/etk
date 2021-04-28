@@ -21,19 +21,9 @@ use self::parser::{AsmParser, Rule};
 
 use sha3::{Digest, Keccak256};
 
-use snafu::{OptionExt, ResultExt};
+use snafu::OptionExt;
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
-
-pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, ParseError> {
-    let asm = fs::read_to_string(path.as_ref()).with_context(|| error::Io {
-        path: path.as_ref().to_owned(),
-    })?;
-    parse_asm(&asm)
-}
+use std::path::PathBuf;
 
 pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let mut program: Vec<Node> = Vec::new();
@@ -437,7 +427,7 @@ mod tests {
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
-            Node::Import(Path::new("hello.asm").to_owned()),
+            Node::Import(PathBuf::from("hello.asm")),
             Op::Push1(Imm::from(2)),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)

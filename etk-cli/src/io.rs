@@ -59,6 +59,38 @@ impl InputSource {
 }
 
 #[derive(Debug)]
+pub struct HexWrite<W> {
+    file: W,
+}
+
+impl<W> HexWrite<W> {
+    pub fn new(file: W) -> Self {
+        Self { file }
+    }
+}
+
+impl<W> io::Write for HexWrite<W>
+where
+    W: io::Write,
+{
+    fn flush(&mut self) -> Result<(), io::Error> {
+        self.file.flush()
+    }
+
+    fn write(&mut self, buf: &[u8]) -> Result<usize, io::Error> {
+        let encoded = hex::encode(buf);
+        let wrote = self.file.write(encoded.as_bytes())?;
+
+        if wrote % 2 != 0 {
+            // Didn't write an entire byte, so we're screwed.
+            Err(io::Error::from(io::ErrorKind::Other))
+        } else {
+            Ok(wrote / 2)
+        }
+    }
+}
+
+#[derive(Debug)]
 struct HexRead<R> {
     first_read: bool,
     file: R,
