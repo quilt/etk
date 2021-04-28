@@ -194,34 +194,47 @@ impl Assembler {
         self.pending.push_back(node);
 
         while let Some(next) = self.pending.front() {
+            let op = match next {
+                Node::Op(op) => op,
+                Node::Raw(raw) => {
+                    self.ready.extend(raw);
+                    self.pending.pop_front();
+                    continue;
+                }
+                _ => unreachable!(),
+            };
+
             let mut address = None;
             let mut label = None;
 
-            if let Node::Op(op) = next {
-                if let Some(lbl) = op.immediate_label() {
-                    match self.labels.get(lbl) {
-                        Some(addr) => {
-                            address = Some(*addr);
-                            label = Some(lbl);
-                        }
-                        None => break,
+            if let Some(lbl) = op.immediate_label() {
+                // If the op has a label, try to resolve it.
+                match self.labels.get(lbl) {
+                    Some(addr) => {
+                        // The label resolved! Move the op to ready.
+                        address = Some(*addr);
+                        label = Some(lbl);
+                    }
+                    None => {
+                        // Otherwise, the address isn't known yet, so break!
+                        break;
                     }
                 }
-
-                let popped = match address {
-                    Some(s) => {
-                        // Don't modify `self.pending` if realize returns an error.
-                        let realized = op.realize(s).with_context(|| error::LabelTooLarge {
-                            label: label.unwrap(),
-                        })?;
-                        self.pending.pop_front();
-                        Node::Op(realized)
-                    }
-                    None => self.pending.pop_front().unwrap(),
-                };
-
-                popped.assemble(&mut self.ready);
             }
+
+            let popped = match address {
+                Some(s) => {
+                    // Don't modify `self.pending` if realize returns an error.
+                    let realized = op.realize(s).with_context(|| error::LabelTooLarge {
+                        label: label.unwrap(),
+                    })?;
+                    self.pending.pop_front();
+                    Node::Op(realized)
+                }
+                None => self.pending.pop_front().unwrap(),
+            };
+
+            popped.assemble(&mut self.ready);
         }
 
         Ok(())
@@ -431,6 +444,28 @@ mod tests {
         expected.push(0x5b);
         expected.push(0x60);
         expected.push(0xff);
+
+        assert_eq!(assembled, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_pending_then_raw() -> Result<(), Error> {
+        let f = new_file!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let nodes = nodes![
+            Op::Push2(Imm::from("lbl")),
+            Node::IncludeHex(f.path().to_owned()),
+            Op::JumpDest(Some("lbl".into())),
+        ];
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(nodes)?;
+        assert_eq!(sz, 29);
+
+        let assembled = asm.take();
+        asm.finish()?;
+
+        let expected = hex!("61001caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5b");
 
         assert_eq!(assembled, expected);
 
