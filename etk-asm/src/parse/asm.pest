@@ -13,7 +13,7 @@ op = @{
 	"codesize" | "codecopy" | "gasprice" | "extcodesize" | "extcodecopy" |
 	"returndatasize" | "returndatacopy" | "extcodehash" | "blockhash" |
 	"coinbase" | "timestamp" | "number" | "difficulty" | "gaslimit" |
-	"pop" | "mload" | "mstore" | "mstore8" | "sload" | "sstore" | "jumpi" |
+	"pop" | "mload" | "mstore8" | "mstore" | "sload" | "sstore" | "jumpi" |
 	"jump" | "pc" | "msize" | "gas" | swap | dup | log |
 	"create" | "call" | "callcode" | "return" | "delegatecall" | "create2" |
 	"staticcall" | "revert" | "selfdestruct"

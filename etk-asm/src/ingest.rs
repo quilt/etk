@@ -35,6 +35,10 @@ mod error {
             source: Box<dyn std::error::Error>,
             backtrace: Backtrace,
         },
+        #[snafu(display("too many levels of recursion/includes"))]
+        RecursionLimit {
+            backtrace: Backtrace,
+        },
     }
 }
 
@@ -44,7 +48,7 @@ use crate::parse::parse_asm;
 
 pub use self::error::Error;
 
-use snafu::ResultExt;
+use snafu::{ensure, ResultExt};
 
 use std::fs::{read_to_string, File};
 use std::io::{self, Read, Write};
@@ -176,6 +180,8 @@ impl<W> SourceStack<W> {
     }
 
     pub fn resolve(&mut self, path: PathBuf, scope: Scope) -> Result<PartialSource<W>, Error> {
+        ensure!(self.sources.len() <= 255, error::RecursionLimit);
+
         let path = if let Some(ref root) = self.root {
             let last = self.sources.last().unwrap();
             let dir = match last.path.parent() {
@@ -628,5 +634,25 @@ mod tests {
         let err = ingest.ingest(root, &text).unwrap_err();
 
         assert_matches!(err, Error::DirectoryTraversal { .. });
+    }
+
+    #[test]
+    fn ingest_recursive() {
+        let (mut f, root) = new_file("");
+        let path = f.path().display().to_string();
+        write!(f, r#"%import("{}")"#, path).unwrap();
+
+        let text = format!(
+            r#"
+                %import("{}")
+            "#,
+            path,
+        );
+
+        let mut output = Vec::new();
+        let mut ingest = Ingest::new(&mut output);
+        let err = ingest.ingest(root, &text).unwrap_err();
+
+        assert_matches!(err, Error::RecursionLimit { .. });
     }
 }
