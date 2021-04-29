@@ -1,0 +1,15 @@
+;;;
+; Hello World
+;;;
+
+push1 32
+push1 31
+mstore8
+
+push32 0x0b68656c6c6f20776f726c640000000000000000000000000000000000000000
+push1 63
+mstore
+
+push1 96
+push1 0
+return

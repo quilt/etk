@@ -1,0 +1,19 @@
+; -- Instructions --            -- Current stack layout --
+
+pc                              ; [0]
+pc                              ; [1, 0]
+push1 .start                    ; [.start, 1, 0]
+add                             ; [.start+1, 0]
+dup1                            ; [.start+1, .start+1, 0]
+codesize                        ; [codesize, .start+1, .start+1, 0]
+sub                             ; [length, .start+1, 0]
+swap2                           ; [0, .start+1, length]
+swap1                           ; [.start+1, 0, length]
+dup3                            ; [length, .start+1, 0, length]
+swap1                           ; [.start+1, length, 0, length]
+dup3                            ; [0, .start+1, length, 0, length]
+codecopy                        ; [0, length]
+return                          ; []
+
+jumpdest .start
+%include("main.etk")
