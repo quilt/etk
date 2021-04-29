@@ -1,7 +1,11 @@
-use etk_asm::{asm::Assembler, parse_asm};
-use std::fs::{self, File};
+use etk_cli::io::HexWrite;
+
+use etk_asm::ingest::{Error, Ingest};
+
+use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
+
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -13,30 +17,25 @@ struct Opt {
     out: Option<PathBuf>,
 }
 
-fn main() {
-    let opt = Opt::from_args();
-    let asm = fs::read_to_string(opt.input).unwrap();
-    let parsed = match parse_asm(&asm) {
-        Ok(p) => p,
-        Err(e) => panic!("Parse error: {:?}", e),
-    };
-    let mut assembler = Assembler::new();
-    assembler.push_all(parsed).unwrap();
-    let output = hex::encode(assembler.take());
-    assembler.finish().unwrap();
-
-    if let Some(out_file) = opt.out {
-        let display = out_file.display();
-        let mut file = match File::create(&out_file) {
-            Err(why) => panic!("couldn't create {}: {}", display, why),
-            Ok(file) => file,
-        };
-
-        match file.write_all(output.as_bytes()) {
-            Err(why) => panic!("couldn't write to {}: {}", display, why),
-            Ok(_) => println!("successfully wrote to {}", display),
-        }
-    } else {
-        print!("{}", output);
+fn create(path: PathBuf) -> File {
+    match File::create(&path) {
+        Err(why) => panic!("couldn't create `{}`: {}", path.display(), why),
+        Ok(file) => file,
     }
+}
+
+fn main() -> Result<(), Error> {
+    let opt = Opt::from_args();
+
+    let out: Box<dyn Write> = match opt.out {
+        Some(o) => Box::new(create(o)),
+        None => Box::new(std::io::stdout()),
+    };
+
+    let hex_out = HexWrite::new(out);
+
+    let mut ingest = Ingest::new(hex_out);
+    ingest.ingest_file(opt.input)?;
+
+    Ok(())
 }

@@ -2,13 +2,10 @@ use pest::error::Error;
 
 use snafu::{Backtrace, IntoError, Snafu};
 
-use std::io;
-use std::path::PathBuf;
-
 use super::Rule;
 
 #[derive(Snafu, Debug)]
-#[snafu(visibility = "pub(crate)")]
+#[snafu(visibility = "pub(super)")]
 #[non_exhaustive]
 pub enum ParseError {
     #[snafu(display("an immediate value was too large for the given opcode"))]
@@ -17,13 +14,6 @@ pub enum ParseError {
     #[snafu(display("lexing failed: {}", source))]
     Lexer {
         source: Box<dyn std::error::Error>,
-        backtrace: Backtrace,
-    },
-
-    #[snafu(display("i/o failed on `{}`: {}", path.to_string_lossy(), source))]
-    Io {
-        path: PathBuf,
-        source: io::Error,
         backtrace: Backtrace,
     },
 
