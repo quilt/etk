@@ -1,3 +1,5 @@
+use assert_matches::assert_matches;
+
 use etk_asm::ingest::{Error, Ingest};
 
 use hex_literal::hex;
@@ -30,6 +32,28 @@ fn simple_constructor() -> Result<(), Error> {
             "
         ),
     );
+
+    Ok(())
+}
+
+#[test]
+fn out_of_bounds() {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    let err = ingester
+        .ingest_file(source(&["out-of-bounds", "main", "main.etk"]))
+        .unwrap_err();
+
+    assert_matches!(err, Error::DirectoryTraversal { .. });
+}
+
+#[test]
+fn subdirectory() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["subdirectory", "main.etk"]))?;
+
+    assert_eq!(output, hex!("63c001c0de60ff"));
 
     Ok(())
 }
