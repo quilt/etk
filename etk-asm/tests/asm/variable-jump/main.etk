@@ -1,0 +1,4 @@
+%push(.hello)
+jump
+
+jumpdest .hello

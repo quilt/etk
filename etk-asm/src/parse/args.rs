@@ -24,6 +24,17 @@ impl FromPair for PathBuf {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Label(pub String);
+
+impl FromPair for Label {
+    fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError> {
+        ensure!(pair.as_rule() == Rule::label, error::ArgumentType);
+        let txt = pair.as_str();
+        Ok(Self(txt[1..].into()))
+    }
+}
+
 pub trait Signature {
     type Output;
     fn parse_arguments(pairs: Pairs<Rule>) -> Result<Self::Output, ParseError>;

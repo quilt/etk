@@ -18,8 +18,11 @@ mod error {
             source: TryFromIntError,
         },
 
+        #[snafu(display("value was too large for any push"))]
+        UnsizedPushTooLarge { backtrace: Backtrace },
+
         #[snafu(display("label `{}` was never defined", label))]
-        UndefinedLabel { label: String, backtrace: Backtrace },
+        UndeclaredLabel { label: String, backtrace: Backtrace },
 
         #[snafu(display("include or import failed to parse: {}", source))]
         #[snafu(context(false))]
@@ -30,39 +33,39 @@ mod error {
     }
 }
 
-use crate::ops::Op;
+use crate::ops::{AbstractOp, Imm, Specifier};
 
 pub use self::error::Error;
 
-use snafu::ResultExt;
+use snafu::{OptionExt, ResultExt};
 
-use std::collections::{hash_map, HashMap, VecDeque};
+use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
 
 #[derive(Debug, Clone)]
 pub enum RawOp {
-    Op(Op),
+    Op(AbstractOp),
     Raw(Vec<u8>),
 }
 
 impl RawOp {
-    pub fn is_empty(&self) -> bool {
+    fn size(&self) -> Option<u32> {
         match self {
-            Self::Op(_) => false,
-            Self::Raw(raw) => raw.is_empty(),
+            Self::Op(op) => op.size(),
+            Self::Raw(raw) => Some(raw.len().try_into().expect("raw too big")),
         }
     }
 
-    pub fn len(&self) -> u32 {
+    fn immediate_label(&self) -> Option<&str> {
         match self {
-            Self::Op(op) => 1 + op.specifier().extra_len(),
-            Self::Raw(raw) => raw.len().try_into().expect("raw too long"),
+            Self::Op(op) => op.immediate_label(),
+            Self::Raw(_) => None,
         }
     }
 }
 
-impl From<Op> for RawOp {
-    fn from(op: Op) -> Self {
+impl From<AbstractOp> for RawOp {
+    fn from(op: AbstractOp) -> Self {
         Self::Op(op)
     }
 }
@@ -73,12 +76,40 @@ impl From<Vec<u8>> for RawOp {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Assembler {
+    /// Assembled ops, ready to be taken.
     ready: Vec<u8>,
+
+    /// Ops which cannot be encoded yet.
     pending: VecDeque<RawOp>,
-    code_len: u32,
-    labels: HashMap<String, u32>,
+
+    /// Sum of the size of all the ops in `pending`, or `None` if `pending` contains
+    /// an unsized op.
+    pending_len: Option<u32>,
+
+    /// Total number of `u8` which have been appended to `ready`.
+    concrete_len: u32,
+
+    /// Labels, in `pending`, associated with an `AbstractOp::Label`.
+    declared_labels: HashMap<String, Option<u32>>,
+
+    /// Labels, in `pending`, which have been referred to (ex. with push) but
+    /// have not been declared with an `AbstractOp::Label`.
+    undeclared_labels: HashSet<String>,
+}
+
+impl Default for Assembler {
+    fn default() -> Self {
+        Self {
+            ready: Default::default(),
+            pending: Default::default(),
+            pending_len: Some(0),
+            concrete_len: 0,
+            declared_labels: Default::default(),
+            undeclared_labels: Default::default(),
+        }
+    }
 }
 
 impl Assembler {
@@ -91,7 +122,7 @@ impl Assembler {
             return match undef {
                 RawOp::Op(op) => {
                     let label = op.immediate_label().unwrap();
-                    error::UndefinedLabel { label }.fail()
+                    error::UndeclaredLabel { label }.fail()
                 }
                 _ => unreachable!(),
             };
@@ -128,23 +159,25 @@ impl Assembler {
     {
         let rop = rop.into();
 
-        if let RawOp::Op(ref op) = rop {
-            if let Some(label) = op.label() {
-                match self.labels.entry(label.to_owned()) {
-                    hash_map::Entry::Occupied(_) => {
-                        return error::DuplicateLabel { label }.fail();
-                    }
-                    hash_map::Entry::Vacant(v) => {
-                        v.insert(self.code_len);
-                    }
+        if let RawOp::Op(AbstractOp::Label(ref label)) = rop {
+            match self.declared_labels.entry(label.to_owned()) {
+                hash_map::Entry::Occupied(_) => {
+                    return error::DuplicateLabel { label }.fail();
+                }
+                hash_map::Entry::Vacant(v) => {
+                    v.insert(None);
+                    self.undeclared_labels.remove(label);
                 }
             }
         }
 
-        let len = rop.len();
-        self.push_unchecked(rop)?;
+        if let Some(label) = rop.immediate_label() {
+            if !self.declared_labels.contains_key(label) {
+                self.undeclared_labels.insert(label.to_owned());
+            }
+        }
 
-        self.code_len += len;
+        self.push_unchecked(rop)?;
         Ok(self.ready.len())
     }
 
@@ -158,39 +191,121 @@ impl Assembler {
 
     fn push_ready(&mut self, rop: RawOp) -> Result<(), Error> {
         match rop {
+            RawOp::Op(AbstractOp::Label(label)) => {
+                let old = self
+                    .declared_labels
+                    .insert(label, Some(self.concrete_len))
+                    .expect("label should exist");
+                assert_eq!(old, None, "label should have been undefined");
+                Ok(())
+            }
             RawOp::Op(mut op) => {
                 if let Some(label) = op.immediate_label() {
-                    match self.labels.get(label) {
-                        Some(addr) => {
+                    match self.declared_labels.get(label) {
+                        Some(Some(addr)) => {
                             op = op.realize(*addr).context(error::LabelTooLarge { label })?;
                         }
-                        None => {
+                        _ => {
+                            assert_eq!(self.pending_len, Some(0));
+                            self.pending_len = op.size();
                             self.pending.push_back(RawOp::Op(op));
                             return Ok(());
                         }
                     }
                 }
 
-                op.assemble(&mut self.ready);
+                let concrete = op.concretize().context(error::UnsizedPushTooLarge)?;
+                self.concrete_len += concrete.size();
+
+                concrete.assemble(&mut self.ready);
 
                 Ok(())
             }
             RawOp::Raw(raw) => {
+                let len: u32 = raw.len().try_into().expect("raw too long");
+                self.concrete_len += len;
                 self.ready.extend(raw);
                 Ok(())
             }
         }
     }
 
-    fn push_pending(&mut self, rop: RawOp) -> Result<(), Error> {
-        self.pending.push_back(rop);
+    fn pop_pending(&mut self) -> Result<(), Error> {
+        let popped = self.pending.pop_front().unwrap();
 
+        let size;
+
+        match popped {
+            RawOp::Raw(raw) => {
+                size = raw.len() as u32;
+                self.ready.extend(raw);
+            }
+            RawOp::Op(aop) => {
+                let cop = aop.concretize().context(error::UnsizedPushTooLarge {})?;
+                size = cop.size();
+                cop.assemble(&mut self.ready);
+            }
+        }
+
+        self.concrete_len += size;
+
+        if self.pending.is_empty() {
+            self.pending_len = Some(0);
+        } else if let Some(ref mut pending_len) = self.pending_len {
+            *pending_len -= size;
+        }
+
+        Ok(())
+    }
+
+    fn push_pending(&mut self, rop: RawOp) -> Result<(), Error> {
+        // Update total size of pending ops.
+        match (&mut self.pending_len, rop.size()) {
+            (Some(p), Some(me)) => {
+                *p += me;
+            }
+            (p, None) => {
+                *p = None;
+            }
+            (None, _) => (),
+        }
+
+        // Handle labels.
+        match (self.pending_len, rop) {
+            (Some(pending_len), RawOp::Op(AbstractOp::Label(lbl))) => {
+                // The label has a defined address.
+                let address = self.concrete_len + pending_len;
+                let item = self.declared_labels.get_mut(&*lbl).unwrap();
+                *item = Some(address);
+            }
+            (None, rop @ RawOp::Op(AbstractOp::Label(_))) => {
+                self.pending.push_back(rop);
+                if self.undeclared_labels.is_empty() {
+                    self.choose_sizes()?;
+                }
+            }
+            (_, rop) => {
+                // Not a label.
+                self.pending.push_back(rop);
+            }
+        }
+
+        // Repeatedly check if the front of the pending list is ready.
         while let Some(next) = self.pending.front() {
             let op = match next {
+                RawOp::Op(AbstractOp::Push(Imm::Label(_))) => {
+                    if self.undeclared_labels.is_empty() {
+                        unreachable!()
+                    } else {
+                        // Still waiting on more labels.
+                        break;
+                    }
+                }
+                RawOp::Op(AbstractOp::Push(Imm::Constant(_))) => unreachable!(),
+                RawOp::Op(AbstractOp::Label(_)) => unreachable!(),
                 RawOp::Op(op) => op,
-                RawOp::Raw(raw) => {
-                    self.ready.extend(raw);
-                    self.pending.pop_front();
+                RawOp::Raw(_) => {
+                    self.pop_pending()?;
                     continue;
                 }
             };
@@ -200,34 +315,102 @@ impl Assembler {
 
             if let Some(lbl) = op.immediate_label() {
                 // If the op has a label, try to resolve it.
-                match self.labels.get(lbl) {
-                    Some(addr) => {
+                match self.declared_labels.get(lbl) {
+                    Some(Some(addr)) => {
                         // The label resolved! Move the op to ready.
                         address = Some(*addr);
                         label = Some(lbl);
                     }
-                    None => {
+                    _ => {
                         // Otherwise, the address isn't known yet, so break!
                         break;
                     }
                 }
             }
 
-            match address {
-                Some(s) => {
-                    // Don't modify `self.pending` if realize returns an error.
-                    let realized = op.realize(s).with_context(|| error::LabelTooLarge {
-                        label: label.unwrap(),
-                    })?;
-                    self.pending.pop_front();
-                    realized.assemble(&mut self.ready);
+            if let Some(s) = address {
+                // Don't modify `self.pending` if realize returns an error.
+                let realized = op.realize(s).with_context(|| error::LabelTooLarge {
+                    label: label.unwrap(),
+                })?;
+                let front = self.pending.front_mut().unwrap();
+                *front = RawOp::Op(realized);
+            }
+
+            self.pop_pending()?;
+        }
+
+        Ok(())
+    }
+
+    fn choose_sizes(&mut self) -> Result<(), Error> {
+        let minimum = Specifier::push_for(self.concrete_len).unwrap();
+
+        let mut undefined_labels: HashMap<String, Specifier> = self
+            .declared_labels
+            .iter()
+            .filter(|(_, v)| v.is_none())
+            .map(|(k, _)| (k.clone(), minimum))
+            .collect();
+
+        let mut subasm;
+
+        loop {
+            // Create a sub-assembler to try assembling with the sizes in
+            // `undefined_labels`.
+            subasm = Self::default();
+            subasm.concrete_len = self.concrete_len;
+            subasm.declared_labels = self.declared_labels.clone();
+
+            let result: Result<Vec<_>, Error> = self
+                .pending
+                .iter()
+                .map(|op| {
+                    let new = match op {
+                        RawOp::Op(AbstractOp::Push(Imm::Label(lbl))) => {
+                            // Replace unsized push with our current guess.
+                            let spec = undefined_labels[lbl];
+                            let aop = AbstractOp::with_label(spec, lbl);
+                            RawOp::Op(aop)
+                        }
+                        RawOp::Op(aop @ AbstractOp::Push(Imm::Constant(_))) => {
+                            let cop = aop
+                                .clone()
+                                .concretize()
+                                .context(error::UnsizedPushTooLarge)?;
+                            RawOp::Op(cop.into())
+                        }
+
+                        op => op.clone(),
+                    };
+
+                    subasm.push_pending(new)
+                })
+                .collect();
+
+            match result {
+                Ok(_) => {
+                    assert!(subasm.pending.is_empty());
+                    break;
                 }
-                None => {
-                    op.assemble(&mut self.ready);
-                    self.pending.pop_front();
+                Err(Error::LabelTooLarge { label, .. }) => {
+                    // If a label is too large for an op, increase the width of
+                    // that label.
+                    let item = undefined_labels.get_mut(&label).unwrap();
+
+                    let new_size = item.upsize().context(error::UnsizedPushTooLarge)?;
+                    *item = new_size;
                 }
+                Err(e) => return Err(e),
             }
         }
+
+        // Insert the results of the sub-assembler into self.
+        let raw = subasm.take();
+        self.pending_len = Some(raw.len().try_into().unwrap());
+        self.pending.clear();
+        self.pending.push_back(RawOp::Raw(raw));
+        self.declared_labels = subasm.declared_labels;
 
         Ok(())
     }
@@ -244,11 +427,155 @@ mod tests {
     use super::*;
 
     #[test]
+    fn assemble_variable_push_const_while_pending() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![
+            AbstractOp::Op(Op::Push1("label1".into())),
+            AbstractOp::Push(Imm::Constant(vec![0x00, 0xaa, 0xbb])),
+            AbstractOp::Label("label1".into()),
+        ])?;
+        assert_eq!(5, sz);
+        assert_eq!(asm.take(), hex!("600561aabb"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_pushes_abab() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Push("label1".into()),
+            AbstractOp::Push("label2".into()),
+            AbstractOp::Label("label1".into()),
+            AbstractOp::Op(Op::GetPc),
+            AbstractOp::Label("label2".into()),
+            AbstractOp::Op(Op::GetPc),
+        ])?;
+        assert_eq!(7, sz);
+        assert_eq!(asm.take(), hex!("5b600560065858"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_pushes_abba() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Push("label1".into()),
+            AbstractOp::Push("label2".into()),
+            AbstractOp::Label("label2".into()),
+            AbstractOp::Op(Op::GetPc),
+            AbstractOp::Label("label1".into()),
+            AbstractOp::Op(Op::GetPc),
+        ])?;
+        assert_eq!(7, sz);
+        assert_eq!(asm.take(), hex!("5b600660055858"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_push1_multiple() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Push("auto".into()),
+            AbstractOp::Push("auto".into()),
+            AbstractOp::Label("auto".into()),
+        ])?;
+        assert_eq!(5, sz);
+        assert_eq!(asm.take(), hex!("5b60056005"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_push_const() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![AbstractOp::Push(Imm::Constant(
+            hex!("00aaaaaaaaaaaaaaaaaaaaaaaa").into(),
+        ))])?;
+        assert_eq!(13, sz);
+        assert_eq!(asm.take(), hex!("6baaaaaaaaaaaaaaaaaaaaaaaa"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_push1_known() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Label("auto".into()),
+            AbstractOp::Push("auto".into()),
+        ])?;
+        assert_eq!(3, sz);
+        assert_eq!(asm.take(), hex!("5b6001"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_push1() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![
+            AbstractOp::Push("auto".into()),
+            AbstractOp::Label("auto".into()),
+            AbstractOp::Op(Op::JumpDest),
+        ])?;
+        assert_eq!(3, sz);
+        assert_eq!(asm.take(), hex!("60025b"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_push1_reuse() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![
+            AbstractOp::Push("auto".into()),
+            AbstractOp::Label("auto".into()),
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Op(Op::Push1("auto".into())),
+        ])?;
+        assert_eq!(5, sz);
+        assert_eq!(asm.take(), hex!("60025b6002"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_push2() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        asm.push(AbstractOp::Push("auto".into()))?;
+        for _ in 0..255 {
+            asm.push(AbstractOp::Op(Op::GetPc))?;
+        }
+
+        asm.push_all(vec![
+            AbstractOp::Label("auto".into()),
+            AbstractOp::Op(Op::JumpDest),
+        ])?;
+
+        let mut expected = vec![0x61, 0x01, 0x02];
+        expected.extend_from_slice(&[0x58; 255]);
+        expected.push(0x5b);
+        assert_eq!(asm.take(), expected);
+
+        asm.finish()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_undeclared_label() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        asm.push_all(vec![AbstractOp::Op(Op::Push1("hi".into()))])?;
+        let err = asm.finish().unwrap_err();
+        assert_matches!(err, Error::UndeclaredLabel { label, .. } if label == "hi");
+        Ok(())
+    }
+
+    #[test]
     fn assemble_jumpdest_no_label() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let sz = asm.push_all(vec![Op::JumpDest(None)])?;
+        let sz = asm.push_all(vec![AbstractOp::Op(Op::JumpDest)])?;
         assert_eq!(1, sz);
-        assert!(asm.labels.is_empty());
+        assert!(asm.declared_labels.is_empty());
         assert_eq!(asm.take(), hex!("5b"));
         Ok(())
     }
@@ -256,19 +583,26 @@ mod tests {
     #[test]
     fn assemble_jumpdest_with_label() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let op = Op::JumpDest(Some("lbl".into()));
+        let ops = vec![
+            AbstractOp::Label("lbl".into()),
+            AbstractOp::Op(Op::JumpDest),
+        ];
 
-        let sz = asm.push_all(vec![op])?;
+        let sz = asm.push_all(ops)?;
         assert_eq!(1, sz);
-        assert_eq!(asm.labels.len(), 1);
-        assert_eq!(asm.labels.get("lbl"), Some(&0));
+        assert_eq!(asm.declared_labels.len(), 1);
+        assert_eq!(asm.declared_labels.get("lbl"), Some(&Some(0)));
         assert_eq!(asm.take(), hex!("5b"));
         Ok(())
     }
 
     #[test]
     fn assemble_jumpdest_jump_with_label() -> Result<(), Error> {
-        let ops = vec![Op::JumpDest(Some("lbl".into())), Op::Push1("lbl".into())];
+        let ops = vec![
+            AbstractOp::Label("lbl".into()),
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Op(Op::Push1("lbl".into())),
+        ];
 
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;
@@ -279,8 +613,28 @@ mod tests {
     }
 
     #[test]
+    fn assemble_labeled_pc() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::Op(Op::Push1("lbl".into())),
+            AbstractOp::Label("lbl".into()),
+            AbstractOp::Op(Op::GetPc),
+        ];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 3);
+        assert_eq!(asm.take(), hex!("600258"));
+
+        Ok(())
+    }
+
+    #[test]
     fn assemble_jump_jumpdest_with_label() -> Result<(), Error> {
-        let ops = vec![Op::Push1("lbl".into()), Op::JumpDest(Some("lbl".into()))];
+        let ops = vec![
+            AbstractOp::Op(Op::Push1("lbl".into())),
+            AbstractOp::Label("lbl".into()),
+            AbstractOp::Op(Op::JumpDest),
+        ];
 
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;
@@ -292,10 +646,12 @@ mod tests {
 
     #[test]
     fn assemble_label_too_large() {
-        let mut ops = vec![Op::GetPc; 255];
-        ops.push(Op::JumpDest(Some("b".into())));
-        ops.push(Op::JumpDest(Some("a".into())));
-        ops.push(Op::Push1(Imm::from("a")));
+        let mut ops: Vec<_> = vec![AbstractOp::Op(Op::GetPc); 255];
+        ops.push(AbstractOp::Label("b".into()));
+        ops.push(AbstractOp::Op(Op::JumpDest));
+        ops.push(AbstractOp::Label("a".into()));
+        ops.push(AbstractOp::Op(Op::JumpDest));
+        ops.push(AbstractOp::Op(Op::Push1(Imm::from("a"))));
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
         assert_matches!(err, Error::LabelTooLarge { label, .. } if label == "a");
@@ -303,10 +659,12 @@ mod tests {
 
     #[test]
     fn assemble_label_just_right() -> Result<(), Error> {
-        let mut ops = vec![Op::GetPc; 255];
-        ops.push(Op::JumpDest(Some("b".into())));
-        ops.push(Op::JumpDest(Some("a".into())));
-        ops.push(Op::Push1(Imm::from("b")));
+        let mut ops: Vec<_> = vec![AbstractOp::Op(Op::GetPc); 255];
+        ops.push(AbstractOp::Label("b".into()));
+        ops.push(AbstractOp::Op(Op::JumpDest));
+        ops.push(AbstractOp::Label("a".into()));
+        ops.push(AbstractOp::Op(Op::JumpDest));
+        ops.push(AbstractOp::Op(Op::Push1(Imm::from("b"))));
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 259);

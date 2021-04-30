@@ -47,11 +47,12 @@ arguments_list = _{ ( argument ~ "," )* ~ argument? }
 argument = _{ string | numeric_argument }
 numeric_argument = _{ number | label | selector }
 
-inst_macro = ${ "%" ~ ( import | include | include_hex ) }
+inst_macro = ${ "%" ~ ( import | include | include_hex | push_macro ) }
 
 import = !{ "import" ~ arguments }
 include = !{ "include" ~ arguments }
 include_hex = !{ "include_hex" ~ arguments }
+push_macro = !{ "push" ~ arguments }
 
 WHITESPACE = _{ " " | "\t" }
 COMMENT = _{ ";" ~ (!"\n" ~ ANY)* }

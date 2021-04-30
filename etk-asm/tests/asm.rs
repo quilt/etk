@@ -57,3 +57,14 @@ fn subdirectory() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn variable_jump() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["variable-jump", "main.etk"]))?;
+
+    assert_eq!(output, hex!("6003565b"));
+
+    Ok(())
+}

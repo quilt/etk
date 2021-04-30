@@ -10,7 +10,6 @@ cli = ["structopt", "etk-cli"]
 backtraces = [ "snafu/backtraces" ]
 
 [dependencies]
-num_enum = "0.5.1"
 hex = "0.4.2"
 pest = "2.1"
 pest_derive = "2.1"
