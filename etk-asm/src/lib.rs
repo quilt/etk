@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 pub mod asm;
 mod ast;
 pub mod disasm;

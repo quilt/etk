@@ -1,10 +1,10 @@
 use etk_asm::disasm::Offset;
-use etk_asm::ops::Op;
+use etk_asm::ops::ConcreteOp;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct BasicBlock {
     pub offset: usize,
-    pub ops: Vec<Op>,
+    pub ops: Vec<ConcreteOp>,
 }
 
 #[derive(Debug, Default)]
@@ -20,7 +20,7 @@ impl Separator {
 
     pub fn push_all<I>(&mut self, iter: I) -> bool
     where
-        I: IntoIterator<Item = Offset<Op>>,
+        I: IntoIterator<Item = Offset<ConcreteOp>>,
     {
         let mut available = false;
         for item in iter.into_iter() {
@@ -29,7 +29,7 @@ impl Separator {
         available
     }
 
-    pub fn push(&mut self, off: Offset<Op>) -> bool {
+    pub fn push(&mut self, off: Offset<ConcreteOp>) -> bool {
         if off.item.is_jump_target() {
             // If we receive a jumpdest, start a new block beginning with it.
             let completed = self.in_progress.replace(BasicBlock {
@@ -89,9 +89,9 @@ mod tests {
     #[test]
     fn three_pushes() {
         let ops = vec![
-            Offset::new(0x00, Op::Push1(5.into())),
-            Offset::new(0x02, Op::Push1(6.into())),
-            Offset::new(0x04, Op::Push1(7.into())),
+            Offset::new(0x00, ConcreteOp::Push1([5])),
+            Offset::new(0x02, ConcreteOp::Push1([6])),
+            Offset::new(0x04, ConcreteOp::Push1([7])),
         ];
 
         let blocks = [];
@@ -99,9 +99,9 @@ mod tests {
         let last = Some(BasicBlock {
             offset: 0x00,
             ops: vec![
-                Op::Push1(5.into()),
-                Op::Push1(6.into()),
-                Op::Push1(7.into()),
+                ConcreteOp::Push1([5]),
+                ConcreteOp::Push1([6]),
+                ConcreteOp::Push1([7]),
             ],
         });
 
@@ -115,25 +115,25 @@ mod tests {
     #[test]
     fn three_jumpdests() {
         let ops = vec![
-            Offset::new(0x00, Op::JumpDest(None)),
-            Offset::new(0x01, Op::JumpDest(None)),
-            Offset::new(0x02, Op::JumpDest(None)),
+            Offset::new(0x00, ConcreteOp::JumpDest),
+            Offset::new(0x01, ConcreteOp::JumpDest),
+            Offset::new(0x02, ConcreteOp::JumpDest),
         ];
 
         let blocks = [
             BasicBlock {
                 offset: 0x00,
-                ops: vec![Op::JumpDest(None)],
+                ops: vec![ConcreteOp::JumpDest],
             },
             BasicBlock {
                 offset: 0x01,
-                ops: vec![Op::JumpDest(None)],
+                ops: vec![ConcreteOp::JumpDest],
             },
         ];
 
         let last = Some(BasicBlock {
             offset: 0x02,
-            ops: vec![Op::JumpDest(None)],
+            ops: vec![ConcreteOp::JumpDest],
         });
 
         let mut sep = Separator::new();
@@ -146,20 +146,20 @@ mod tests {
     #[test]
     fn jumpdest_jump_jumpdest_jump() {
         let ops = vec![
-            Offset::new(0x00, Op::JumpDest(None)),
-            Offset::new(0x01, Op::Jump),
-            Offset::new(0x02, Op::JumpDest(None)),
-            Offset::new(0x03, Op::Jump),
+            Offset::new(0x00, ConcreteOp::JumpDest),
+            Offset::new(0x01, ConcreteOp::Jump),
+            Offset::new(0x02, ConcreteOp::JumpDest),
+            Offset::new(0x03, ConcreteOp::Jump),
         ];
 
         let blocks = [
             BasicBlock {
                 offset: 0x00,
-                ops: vec![Op::JumpDest(None), Op::Jump],
+                ops: vec![ConcreteOp::JumpDest, ConcreteOp::Jump],
             },
             BasicBlock {
                 offset: 0x02,
-                ops: vec![Op::JumpDest(None), Op::Jump],
+                ops: vec![ConcreteOp::JumpDest, ConcreteOp::Jump],
             },
         ];
 
@@ -175,26 +175,26 @@ mod tests {
     #[test]
     fn jump_jumpdest_jump_jumpdest() {
         let ops = vec![
-            Offset::new(0x00, Op::Jump),
-            Offset::new(0x01, Op::JumpDest(None)),
-            Offset::new(0x02, Op::Jump),
-            Offset::new(0x03, Op::JumpDest(None)),
+            Offset::new(0x00, ConcreteOp::Jump),
+            Offset::new(0x01, ConcreteOp::JumpDest),
+            Offset::new(0x02, ConcreteOp::Jump),
+            Offset::new(0x03, ConcreteOp::JumpDest),
         ];
 
         let blocks = [
             BasicBlock {
                 offset: 0x00,
-                ops: vec![Op::Jump],
+                ops: vec![ConcreteOp::Jump],
             },
             BasicBlock {
                 offset: 0x01,
-                ops: vec![Op::JumpDest(None), Op::Jump],
+                ops: vec![ConcreteOp::JumpDest, ConcreteOp::Jump],
             },
         ];
 
         let last = Some(BasicBlock {
             offset: 0x03,
-            ops: vec![Op::JumpDest(None)],
+            ops: vec![ConcreteOp::JumpDest],
         });
 
         let mut sep = Separator::new();
@@ -207,23 +207,23 @@ mod tests {
     #[test]
     fn three_jumps() {
         let ops = vec![
-            Offset::new(0x00, Op::Jump),
-            Offset::new(0x01, Op::Jump),
-            Offset::new(0x02, Op::Jump),
+            Offset::new(0x00, ConcreteOp::Jump),
+            Offset::new(0x01, ConcreteOp::Jump),
+            Offset::new(0x02, ConcreteOp::Jump),
         ];
 
         let blocks = [
             BasicBlock {
                 offset: 0x00,
-                ops: vec![Op::Jump],
+                ops: vec![ConcreteOp::Jump],
             },
             BasicBlock {
                 offset: 0x01,
-                ops: vec![Op::Jump],
+                ops: vec![ConcreteOp::Jump],
             },
             BasicBlock {
                 offset: 0x02,
-                ops: vec![Op::Jump],
+                ops: vec![ConcreteOp::Jump],
             },
         ];
 

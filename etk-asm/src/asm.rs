@@ -30,7 +30,7 @@ mod error {
     }
 }
 
-use crate::ops::Op;
+use crate::ops::{AbstractOp, LabelOp};
 
 pub use self::error::Error;
 
@@ -41,7 +41,7 @@ use std::convert::TryInto;
 
 #[derive(Debug, Clone)]
 pub enum RawOp {
-    Op(Op),
+    Op(LabelOp),
     Raw(Vec<u8>),
 }
 
@@ -61,8 +61,14 @@ impl RawOp {
     }
 }
 
-impl From<Op> for RawOp {
-    fn from(op: Op) -> Self {
+impl From<AbstractOp> for RawOp {
+    fn from(op: AbstractOp) -> Self {
+        Self::Op(op.into())
+    }
+}
+
+impl From<LabelOp> for RawOp {
+    fn from(op: LabelOp) -> Self {
         Self::Op(op)
     }
 }
@@ -171,7 +177,7 @@ impl Assembler {
                     }
                 }
 
-                op.assemble(&mut self.ready);
+                op.concretize().assemble(&mut self.ready);
 
                 Ok(())
             }
@@ -220,10 +226,10 @@ impl Assembler {
                         label: label.unwrap(),
                     })?;
                     self.pending.pop_front();
-                    realized.assemble(&mut self.ready);
+                    realized.concretize().assemble(&mut self.ready);
                 }
                 None => {
-                    op.assemble(&mut self.ready);
+                    op.clone().concretize().assemble(&mut self.ready);
                     self.pending.pop_front();
                 }
             }
@@ -246,7 +252,7 @@ mod tests {
     #[test]
     fn assemble_jumpdest_no_label() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let sz = asm.push_all(vec![Op::JumpDest(None)])?;
+        let sz = asm.push_all(vec![Op::JumpDest])?;
         assert_eq!(1, sz);
         assert!(asm.labels.is_empty());
         assert_eq!(asm.take(), hex!("5b"));
@@ -256,7 +262,7 @@ mod tests {
     #[test]
     fn assemble_jumpdest_with_label() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let op = Op::JumpDest(Some("lbl".into()));
+        let op = LabelOp::with_label(Op::JumpDest, "lbl");
 
         let sz = asm.push_all(vec![op])?;
         assert_eq!(1, sz);
@@ -268,7 +274,10 @@ mod tests {
 
     #[test]
     fn assemble_jumpdest_jump_with_label() -> Result<(), Error> {
-        let ops = vec![Op::JumpDest(Some("lbl".into())), Op::Push1("lbl".into())];
+        let ops = vec![
+            LabelOp::with_label(Op::JumpDest, "lbl"),
+            LabelOp::new(Op::Push1("lbl".into())),
+        ];
 
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;
@@ -279,8 +288,26 @@ mod tests {
     }
 
     #[test]
+    fn assemble_labeled_pc() -> Result<(), Error> {
+        let ops = vec![
+            LabelOp::new(Op::Push1("lbl".into())),
+            LabelOp::with_label(Op::GetPc, "lbl"),
+        ];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 3);
+        assert_eq!(asm.take(), hex!("600258"));
+
+        Ok(())
+    }
+
+    #[test]
     fn assemble_jump_jumpdest_with_label() -> Result<(), Error> {
-        let ops = vec![Op::Push1("lbl".into()), Op::JumpDest(Some("lbl".into()))];
+        let ops = vec![
+            LabelOp::new(Op::Push1("lbl".into())),
+            LabelOp::with_label(Op::JumpDest, "lbl"),
+        ];
 
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;
@@ -292,10 +319,13 @@ mod tests {
 
     #[test]
     fn assemble_label_too_large() {
-        let mut ops = vec![Op::GetPc; 255];
-        ops.push(Op::JumpDest(Some("b".into())));
-        ops.push(Op::JumpDest(Some("a".into())));
-        ops.push(Op::Push1(Imm::from("a")));
+        let mut ops: Vec<_> = std::iter::repeat(Op::GetPc)
+            .take(255)
+            .map(LabelOp::new)
+            .collect();
+        ops.push(LabelOp::with_label(Op::JumpDest, "b"));
+        ops.push(LabelOp::with_label(Op::JumpDest, "a"));
+        ops.push(Op::Push1(Imm::from("a")).into());
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
         assert_matches!(err, Error::LabelTooLarge { label, .. } if label == "a");
@@ -303,10 +333,13 @@ mod tests {
 
     #[test]
     fn assemble_label_just_right() -> Result<(), Error> {
-        let mut ops = vec![Op::GetPc; 255];
-        ops.push(Op::JumpDest(Some("b".into())));
-        ops.push(Op::JumpDest(Some("a".into())));
-        ops.push(Op::Push1(Imm::from("b")));
+        let mut ops: Vec<_> = std::iter::repeat(Op::GetPc)
+            .take(255)
+            .map(LabelOp::new)
+            .collect();
+        ops.push(LabelOp::with_label(Op::JumpDest, "b"));
+        ops.push(LabelOp::with_label(Op::JumpDest, "a"));
+        ops.push(Op::Push1(Imm::from("b")).into());
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 259);

@@ -11,7 +11,7 @@ mod parser {
 }
 
 use crate::ast::Node;
-use crate::ops::{Op, Specifier};
+use crate::ops::{AbstractOp, LabelOp, Op, Specifier};
 
 use pest::Parser;
 
@@ -41,7 +41,8 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
             Rule::jumpdest => {
                 let mut pair = pair.into_inner();
                 let label = pair.next().unwrap();
-                program.push(Op::JumpDest(Some(label.as_str()[1..].to_string())).into());
+                let op = LabelOp::with_label(Op::JumpDest, &label.as_str()[1..]);
+                program.push(op.into());
             }
             Rule::push => {
                 program.push(parse_push(pair)?.into());
@@ -64,32 +65,68 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
     let size: usize = size.as_str().parse().unwrap();
     let operand = pair.next().unwrap();
 
+    let spec = match size {
+        1 => Specifier::Push1(()),
+        2 => Specifier::Push2(()),
+        3 => Specifier::Push3(()),
+        4 => Specifier::Push4(()),
+        5 => Specifier::Push5(()),
+        6 => Specifier::Push6(()),
+        7 => Specifier::Push7(()),
+        8 => Specifier::Push8(()),
+        9 => Specifier::Push9(()),
+        10 => Specifier::Push10(()),
+        11 => Specifier::Push11(()),
+        12 => Specifier::Push12(()),
+        13 => Specifier::Push13(()),
+        14 => Specifier::Push14(()),
+        15 => Specifier::Push15(()),
+        16 => Specifier::Push16(()),
+        17 => Specifier::Push17(()),
+        18 => Specifier::Push18(()),
+        19 => Specifier::Push19(()),
+        20 => Specifier::Push20(()),
+        21 => Specifier::Push21(()),
+        22 => Specifier::Push22(()),
+        23 => Specifier::Push23(()),
+        24 => Specifier::Push24(()),
+        25 => Specifier::Push25(()),
+        26 => Specifier::Push26(()),
+        27 => Specifier::Push27(()),
+        28 => Specifier::Push28(()),
+        29 => Specifier::Push29(()),
+        30 => Specifier::Push30(()),
+        31 => Specifier::Push31(()),
+        32 => Specifier::Push32(()),
+        _ => unreachable!(),
+    };
+
     let op = match operand.as_rule() {
         Rule::binary => {
             let raw = operand.as_str();
             let imm = radix_str_to_vec(&raw[2..], 2, size)?;
-            Op::push_with_immediate(size, imm.as_ref())
+            AbstractOp::with_immediate(spec, imm.as_ref())
                 .ok()
                 .context(error::ImmediateTooLarge)?
         }
         Rule::octal => {
             let raw = operand.as_str();
             let imm = radix_str_to_vec(&raw[2..], 8, size)?;
-            Op::push_with_immediate(size, imm.as_ref())
+            AbstractOp::with_immediate(spec, imm.as_ref())
                 .ok()
                 .context(error::ImmediateTooLarge)?
         }
         Rule::decimal => {
             let raw = operand.as_str();
             let imm = radix_str_to_vec(raw, 10, size)?;
-            Op::push_with_immediate(size, imm.as_ref())
+            AbstractOp::with_immediate(spec, imm.as_ref())
                 .ok()
                 .context(error::ImmediateTooLarge)?
         }
         Rule::hex => {
             let raw = operand.as_str();
             let imm = hex::decode(&raw[2..]).unwrap();
-            Op::push_with_immediate(size, imm.as_ref())
+            AbstractOp::with_immediate(spec, imm.as_ref())
                 .ok()
                 .context(error::ImmediateTooLarge)?
         }
@@ -97,13 +134,13 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<Op, ParseError> {
             let raw = operand.into_inner().next().unwrap().as_str();
             let mut hasher = Keccak256::new();
             hasher.update(raw.as_bytes());
-            Op::push_with_immediate(size, &hasher.finalize()[0..4])
+            AbstractOp::with_immediate(spec, &hasher.finalize()[0..4])
                 .ok()
                 .context(error::ImmediateTooLarge)?
         }
         Rule::label => {
             let label = operand.as_str()[1..].to_string();
-            Op::push_with_label(size, label)
+            AbstractOp::with_label(spec, label)
         }
         r => unreachable!(format!("{:?}", r)),
     };
@@ -284,7 +321,7 @@ mod tests {
     #[test]
     fn parse_jumpdest_label() {
         let asm = "jumpdest .start";
-        let expected = nodes![Op::JumpDest(Some(String::from("start")))];
+        let expected = nodes![LabelOp::with_label(Op::JumpDest, "start")];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
