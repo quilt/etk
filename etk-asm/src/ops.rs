@@ -184,7 +184,7 @@ macro_rules! extra_len {
 
 macro_rules! to_u8 {
     ($test:ident, $c:expr; $first:ident, ) => {
-        0u8
+        $c
     };
     ($test:ident, $c:expr; $first:ident$(|$arg:ident)?, $($rest:ident$(|$args:ident)?, )+) => {
         if matches!($test, pat!($first$(, $arg)?)) {
@@ -278,7 +278,7 @@ macro_rules! ops {
             ];
 
             const fn to_u8(self) -> u8 {
-                to_u8!(self, 0; $($op$(|$arg)?, )*)
+                to_u8!(self, 0u8; $($op$(|$arg)?, )*)
             }
 
             fn extra_len(self) -> u32 {
@@ -1092,5 +1092,11 @@ mod tests {
     fn specifier_push_for_4294967295() {
         let spec = Specifier::push_for(4294967295);
         assert_eq!(spec, Some(Specifier::Push4(())));
+    }
+
+    #[test]
+    fn specifier_to_u8_selfdestruct() {
+        let spec = Specifier::SelfDestruct;
+        assert_eq!(0xffu8, spec.into());
     }
 }

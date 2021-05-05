@@ -40,9 +40,10 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
             }
             Rule::jumpdest => {
                 let mut pair = pair.into_inner();
-                let label = pair.next().unwrap();
-                let txt = &label.as_str()[1..];
-                program.push(AbstractOp::Label(txt.into()).into());
+                if let Some(label) = pair.next() {
+                    let txt = &label.as_str()[1..];
+                    program.push(AbstractOp::Label(txt.into()).into());
+                }
                 program.push(AbstractOp::Op(Op::JumpDest).into());
             }
             Rule::push => {
@@ -301,6 +302,13 @@ mod tests {
             Op::Log0,
             Op::Log4,
         ];
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+    }
+
+    #[test]
+    fn parse_jumpdest_no_label() {
+        let asm = "jumpdest";
+        let expected = nodes![Op::JumpDest];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 

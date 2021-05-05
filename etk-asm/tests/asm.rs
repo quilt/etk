@@ -68,3 +68,169 @@ fn variable_jump() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn every_op() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["every-op", "main.etk"]))?;
+
+    assert_eq!(
+        output,
+        hex!(
+            "
+        00
+        01
+        02
+        03
+        04
+        05
+        06
+        07
+        08
+        09
+        0a
+        0b
+
+        10
+        11
+        12
+        13
+        14
+        15
+        16
+        17
+        18
+        19
+        1a
+        1b
+        1c
+        1d
+
+        20
+
+        30
+        31
+        32
+        33
+        34
+        35
+        36
+        37
+        38
+        39
+        3a
+        3b
+        3c
+        3d
+        3e
+        3f
+        40
+        41
+        42
+        43
+        44
+        45
+        46
+
+        50
+        51
+        52
+        53
+        54
+        55
+        56
+        57
+        58
+        59
+        5a
+        5b
+
+        60 aa
+        61 aabb
+        62 aabbcc
+        63 aabbccdd
+        64 aabbccddee
+        65 aabbccddeeff
+        66 aabbccddeeff00
+        67 aabbccddeeff0011
+        68 aabbccddeeff001122
+        69 aabbccddeeff00112233
+        6a aabbccddeeff0011223344
+        6b aabbccddeeff001122334455
+        6c aabbccddeeff00112233445566
+        6d aabbccddeeff0011223344556677
+        6e aabbccddeeff001122334455667788
+        6f aabbccddeeff00112233445566778899
+        70 aabbccddeeff00112233445566778899aa
+        71 aabbccddeeff00112233445566778899aabb
+        72 aabbccddeeff00112233445566778899aabbcc
+        73 aabbccddeeff00112233445566778899aabbccdd
+        74 aabbccddeeff00112233445566778899aabbccddee
+        75 aabbccddeeff00112233445566778899aabbccddeeff
+        76 aabbccddeeff00112233445566778899aabbccddeeff00
+        77 aabbccddeeff00112233445566778899aabbccddeeff0011
+        78 aabbccddeeff00112233445566778899aabbccddeeff001122
+        79 aabbccddeeff00112233445566778899aabbccddeeff00112233
+        7a aabbccddeeff00112233445566778899aabbccddeeff0011223344
+        7b aabbccddeeff00112233445566778899aabbccddeeff001122334455
+        7c aabbccddeeff00112233445566778899aabbccddeeff00112233445566
+        7d aabbccddeeff00112233445566778899aabbccddeeff0011223344556677
+        7e aabbccddeeff00112233445566778899aabbccddeeff001122334455667788
+        7f aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899
+        80
+        81
+        82
+        83
+        84
+        85
+        86
+        87
+        88
+        89
+        8a
+        8b
+        8c
+        8d
+        8e
+        8f
+        90
+        91
+        92
+        93
+        94
+        95
+        96
+        97
+        98
+        99
+        9a
+        9b
+        9c
+        9d
+        9e
+        9f
+        a0
+        a1
+        a2
+        a3
+        a4
+
+        f0
+        f1
+        f2
+        f3
+        f4
+        f5
+
+        fa
+
+        fd
+        fe
+        ff
+    "
+        )
+    );
+
+    Ok(())
+}
