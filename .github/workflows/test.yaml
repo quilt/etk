@@ -50,3 +50,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
+
+  doc:
+    name: mdBook Setup
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: peaceiris/actions-mdbook@v1
+        with:
+          mdbook-version: '0.4.7'
+      - run: mdbook test doc

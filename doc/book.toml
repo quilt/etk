@@ -1,0 +1,6 @@
+[book]
+authors = ["Sam Wilson"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Ethereum Toolkit (ETK)"
