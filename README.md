@@ -47,10 +47,11 @@ instructions to take an immediate label.
 push1 1
 
 ; push a label
-push4 .label
+push4 label
 
 ; label a jumpdest
-jumpdest .label
+label:
+jumpdest
 ```
 
 ### Expanders
@@ -89,30 +90,32 @@ shr                             ; [selector]
 dup1                            ; [selector, selector]
 push4 selector("flag()")        ; [selector, selector, decimals]
 eq                              ; [selector, is_decimals]
-push4 .flag                     ; [selector, is_decimals, .decimals]
+push4 flag                      ; [selector, is_decimals, decimals]
 jumpi                           ; [selector]
 
 dup1                            ; [selector, selector]
 push4 selector("set_flag()")    ; [selector, selector, decimals]
 eq                              ; [selector, is_decimals]
-push4 .set                      ; [selector, is_decimals, .decimals]
+push4 set                       ; [selector, is_decimals, decimals]
 jumpi                           ; [selector]
 
 stop
 
 ; return the current value of the flag
-jumpdest .flag
+flag:
+jumpdest
 pop                             ; []
 push1 0                         ; [0]
 sload                           ; [flag]
 push1 0                         ; [flag, 0]
 mstore                          ; []
 push1 0                         ; [0]
-push1 32                        ; [0, 32] 
+push1 32                        ; [0, 32]
 return
 
 ; set the flat to "1"
-jumpdest .set
+set:
+jumpdest
 pop                             ; []
 push1 1                         ; [1]
 push1 0                         ; [1, 0]
