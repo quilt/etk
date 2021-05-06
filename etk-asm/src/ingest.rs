@@ -411,9 +411,10 @@ mod tests {
     fn ingest_include() -> Result<(), Error> {
         let (f, root) = new_file(
             r#"
-                jumpdest .a
+                a:
+                jumpdest
                 pc
-                push1 .a
+                push1 a
                 jump
             "#,
         );
@@ -439,8 +440,9 @@ mod tests {
     fn ingest_import_twice() {
         let (f, root) = new_file(
             r#"
-                jumpdest .a
-                push1 .a
+                a:
+                jumpdest
+                push1 a
             "#,
         );
 
@@ -495,8 +497,9 @@ mod tests {
             r#"
                 push1 1
                 %include_hex("{}")
-                jumpdest .a
-                push1 .a
+                a:
+                jumpdest
+                push1 a
                 push1 0xff
             "#,
             f.path().display(),
@@ -516,9 +519,10 @@ mod tests {
 
         let text = format!(
             r#"
-                push2 .lbl
+                push2 lbl
                 %include_hex("{}")
-                jumpdest .lbl
+                lbl:
+                jumpdest
             "#,
             f.path().display(),
         );
@@ -537,27 +541,30 @@ mod tests {
     fn ingest_import_in_import() -> Result<(), Error> {
         let (end, _) = new_file(
             r#"
-                jumpdest .end
-                push1 .start
-                push1 .middle
+                end:
+                jumpdest
+                push1 start
+                push1 middle
             "#,
         );
 
         let (middle, root) = new_file(format!(
             r#"
                 %import("{}")
-                jumpdest .middle
-                push2 .start
-                push2 .end
+                middle:
+                jumpdest
+                push2 start
+                push2 end
             "#,
             end.path().display(),
         ));
 
         let text = format!(
             r#"
-                push3 .end
-                push3 .middle
-                jumpdest .start
+                push3 end
+                push3 middle
+                start:
+                jumpdest
                 %import("{}")
             "#,
             middle.path().display(),
@@ -577,32 +584,37 @@ mod tests {
     fn ingest_import_in_include() -> Result<(), Error> {
         let (end, _) = new_file(
             r#"
-                jumpdest .included
-                push2 .backward
-                push2 .forward
+                included:
+                jumpdest
+                push2 backward
+                push2 forward
             "#,
         );
 
         let (middle, root) = new_file(format!(
             r#"
                 pc
-                push1 .backward
-                jumpdest .forward
+                push1 backward
+                forward:
+                jumpdest
                 %import("{}")
-                jumpdest .backward
-                push1 .forward
-                push1 .included
+                backward:
+                jumpdest
+                push1 forward
+                push1 included
             "#,
             end.path().display(),
         ));
 
         let text = format!(
             r#"
-                push3 .backward
-                jumpdest .forward
+                push3 backward
+                forward:
+                jumpdest
                 %include("{}")
-                jumpdest .backward
-                push3 .forward
+                backward:
+                jumpdest
+                push3 forward
             "#,
             middle.path().display(),
         );

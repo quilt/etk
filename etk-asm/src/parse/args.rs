@@ -31,7 +31,7 @@ impl FromPair for Label {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError> {
         ensure!(pair.as_rule() == Rule::label, error::ArgumentType);
         let txt = pair.as_str();
-        Ok(Self(txt[1..].into()))
+        Ok(Self(txt.into()))
     }
 }
 

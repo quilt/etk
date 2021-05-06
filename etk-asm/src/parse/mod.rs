@@ -38,13 +38,11 @@ pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
                 let node = parse_inst_macro(inst_macro)?;
                 program.push(node);
             }
-            Rule::jumpdest => {
+            Rule::label_defn => {
                 let mut pair = pair.into_inner();
-                if let Some(label) = pair.next() {
-                    let txt = &label.as_str()[1..];
-                    program.push(AbstractOp::Label(txt.into()).into());
-                }
-                program.push(AbstractOp::Op(Op::JumpDest).into());
+                let label = pair.next().unwrap();
+                let txt = label.as_str();
+                program.push(AbstractOp::Label(txt.into()).into());
             }
             Rule::push => {
                 program.push(parse_push(pair)?.into());
@@ -108,7 +106,7 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseErro
                 .context(error::ImmediateTooLarge)?
         }
         Rule::label => {
-            let label = operand.as_str()[1..].to_string();
+            let label = operand.as_str().to_string();
             AbstractOp::with_label(spec, label)
         }
         r => unreachable!(format!("{:?}", r)),
@@ -314,7 +312,7 @@ mod tests {
 
     #[test]
     fn parse_jumpdest_label() {
-        let asm = "jumpdest .start";
+        let asm = "start:\njumpdest";
         let expected = nodes![AbstractOp::Label("start".into()), Op::JumpDest,];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
@@ -322,7 +320,7 @@ mod tests {
     #[test]
     fn parse_push_label() {
         let asm = r#"
-            push2 .snake_case
+            push2 snake_case
             jumpi
         "#;
         let expected = nodes![Op::Push2(Imm::from("snake_case")), Op::JumpI];
@@ -469,7 +467,7 @@ mod tests {
         let asm = format!(
             r#"
             push1 1
-            %push( .hello )
+            %push( hello )
             push1 2
             "#,
         );
