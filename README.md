@@ -9,7 +9,7 @@ ETK is a collection of tools for writing, reading, and analyzing EVM bytecode.
 
 ETK has some more friendly documentation!
 
- - [For the `master` branch](https://quilt.github.io/etk/book/master/)
+ - [For the `master` branch](https://quilt.github.io/etk)
 
 ## Quickstart
 
