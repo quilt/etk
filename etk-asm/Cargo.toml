@@ -4,6 +4,12 @@ version = "0.1.0"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
+description = "Ethereum Toolkit assembler"
+homepage = "https://quilt.github.io/etk"
+repository = "https://github.com/quilt/etk"
+readme = "README.md"
+keywords = ["etk", "ethereum", "assembler"]
+categories = ["cryptography::cryptocurrencies", "command-line-utilities", "development-tools", "compilers"]
 
 [features]
 cli = ["structopt", "etk-cli"]
@@ -15,7 +21,7 @@ pest = "2.1"
 pest_derive = "2.1"
 sha3 = "0.9.1"
 structopt = { optional = true, version = "0.3.21" }
-etk-cli = { optional = true, path = "../etk-cli" }
+etk-cli = { optional = true, path = "../etk-cli", version = "0.1.0" }
 snafu = { version = "0.6.10", default-features = false, features = [ "std" ] }
 
 [dev-dependencies]

@@ -1,4 +1,4 @@
-gencfg-cli
-==========
+etk-cli
+=======
 
-Common utilities for gencfg command line tools, like parsing hex arguments or opening files.
+Ethereum Toolkit command-line utility crate for tasks like parsing hex arguments or opening files.
