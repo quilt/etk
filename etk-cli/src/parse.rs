@@ -1,14 +1,21 @@
+//! Utilities for parsing strings.
+
 use hex::FromHex;
 
 use std::fmt;
 use std::str::FromStr;
 
+/// Wrapper around `T` that uses hexadecimal for `Display` and `FromStr`.
 #[derive(Debug)]
 pub struct Hex<T>(pub T);
 
+/// Errors that can occur while parsing hexadecimal.
 #[derive(Debug)]
 pub enum FromHexError<E> {
+    /// The required `0x` prefix was not found.
     Prefix,
+
+    /// Parsing the hexadecimal string failed.
     Hex(E),
 }
 

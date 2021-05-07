@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use super::{error, ParseError, Rule};
 
-pub trait FromPair: Sized {
+pub(super) trait FromPair: Sized {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError>;
 }
 
@@ -25,7 +25,7 @@ impl FromPair for PathBuf {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Label(pub String);
+pub(super) struct Label(pub(super) String);
 
 impl FromPair for Label {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError> {
@@ -35,7 +35,7 @@ impl FromPair for Label {
     }
 }
 
-pub trait Signature {
+pub(super) trait Signature {
     type Output;
     fn parse_arguments(pairs: Pairs<Rule>) -> Result<Self::Output, ParseError>;
 }

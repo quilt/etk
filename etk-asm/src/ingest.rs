@@ -1,42 +1,90 @@
+//! High-level interface for assembling instructions.
+//!
+//! See the [`Ingest`] documentation for examples and more information.
 mod error {
     use crate::asm::Error as AssembleError;
-    use crate::parse::ParseError;
+    use crate::ParseError;
 
     use snafu::{Backtrace, Snafu};
 
     use std::path::PathBuf;
 
+    /// Errors that may arise during the assembly process.
     #[derive(Debug, Snafu)]
     #[non_exhaustive]
     #[snafu(visibility = "pub(super)")]
     pub enum Error {
+        /// An included/imported file was outside of the root directory.
+        #[snafu(display(
+            "`{}` is outside of the root directory `{}`",
+            file.display(),
+            root.display()
+        ))]
+        #[non_exhaustive]
         DirectoryTraversal {
+            /// The root directory.
             root: PathBuf,
+
+            /// The file that was to be included or imported.
             file: PathBuf,
         },
+
+        /// An i/o error.
+        #[snafu(display(
+            "an i/o error occurred on path `{}`",
+            path.as_ref().map(|p| p.display().to_string()).unwrap_or_default(),
+        ))]
+        #[non_exhaustive]
         Io {
+            /// The underlying source of this error.
             source: std::io::Error,
+
+            /// The location of the error.
             backtrace: Backtrace,
+
+            /// The optional path where the error occurred.
             path: Option<PathBuf>,
         },
+
+        /// An error that occurred while parsing a file.
         #[snafu(context(false))]
+        #[non_exhaustive]
+        #[snafu(display("{}", source))]
         Parse {
+            /// The underlying source of this error.
             #[snafu(backtrace)]
             source: ParseError,
         },
+
+        /// An error that occurred while assembling a file.
         #[snafu(context(false))]
+        #[non_exhaustive]
+        #[snafu(display("{}", source))]
         Assemble {
+            /// The underlying source of this error.
             #[snafu(backtrace)]
             source: AssembleError,
         },
+
+        /// An included fail failed to parse as hexadecimal.
         #[snafu(display("included file `{}` is invalid hex: {}", path.to_string_lossy(), source))]
+        #[non_exhaustive]
         InvalidHex {
+            /// Path to the offending file.
             path: PathBuf,
+
+            /// The underlying source of this error.
             source: Box<dyn std::error::Error>,
+
+            /// The location of the error.
             backtrace: Backtrace,
         },
+
+        /// A recursion limit was reached while including or importing a file.
         #[snafu(display("too many levels of recursion/includes"))]
+        #[non_exhaustive]
         RecursionLimit {
+            /// The location of the error.
             backtrace: Backtrace,
         },
     }
@@ -69,11 +117,11 @@ enum Scope {
 }
 
 impl Scope {
-    pub fn same() -> Self {
+    fn same() -> Self {
         Self::Same
     }
 
-    pub fn independent() -> Self {
+    fn independent() -> Self {
         Self::Independent(Assembler::new())
     }
 }
@@ -92,7 +140,7 @@ struct Root {
 }
 
 impl Root {
-    pub fn new(mut file: PathBuf) -> Result<Self, Error> {
+    fn new(mut file: PathBuf) -> Result<Self, Error> {
         // Pop the filename.
         if !file.pop() {
             file = std::env::current_dir().context(error::Io { path: None })?;
@@ -117,7 +165,7 @@ impl Root {
         })
     }
 
-    pub fn check<P>(&self, path: P) -> Result<(), Error>
+    fn check<P>(&self, path: P) -> Result<(), Error>
     where
         P: AsRef<Path>,
     {
@@ -148,11 +196,11 @@ struct PartialSource<'a, W> {
 }
 
 impl<'a, W> PartialSource<'a, W> {
-    pub fn path(&self) -> &Path {
+    fn path(&self) -> &Path {
         &self.path
     }
 
-    pub fn push(self, nodes: Vec<Node>) -> &'a mut Source {
+    fn push(self, nodes: Vec<Node>) -> &'a mut Source {
         self.stack.sources.push(Source {
             path: self.path,
             nodes: nodes.into_iter(),
@@ -171,7 +219,7 @@ struct SourceStack<W> {
 }
 
 impl<W> SourceStack<W> {
-    pub fn new(output: W) -> Self {
+    fn new(output: W) -> Self {
         Self {
             output,
             sources: Default::default(),
@@ -179,7 +227,7 @@ impl<W> SourceStack<W> {
         }
     }
 
-    pub fn resolve(&mut self, path: PathBuf, scope: Scope) -> Result<PartialSource<W>, Error> {
+    fn resolve(&mut self, path: PathBuf, scope: Scope) -> Result<PartialSource<W>, Error> {
         ensure!(self.sources.len() <= 255, error::RecursionLimit);
 
         let path = if let Some(ref root) = self.root {
@@ -204,7 +252,7 @@ impl<W> SourceStack<W> {
         })
     }
 
-    pub fn peek(&mut self) -> Option<&mut Source> {
+    fn peek(&mut self) -> Option<&mut Source> {
         self.sources.last_mut()
     }
 }
@@ -213,7 +261,7 @@ impl<W> SourceStack<W>
 where
     W: Write,
 {
-    pub fn pop(&mut self) -> Result<(), Error> {
+    fn pop(&mut self) -> Result<(), Error> {
         let popped = self.sources.pop().unwrap();
 
         if self.sources.is_empty() {
@@ -242,7 +290,7 @@ where
         }
     }
 
-    pub fn write(&mut self, mut op: RawOp) -> Result<(), Error> {
+    fn write(&mut self, mut op: RawOp) -> Result<(), Error> {
         if self.sources.is_empty() {
             panic!("no sources!");
         }
@@ -271,12 +319,38 @@ where
     }
 }
 
+/// A high-level interface for assembling files into EVM bytecode.
+///
+/// ## Example
+///
+/// ```rust
+/// use etk_asm::ingest::Ingest;
+/// #
+/// # use etk_asm::ingest::Error;
+/// #
+/// # use hex_literal::hex;
+///
+/// let text = r#"
+///     push2 lbl
+///     lbl:
+///     jumpdest
+/// "#;
+///
+/// let mut output = Vec::new();
+/// let mut ingest = Ingest::new(&mut output);
+/// ingest.ingest("./example.etk", &text)?;
+///
+/// # let expected = hex!("6100035b");
+/// # assert_eq!(output, expected);
+/// # Result::<(), Error>::Ok(())
+/// ```
 #[derive(Debug)]
 pub struct Ingest<W> {
     sources: SourceStack<W>,
 }
 
 impl<W> Ingest<W> {
+    /// Make a new `Ingest` that writes assembled bytes to `output`.
     pub fn new(output: W) -> Self {
         Self {
             sources: SourceStack::new(output),
@@ -288,6 +362,7 @@ impl<W> Ingest<W>
 where
     W: Write,
 {
+    /// Assemble instructions from the file located at `path`.
     pub fn ingest_file<P>(&mut self, path: P) -> Result<(), Error>
     where
         P: Into<PathBuf>,
@@ -302,6 +377,8 @@ where
         self.ingest(path, &text)
     }
 
+    /// Assemble instructions from `src` as if they were read from a file located
+    /// at `path`.
     pub fn ingest<P>(&mut self, path: P, src: &str) -> Result<(), Error>
     where
         P: Into<PathBuf>,

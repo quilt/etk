@@ -5,12 +5,14 @@ use snafu::{Backtrace, Snafu};
 use std::convert::TryFrom;
 use std::fmt::{self, Debug};
 
+/// An error that arises when converting an integer into an immediate.
 #[derive(Snafu, Debug)]
 #[snafu(visibility = "pub(super)")]
 pub struct TryFromIntError {
     backtrace: Backtrace,
 }
 
+/// An error that arises when converting a slice into an immediate.
 #[derive(Snafu, Debug)]
 pub struct TryFromSliceError {
     backtrace: Backtrace,
@@ -22,9 +24,13 @@ impl From<std::convert::Infallible> for TryFromIntError {
     }
 }
 
+/// An immediate value for push instructions.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Imm<T> {
+    /// A label argument.
     Label(String),
+
+    /// A constant argument.
     Constant(T),
 }
 
@@ -215,6 +221,7 @@ where
     }
 }
 
+#[doc(hidden)]
 pub trait Immediate<const N: usize>: Debug + Clone + Eq + PartialEq {
     fn extra_len() -> usize {
         N

@@ -1,32 +1,67 @@
+//! Single-scope assembler implementation and related types.
+//!
+//! See [`Assembler`] for more details on the low-level assembly process, or the
+//! [`mod@crate::ingest`] module for a higher-level interface.
+
 mod error {
     use crate::ops::TryFromIntError;
-    use crate::parse::ParseError;
+    use crate::ParseError;
 
     use snafu::{Backtrace, Snafu};
 
+    /// Errors that can occur while assembling instructions.
     #[derive(Snafu, Debug)]
     #[non_exhaustive]
     #[snafu(visibility = "pub(super)")]
     pub enum Error {
+        /// A label was declared multiple times.
         #[snafu(display("label `{}` declared multiple times", label))]
-        DuplicateLabel { label: String, backtrace: Backtrace },
-
-        #[snafu(display("value of label `{}` was too large for the given opcode", label))]
-        LabelTooLarge {
+        #[non_exhaustive]
+        DuplicateLabel {
+            /// The name of the conflicting label.
             label: String,
+
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
+
+        /// A push instruction was too small for the address of a label.
+        #[snafu(display("value of label `{}` was too large for the given opcode", label))]
+        #[non_exhaustive]
+        LabelTooLarge {
+            /// The name of the oversized label.
+            label: String,
+
+            /// The next source of this error.
             #[snafu(backtrace)]
             source: TryFromIntError,
         },
 
+        /// The value provided to an unsized push (`%push`) was too large.
         #[snafu(display("value was too large for any push"))]
-        UnsizedPushTooLarge { backtrace: Backtrace },
+        #[non_exhaustive]
+        UnsizedPushTooLarge {
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
 
+        /// A label was used without being defined.
         #[snafu(display("label `{}` was never defined", label))]
-        UndeclaredLabel { label: String, backtrace: Backtrace },
+        #[non_exhaustive]
+        UndeclaredLabel {
+            /// The label that was used without being defined.
+            label: String,
 
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
+
+        /// An import or include failed to parse.
         #[snafu(display("include or import failed to parse: {}", source))]
         #[snafu(context(false))]
+        #[non_exhaustive]
         ParseInclude {
+            /// The next source of this error.
             #[snafu(backtrace)]
             source: ParseError,
         },
@@ -42,9 +77,15 @@ use snafu::{OptionExt, ResultExt};
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
 
+/// An item to be assembled, which can be either an [`AbstractOp`] or a raw byte
+/// sequence.
 #[derive(Debug, Clone)]
 pub enum RawOp {
+    /// An instruction to be assembled.
     Op(AbstractOp),
+
+    /// Raw bytes, for example from `%include_hex`, to be included verbatim in
+    /// the output.
     Raw(Vec<u8>),
 }
 
@@ -76,25 +117,45 @@ impl From<Vec<u8>> for RawOp {
     }
 }
 
+/// Assembles a series of [`RawOp`] into raw bytes, tracking and resolving labels
+/// and handling dynamic pushes.
+///
+/// ## Example
+///
+/// ```rust
+/// use etk_asm::asm::Assembler;
+/// use etk_asm::ops::{Op, AbstractOp};
+/// # use etk_asm::asm::Error;
+/// #
+/// # use hex_literal::hex;
+/// let mut asm = Assembler::new();
+/// asm.push_all(vec![
+///     AbstractOp::Op(Op::GetPc),
+/// ])?;
+/// let output = asm.take();
+/// asm.finish()?;
+/// # assert_eq!(output, hex!("58"));
+/// # Result::<(), Error>::Ok(())
+/// ```
 #[derive(Debug)]
 pub struct Assembler {
     /// Assembled ops, ready to be taken.
     ready: Vec<u8>,
 
-    /// Ops which cannot be encoded yet.
+    /// Ops that cannot be encoded yet.
     pending: VecDeque<RawOp>,
 
     /// Sum of the size of all the ops in `pending`, or `None` if `pending` contains
     /// an unsized op.
     pending_len: Option<u32>,
 
-    /// Total number of `u8` which have been appended to `ready`.
+    /// Total number of `u8` that have been appended to `ready`.
     concrete_len: u32,
 
     /// Labels, in `pending`, associated with an `AbstractOp::Label`.
     declared_labels: HashMap<String, Option<u32>>,
 
-    /// Labels, in `pending`, which have been referred to (ex. with push) but
+    /// Labels, in `pending`, that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
     undeclared_labels: HashSet<String>,
 }
@@ -113,10 +174,13 @@ impl Default for Assembler {
 }
 
 impl Assembler {
+    /// Create a new `Assembler`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Indicate that the input sequence is complete. Returns any errors that
+    /// may remain.
     pub fn finish(self) -> Result<(), Error> {
         if let Some(undef) = self.pending.front() {
             return match undef {
@@ -135,10 +199,14 @@ impl Assembler {
         Ok(())
     }
 
+    /// Collect any assembled instructions that are ready to be output.
     pub fn take(&mut self) -> Vec<u8> {
         std::mem::take(&mut self.ready)
     }
 
+    /// Feed instructions into the `Assembler`.
+    ///
+    /// Returns the number of bytes that can be collected with [`Assembler::take`].
     pub fn push_all<I, O>(&mut self, ops: I) -> Result<usize, Error>
     where
         I: IntoIterator<Item = O>,
@@ -153,6 +221,9 @@ impl Assembler {
         Ok(self.ready.len())
     }
 
+    /// Feed a single instruction into the `Assembler`.
+    ///
+    /// Returns the number of bytes that can be collected with [`Assembler::take`]
     pub fn push<O>(&mut self, rop: O) -> Result<usize, Error>
     where
         O: Into<RawOp>,

@@ -1,3 +1,5 @@
+//! Tools for reading/writing various formats.
+
 use crate::parse::Hex;
 
 use std::fs::File;
@@ -6,6 +8,8 @@ use std::path::PathBuf;
 
 use structopt::StructOpt;
 
+/// Command-line options describing an input source, either from a file or
+/// directly from the command line.
 #[derive(Debug, StructOpt)]
 pub struct InputSource {
     #[structopt(
@@ -34,6 +38,7 @@ pub struct InputSource {
 }
 
 impl InputSource {
+    /// Convert `self` into something that implements `std::io::Read`.
     pub fn open(self) -> Result<impl io::Read, io::Error> {
         let boxed: Box<dyn io::Read> = match (self.bin_file, self.hex_file, self.code) {
             (Some(bin), None, None) => Box::new(Self::bin(bin)?),
@@ -58,12 +63,16 @@ impl InputSource {
     }
 }
 
+/// An implementation of `std::io::Write` that converts from binary to
+/// hexadecimal.
 #[derive(Debug)]
 pub struct HexWrite<W> {
     file: W,
 }
 
 impl<W> HexWrite<W> {
+    /// Create a new `HexWrite` wrapping another implementation of
+    /// `std::io::Write`.
     pub fn new(file: W) -> Self {
         Self { file }
     }

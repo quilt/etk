@@ -2,7 +2,7 @@ use crate::ops::{AbstractOp, Op};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Node {
+pub(crate) enum Node {
     Op(AbstractOp),
     Raw(Vec<u8>),
     Import(PathBuf),
