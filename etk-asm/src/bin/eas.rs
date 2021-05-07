@@ -27,15 +27,17 @@ fn create(path: PathBuf) -> File {
 fn main() -> Result<(), Error> {
     let opt = Opt::from_args();
 
-    let out: Box<dyn Write> = match opt.out {
+    let mut out: Box<dyn Write> = match opt.out {
         Some(o) => Box::new(create(o)),
         None => Box::new(std::io::stdout()),
     };
 
-    let hex_out = HexWrite::new(out);
+    let hex_out = HexWrite::new(&mut out);
 
     let mut ingest = Ingest::new(hex_out);
     ingest.ingest_file(opt.input)?;
+
+    out.write_all(b"\n").unwrap();
 
     Ok(())
 }

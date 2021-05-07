@@ -37,9 +37,10 @@ hex = @{ "0x" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT+ }
 number = _{ binary | octal | hex | decimal }
 
 selector = { "selector(\"" ~ function_declaration ~ "\")" }
-function_declaration = { ASCII_ALPHANUMERIC+ ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
+function_declaration = { function_name ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
+function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
 
-label = @{ (ASCII_ALPHA_LOWER ~ "_"*)+ }
+label = @{ (ASCII_ALPHA ~ "_"*) ~ (ASCII_ALPHANUMERIC | "_")* }
 label_defn = { label ~ ":" }
 
 arguments = _{ "(" ~ arguments_list? ~ ")" }

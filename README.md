@@ -5,38 +5,43 @@
 
 ETK is a collection of tools for writing, reading, and analyzing EVM bytecode.
 
-## Tools
+## The ETK Book
+
+ETK has some more friendly documentation!
+
+ - [For the `master` branch](https://quilt.github.io/etk/book/master/)
+
+## Quickstart
+
+### Tools
 
 * Assembler (eas)
 * Disassembler (disease)
 
-## Installation
+### Installation
 
 ```console
-git clone git@github.com:quilt/etk.git
-cd etk
-cargo install --path etk-asm --features cli
-cargo install --path etk-analyze --features cli
+cargo install --git https://github.com/quilt/etk.git etk-asm etk-analyze
 ```
 
-## Usage
+### Usage
 
 ```console
-$ eas contract.asm out.bin
-$ disease --bin-file out.bin
-    0:  CALLDATASIZE
-    1:  PUSH1 0x01
-    2:  DUP1
+$ eas contract.etk out.hex
+$ disease --hex-file out.hex
+    0:  calldatasize
+    1:  push1 0x01
+    2:  dup1
     ...
 ```
 
-## Assembly Format
+### Assembly Format
 
-### Opcodes
+#### Opcodes
 
 Opcodes can be used via their [mnemonic](etk-asm/src/parse/asm.pest).
 
-### Immediates
+#### Immediates
 
 Some opcodes accept immediate operands. The only EVM instruction that suports
 immediates natively is the `PUSH` family. ETK also allows for `jumpdest`
@@ -54,7 +59,7 @@ label:
 jumpdest
 ```
 
-### Expanders
+#### Expanders
 
 Expanders are built-in macros for common use cases. For example, selector
 generation is a requirement for being ABI compatible.
@@ -65,11 +70,11 @@ generation is a requirement for being ABI compatible.
 push4 selector("transfer(address, uint256)")
 ```
 
-### Macros
+#### Macros
 
 Coming soon!
 
-## Example Program
+### Example Program
 
 ```asm
 ; -- Instructions --            -- Current stack layout --

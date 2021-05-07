@@ -30,6 +30,11 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --all --all-features
+      - uses: peaceiris/actions-mdbook@v1
+        with:
+          mdbook-version: '0.4.7'
+      - run: mdbook test doc -L ./target/debug/deps
 
   fmt:
     name: Rustfmt
