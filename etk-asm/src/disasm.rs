@@ -1,4 +1,4 @@
-use crate::ops::{Op, Specifier};
+use crate::ops::{ConcreteOp, Op, Specifier};
 
 use std::collections::VecDeque;
 use std::fmt;
@@ -36,13 +36,13 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = Offset<Op>;
+    type Item = Offset<ConcreteOp>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let buffer = &mut self.disassembler.buffer;
         let front = *buffer.front()?;
         let specifier = Specifier::from(front);
-        let len = specifier.extra_len() as usize + 1;
+        let len = specifier.size() as usize;
         if buffer.len() < len {
             return None;
         }

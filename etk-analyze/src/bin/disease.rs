@@ -58,7 +58,7 @@ fn run() -> Result<(), Error> {
     for block in basic_blocks {
         let mut offset = block.offset;
         for op in block.ops {
-            let len = op.specifier().extra_len() + 1;
+            let len = op.size();
             let off = Offset::new(offset, op);
             offset += len as usize;
 

@@ -5,18 +5,18 @@ stmt = _{ expr }
 expr = _{ jumpdest | op | push | inst_macro }
 
 op = @{
-	"origin" | "stop" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
-	"addmod" | "mulmod" | "exp" | "signextend" | "lt" | "gt" | "slt" |
+	"origin" | "stop" | "mulmod" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
+	"addmod" | "exp" | "signextend" | "lt" | "gt" | "slt" |
 	"sgt" | "eq" | "iszero" | "and" | "or" | "xor" | "not" | "shl" | "shr" |
-	"sar" | "sha3" | "address" | "add" | "balance" | "caller" |
+	"sar" | "keccak256" | "address" | "add" | "balance" | "caller" |
 	"callvalue" | "calldataload" | "calldatasize" | "calldatacopy" |
 	"codesize" | "codecopy" | "gasprice" | "extcodesize" | "extcodecopy" |
 	"returndatasize" | "returndatacopy" | "extcodehash" | "blockhash" |
 	"coinbase" | "timestamp" | "number" | "difficulty" | "gaslimit" |
 	"pop" | "mload" | "mstore8" | "mstore" | "sload" | "sstore" | "jumpi" |
 	"jump" | "pc" | "msize" | "gas" | swap | dup | log |
-	"create" | "call" | "callcode" | "return" | "delegatecall" | "create2" |
-	"staticcall" | "revert" | "selfdestruct"
+	"create2" | "callcode" | "call" | "return" | "delegatecall" | "create" |
+	"staticcall" | "revert" | "selfdestruct" | "byte" | "chainid" | "invalid"
 }
 
 push = ${ "push" ~  word_size ~ WHITESPACE ~ numeric_argument }
@@ -40,18 +40,19 @@ selector = { "selector(\"" ~ function_declaration ~ "\")" }
 function_declaration = { ASCII_ALPHANUMERIC+ ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
 
 label = @{ "." ~ (ASCII_ALPHA_LOWER ~ "_"*)+ }
-jumpdest = { "jumpdest" ~ label }
+jumpdest = { "jumpdest" ~ label? }
 
 arguments = _{ "(" ~ arguments_list? ~ ")" }
 arguments_list = _{ ( argument ~ "," )* ~ argument? }
 argument = _{ string | numeric_argument }
 numeric_argument = _{ number | label | selector }
 
-inst_macro = ${ "%" ~ ( import | include | include_hex ) }
+inst_macro = ${ "%" ~ ( import | include | include_hex | push_macro ) }
 
 import = !{ "import" ~ arguments }
 include = !{ "include" ~ arguments }
 include_hex = !{ "include_hex" ~ arguments }
+push_macro = !{ "push" ~ arguments }
 
 WHITESPACE = _{ " " | "\t" }
 COMMENT = _{ ";" ~ (!"\n" ~ ANY)* }
