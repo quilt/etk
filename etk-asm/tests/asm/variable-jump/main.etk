@@ -1,4 +1,5 @@
-%push(.hello)
+%push(hello)
 jump
 
-jumpdest .hello
+hello:
+jumpdest

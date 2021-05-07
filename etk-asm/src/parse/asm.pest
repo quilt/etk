@@ -2,7 +2,7 @@ program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+)* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
-expr = _{ jumpdest | op | push | inst_macro }
+expr = _{ op | push | inst_macro | label_defn }
 
 op = @{
 	"origin" | "stop" | "mulmod" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
@@ -13,8 +13,8 @@ op = @{
 	"codesize" | "codecopy" | "gasprice" | "extcodesize" | "extcodecopy" |
 	"returndatasize" | "returndatacopy" | "extcodehash" | "blockhash" |
 	"coinbase" | "timestamp" | "number" | "difficulty" | "gaslimit" |
-	"pop" | "mload" | "mstore8" | "mstore" | "sload" | "sstore" | "jumpi" |
-	"jump" | "pc" | "msize" | "gas" | swap | dup | log |
+	"pop" | "mload" | "mstore8" | "mstore" | "sload" | "sstore" | "jumpdest" |
+	"jumpi" | "jump" | "pc" | "msize" | "gas" | swap | dup | log |
 	"create2" | "callcode" | "call" | "return" | "delegatecall" | "create" |
 	"staticcall" | "revert" | "selfdestruct" | "byte" | "chainid" | "invalid"
 }
@@ -39,13 +39,13 @@ number = _{ binary | octal | hex | decimal }
 selector = { "selector(\"" ~ function_declaration ~ "\")" }
 function_declaration = { ASCII_ALPHANUMERIC+ ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
 
-label = @{ "." ~ (ASCII_ALPHA_LOWER ~ "_"*)+ }
-jumpdest = { "jumpdest" ~ label? }
+label = @{ (ASCII_ALPHA_LOWER ~ "_"*)+ }
+label_defn = { label ~ ":" }
 
 arguments = _{ "(" ~ arguments_list? ~ ")" }
 arguments_list = _{ ( argument ~ "," )* ~ argument? }
 argument = _{ string | numeric_argument }
-numeric_argument = _{ number | label | selector }
+numeric_argument = _{ number | selector | label }
 
 inst_macro = ${ "%" ~ ( import | include | include_hex | push_macro ) }
 
