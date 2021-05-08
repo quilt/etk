@@ -21,7 +21,11 @@ ETK has some more friendly documentation!
 ### Installation
 
 ```console
-cargo install --git https://github.com/quilt/etk.git etk-asm etk-analyze
+cargo install \
+    --git https://github.com/quilt/etk.git \
+    --features cli \
+    etk-asm \
+    etk-analyze
 ```
 
 ### Usage

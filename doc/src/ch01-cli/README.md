@@ -22,6 +22,7 @@ Open a terminal and use cargo to install ETK:
 ```bash
 cargo install \
     --git 'https://github.com/quilt/etk' \
+    --features cli \
     etk-asm \
     etk-analyze
 ```
