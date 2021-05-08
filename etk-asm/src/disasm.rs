@@ -1,21 +1,52 @@
+//! A simple disassembler from the Ethereum Toolkit.
+//!
+//! Converts a stream of bytes into an iterator of [`ConcreteOp'].
+//!
+//! See the documentation for [`Disassembler`] for more information.
+mod error {
+    use snafu::{Backtrace, Snafu};
+
+    use super::Offset;
+
+    /// Errors that may arise during disassembly.
+    #[derive(Debug, Snafu)]
+    #[snafu(visibility = "pub(super)")]
+    #[non_exhaustive]
+    pub enum Error {
+        /// The input is incomplete.
+        #[non_exhaustive]
+        Truncated {
+            /// The remaining bytes, with their location.
+            remaining: Offset<Vec<u8>>,
+
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
+    }
+}
+
 use crate::ops::{ConcreteOp, Op, Specifier};
+
+pub use self::error::Error;
+
+use snafu::ensure;
 
 use std::collections::VecDeque;
 use std::fmt;
 use std::io::{self, Write};
 
-#[derive(Debug, Clone)]
-pub enum Error {
-    Truncated { remaining: Offset<Vec<u8>> },
-}
-
+/// An item with its location within a stream of bytes.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Offset<T> {
+    /// The location within a stream of bytes of a particular item.
     pub offset: usize,
+
+    /// The item, which was located at `offset.
     pub item: T,
 }
 
 impl<T> Offset<T> {
+    /// Create a new instance of `Offset`.
     pub const fn new(offset: usize, item: T) -> Self {
         Self { offset, item }
     }
@@ -30,6 +61,8 @@ where
     }
 }
 
+/// A [`std::iter::Iterator`] over the [`ConcreteOp`] produced by disassembling
+/// a stream of bytes.
 #[derive(Debug)]
 pub struct Iter<'a> {
     disassembler: &'a mut Disassembler,
@@ -58,6 +91,29 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+/// A simple disassembler that converts a stream of bytes into an iterator over
+/// the disassembled [`ConcreteOp`].
+///
+/// ## Example
+/// ```rust
+/// use etk_asm::ops::Op;
+/// use etk_asm::disasm::Disassembler;
+/// # use etk_asm::disasm::Offset;
+///
+/// use std::io::Write;
+///
+/// let input = [0x58, 0x00];
+///
+/// let mut dasm = Disassembler::new();
+/// dasm.write_all(&input).unwrap();
+///
+/// let actual: Vec<_> = dasm.ops().collect();
+///
+/// dasm.finish().unwrap();
+///
+/// # let expected = [Offset::new(0, Op::GetPc), Offset::new(1, Op::Stop)];
+/// # assert_eq!(expected, actual.as_slice());
+/// ```
 #[derive(Debug, Default)]
 pub struct Disassembler {
     buffer: VecDeque<u8>,
@@ -77,22 +133,26 @@ impl Write for Disassembler {
 }
 
 impl Disassembler {
+    /// Create a new instance of `Disassembler`.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Get an iterator over the disassembled [`ConcreteOp`].
     pub fn ops(&mut self) -> Iter {
         Iter { disassembler: self }
     }
 
+    /// Indicate that there are no further bytes to write. Returns any errors
+    /// collected.
     pub fn finish(self) -> Result<(), Error> {
-        if self.buffer.is_empty() {
-            Ok(())
-        } else {
-            Err(Error::Truncated {
+        ensure!(
+            self.buffer.is_empty(),
+            error::Truncated {
                 remaining: Offset::new(self.offset, self.buffer.into()),
-            })
-        }
+            }
+        );
+        Ok(())
     }
 }
 

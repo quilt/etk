@@ -7,7 +7,7 @@ mod parser {
 
     #[derive(Parser)]
     #[grammar = "parse/asm.pest"]
-    pub struct AsmParser;
+    pub(super) struct AsmParser;
 }
 
 use crate::ast::Node;
@@ -16,7 +16,7 @@ use crate::ops::{AbstractOp, Imm, Op, Specifier};
 use pest::Parser;
 
 use self::args::{Label, Signature};
-pub use self::error::ParseError;
+use self::error::ParseError;
 use self::parser::{AsmParser, Rule};
 
 use sha3::{Digest, Keccak256};
@@ -25,7 +25,7 @@ use snafu::OptionExt;
 
 use std::path::PathBuf;
 
-pub fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
+pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let mut program: Vec<Node> = Vec::new();
 
     let pairs = AsmParser::parse(Rule::program, asm)?;

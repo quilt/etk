@@ -1,3 +1,5 @@
+//! Blocks are sections of EVM instructions.
+
 pub mod annotated;
 pub mod basic;
 

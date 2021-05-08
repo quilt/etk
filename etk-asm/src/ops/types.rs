@@ -2,6 +2,7 @@ use super::imm::{Imm, Immediate};
 
 use std::fmt::Debug;
 
+#[doc(hidden)]
 pub trait ImmediateTypes: Debug + Clone + Eq + PartialEq {
     // TODO: Technically `Self` doesn't need to implement anything, but it makes
     //       derive(...) work on `Op`.
@@ -40,6 +41,8 @@ pub trait ImmediateTypes: Debug + Clone + Eq + PartialEq {
     type P32: Immediate<32>;
 }
 
+/// Marker type for concrete instructions, meaning instructions which cannot use
+/// labels.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Concrete {}
 
@@ -78,6 +81,8 @@ impl ImmediateTypes for Concrete {
     type P32 = [u8; 32];
 }
 
+/// Marker type for instructions which may accept labels or constants as
+/// arguments.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Abstract {}
 
@@ -116,6 +121,7 @@ impl ImmediateTypes for Abstract {
     type P32 = Imm<[u8; 32]>;
 }
 
+/// Marker type for instructions without arguments.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Spec {}
 

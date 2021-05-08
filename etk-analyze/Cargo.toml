@@ -1,18 +1,24 @@
 [package]
 name = "etk-analyze"
 version = "0.1.0"
-authors = ["Sam Wilson <sam.wilson@mesh.xyz>"]
+authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
+description = "Ethereum Toolkit analysis tools"
+homepage = "https://quilt.github.io/etk"
+repository = "https://github.com/quilt/etk"
+readme = "README.md"
+keywords = ["etk", "ethereum", "disassembler"]
+categories = ["cryptography::cryptocurrencies", "command-line-utilities", "development-tools"]
 
 [features]
 cli = ["structopt", "etk-cli"]
 
 [dependencies]
 hex = "0.4.2"
-etk-asm = { path = "../etk-asm" }
+etk-asm = { path = "../etk-asm", version = "0.1.0" }
 structopt = { optional = true, version = "0.3.21" }
-etk-cli = { optional = true, path = "../etk-cli" }
+etk-cli = { optional = true, path = "../etk-cli", version = "0.1.0" }
 
 [[bin]]
 name = "disease"

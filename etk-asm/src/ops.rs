@@ -1,6 +1,23 @@
+//! Definitions of all instructions supported by the assembler.
+
+mod error {
+    use snafu::{Backtrace, Snafu};
+
+    /// The error that can arise while parsing a specifier from a string.
+    #[derive(Debug, Snafu)]
+    #[snafu(display("unknown specifier: {}", text))]
+    #[snafu(visibility = "pub(super)")]
+    #[non_exhaustive]
+    pub struct UnknownSpecifierError {
+        text: String,
+        backtrace: Backtrace,
+    }
+}
+
 mod imm;
 mod types;
 
+pub use self::error::UnknownSpecifierError;
 pub use self::imm::{Imm, Immediate, TryFromIntError, TryFromSliceError};
 use self::types::ImmediateTypes;
 pub use self::types::{Abstract, Concrete, Spec};
@@ -12,9 +29,17 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 
+/// Extra information about an instruction.
 pub trait Metadata {
+    /// Returns true if the current instruction changes the program counter (other
+    /// than incrementing it.)
     fn is_jump(&self) -> bool;
+
+    /// Returns true if the current instruction is a valid destination for jumps.
     fn is_jump_target(&self) -> bool;
+
+    /// Returns true if the current instruction causes the EVM to stop executing
+    /// the contract.
     fn is_exit(&self) -> bool;
 }
 
@@ -212,7 +237,14 @@ macro_rules! ops {
         $(, jump = $jmp:expr)?
         $(, jump_target = $jt:expr)?),
     )*) => {
+        /// Enumeration of all supported instructions.
+        ///
+        /// There are three flavors of `Op`:
+        ///  - Abstract: `Op` that may use labels or constants.
+        ///  - Concrete: `Op` that may only use constants.
+        ///  - Specifier: `Op` without any arguments.
         #[derive(Debug, Clone, PartialEq, Eq)]
+        #[allow(missing_docs)]
         pub enum Op<I = Abstract> where I: ImmediateTypes {
             $($op$((I::$arg))?, )*
         }
@@ -245,6 +277,10 @@ macro_rules! ops {
         }
 
         impl<I> Op<I> where I: ImmediateTypes {
+            /// Create a new `Op` given a particular specifier.
+            ///
+            /// Returns `None` if the instruction specified requires an
+            /// immediate argument.
             pub fn new(spec: Op<Spec>) -> Option<Self> {
                 match spec {
                     $(
@@ -253,6 +289,7 @@ macro_rules! ops {
                 }
             }
 
+            /// Return the specifier that corresponds to this `Op`.
             pub fn specifier(&self) -> Op<Spec> {
                 match self {
                     $(
@@ -261,11 +298,16 @@ macro_rules! ops {
                 }
             }
 
+            /// Return the total encoded size for this instruction, including the
+            /// immediate if one is required.
             pub fn size(&self) -> u32 {
                 self.specifier().extra_len() + 1u32
             }
         }
 
+        /// A `Specifier` is an `Op` that takes no arguments. It's useful to refer
+        /// to instructions without needing knowledge of any particular immediate
+        /// argument value.
         pub type Specifier = Op<Spec>;
 
         impl Copy for Op<Spec> {}
@@ -304,7 +346,7 @@ macro_rules! ops {
         }
 
         impl FromStr for Op<Spec> {
-            type Err = UnknownSpecifier;
+            type Err = UnknownSpecifierError;
 
             fn from_str(text: &str) -> Result<Self, Self::Err> {
                 let result = match text {
@@ -312,7 +354,9 @@ macro_rules! ops {
                         $mnemonic => Op::$op$((default!($arg)))?,
                     )*
 
-                    _ => return Err(UnknownSpecifier(())),
+                    _ => return error::UnknownSpecifierContext {
+                        text: text.clone()
+                    }.fail(),
                 };
 
                 Ok(result)
@@ -331,6 +375,12 @@ macro_rules! ops {
         }
 
         impl Op<Abstract> {
+            /// Construct an `Op` with the given label.
+            ///
+            /// ## Panics
+            ///
+            /// This function panics if the instruction described by the specifier
+            /// does not accept immediate arguments.
             pub fn with_label<S: Into<String>>(spec: Op<Spec>, lbl: S) -> Self {
                 let lbl = lbl.into();
 
@@ -341,6 +391,15 @@ macro_rules! ops {
                 }
             }
 
+            /// Construct an `Op` with the given immediate argument.
+            ///
+            /// An error is returned if `imm` doesn't match the immediate size for
+            /// the instruction described by `spec`.
+            ///
+            /// ## Panics
+            ///
+            /// This function panics if the instruction described by the specifier
+            /// does not accept immediate arguments.
             pub fn with_immediate(spec: Op<Spec>, imm: &[u8]) -> Result<Self, TryFromSliceError> {
                 let op = match spec {
                     $(
@@ -408,9 +467,20 @@ macro_rules! ops {
             }
         }
 
+        /// Shorthand for `Op<Concrete>`, that is an `Op` that can only accept
+        /// constants as arguments.
         pub type ConcreteOp = Op<Concrete>;
 
         impl Op<Concrete> {
+            /// Construct an `Op` with the given immediate argument.
+            ///
+            /// An error is returned if `imm` doesn't match the immediate size for
+            /// the instruction described by `spec`.
+            ///
+            /// ## Panics
+            ///
+            /// This function panics if the instruction described by the specifier
+            /// does not accept immediate arguments.
             pub fn with_immediate(spec: Op<Spec>, imm: &[u8]) -> Result<Self, std::array::TryFromSliceError> {
                 let op = match spec {
                     $(
@@ -421,6 +491,12 @@ macro_rules! ops {
                 Ok(op)
             }
 
+            /// Construct an `Op` by disassembling the given slice `bytes`.
+            ///
+            /// ## Panics
+            ///
+            /// This function panics if the length of `bytes` doesn't match the
+            /// instruction size, as determined by the first element of `bytes`.
             pub fn from_slice(bytes: &[u8]) -> Self {
                 let specifier: Op<Spec> = Op::from(bytes[0]);
                 let sz = specifier.extra_len() as usize + 1;
@@ -480,6 +556,13 @@ impl Op<Spec> {
         Self::push(bytes)
     }
 
+    /// Converts a push instruction to the next larger push size.
+    ///
+    /// For example, a `push2` will become a `push3`.
+    ///
+    /// ## Panics
+    ///
+    /// This function panics if `self` is not a push instruction.
     pub fn upsize(self) -> Option<Self> {
         let extra = match self.extra_len() {
             0 => panic!("only push ops can be upsized"),
@@ -489,6 +572,7 @@ impl Op<Spec> {
         Self::push(extra + 1)
     }
 
+    /// Create a new push instruction with the given immediate size.
     pub fn push(bytes: u32) -> Option<Self> {
         let spec = match bytes {
             0 | 1 => Self::Push1(()),
@@ -814,22 +898,50 @@ ops! {
     SelfDestruct(mnemonic="selfdestruct", exit=true),
 }
 
+/// Like an [`Op`], except it also supports virtual instructions.
+///
+/// In addition to the real EVM instructions, `AbstractOp` also supports defining
+/// labels, and pushing variable length immediate arguments.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum AbstractOp {
+    /// A real `Op`, as opposed to a label or variable sized push.
     Op(Op<Abstract>),
+
+    /// A label, which is a virtual instruction.
     Label(String),
+
+    /// A variable sized push, which is a virtual instruction.
     Push(Imm<Vec<u8>>),
 }
 
 impl AbstractOp {
+    /// Construct a new `AbstractOp` given a specifier.
+    ///
+    /// Returns `None` if the instruction described by `spec` requires an immediate
+    /// argument.
     pub fn new(spec: Op<Spec>) -> Option<Self> {
         Some(Self::Op(Op::new(spec)?))
     }
 
+    /// Construct an `AbstractOp` with the given label.
+    ///
+    /// ## Panics
+    ///
+    /// This function panics if the instruction described by the specifier
+    /// does not accept immediate arguments.
     pub fn with_label<S: Into<String>>(spec: Op<Spec>, lbl: S) -> Self {
         Self::Op(Op::with_label(spec, lbl))
     }
 
+    /// Construct an `AbstractOp` with the given immediate argument.
+    ///
+    /// An error is returned if `imm` doesn't match the immediate size for
+    /// the instruction described by `spec`.
+    ///
+    /// ## Panics
+    ///
+    /// This function panics if the instruction described by the specifier
+    /// does not accept immediate arguments.
     pub fn with_immediate(spec: Op<Spec>, imm: &[u8]) -> Result<Self, TryFromSliceError> {
         Ok(Self::Op(Op::<Abstract>::with_immediate(spec, imm)?))
     }
@@ -880,6 +992,11 @@ impl AbstractOp {
         Some(res)
     }
 
+    /// Return the total encoded size for this instruction, including the
+    /// immediate if one is required.
+    ///
+    /// If the size of this instruction is undefined (for example a variable sized
+    /// push), this function returns `None`.
     pub fn size(&self) -> Option<u32> {
         match self {
             Self::Op(op) => Some(op.size()),
@@ -888,6 +1005,7 @@ impl AbstractOp {
         }
     }
 
+    /// Return the specifier that corresponds to this `AbstractOp`.
     pub fn specifier(&self) -> Option<Op<Spec>> {
         match self {
             Self::Op(op) => Some(op.specifier()),
@@ -937,10 +1055,6 @@ impl Metadata for AbstractOp {
         }
     }
 }
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-#[non_exhaustive]
-pub struct UnknownSpecifier(());
 
 #[cfg(test)]
 mod tests {
