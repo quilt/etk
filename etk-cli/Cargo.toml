@@ -1,6 +1,6 @@
 [package]
 name = "etk-cli"
-version = "0.1.0"
+version = "0.2.0-dev"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
@@ -12,7 +12,7 @@ keywords = ["etk", "ethereum", "cli"]
 categories = ["cryptography::cryptocurrencies", "command-line-utilities", "development-tools", "command-line-interface"]
 
 [dependencies]
-hex = "0.4.2"
+hex = "0.4.3"
 structopt = "0.3.21"
 
 [dev-dependencies]

@@ -5,5 +5,8 @@ multilingual = false
 src = "src"
 title = "Ethereum Toolkit (ETK)"
 
+[output.html]
+git-repository-url = "https://github.com/quilt/etk"
+
 [rust]
 edition = "2018"
