@@ -385,9 +385,6 @@ impl<'a> Annotator<'a> {
                 }
                 ConcreteOp::GetPc => self.push(Expr::pc(pc as u16)),
 
-                ConcreteOp::BeginSub => {
-                    // No-op
-                }
                 ConcreteOp::JumpDest => {
                     // No-op
                 }
@@ -655,19 +652,7 @@ impl<'a> Annotator<'a> {
                     ))
                 }
 
-                ConcreteOp::JumpTo
-                | ConcreteOp::TxExecGas
-                | ConcreteOp::JumpIf
-                | ConcreteOp::JumpSub
-                | ConcreteOp::JumpSubV
-                | ConcreteOp::BeginData
-                | ConcreteOp::ReturnSub
-                | ConcreteOp::PutLocal
-                | ConcreteOp::GetLocal
-                | ConcreteOp::SLoadBytes
-                | ConcreteOp::SStoreBytes
-                | ConcreteOp::SSize
-                | ConcreteOp::Invalid
+                ConcreteOp::Invalid
                 | ConcreteOp::Invalid0c
                 | ConcreteOp::Invalid0d
                 | ConcreteOp::Invalid0e
@@ -713,8 +698,17 @@ impl<'a> Annotator<'a> {
                 | ConcreteOp::InvalidAd
                 | ConcreteOp::InvalidAe
                 | ConcreteOp::InvalidAf
+                | ConcreteOp::InvalidB0
+                | ConcreteOp::InvalidB1
+                | ConcreteOp::InvalidB2
                 | ConcreteOp::InvalidB3
+                | ConcreteOp::InvalidB4
+                | ConcreteOp::InvalidB5
+                | ConcreteOp::InvalidB6
                 | ConcreteOp::InvalidB7
+                | ConcreteOp::InvalidB8
+                | ConcreteOp::InvalidB9
+                | ConcreteOp::InvalidBa
                 | ConcreteOp::InvalidBb
                 | ConcreteOp::InvalidBc
                 | ConcreteOp::InvalidBd
@@ -753,6 +747,9 @@ impl<'a> Annotator<'a> {
                 | ConcreteOp::InvalidDe
                 | ConcreteOp::InvalidDf
                 | ConcreteOp::InvalidE0
+                | ConcreteOp::InvalidE1
+                | ConcreteOp::InvalidE2
+                | ConcreteOp::InvalidE3
                 | ConcreteOp::InvalidE4
                 | ConcreteOp::InvalidE5
                 | ConcreteOp::InvalidE6
@@ -769,7 +766,8 @@ impl<'a> Annotator<'a> {
                 | ConcreteOp::InvalidF7
                 | ConcreteOp::InvalidF8
                 | ConcreteOp::InvalidF9
-                | ConcreteOp::InvalidFb => {
+                | ConcreteOp::InvalidFb
+                | ConcreteOp::InvalidFc => {
                     assert!(is_last);
                     return Exit::Terminate;
                 }

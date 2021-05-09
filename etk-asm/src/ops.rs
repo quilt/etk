@@ -29,6 +29,31 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 
+/// The access mode (read, write, both) of an instruction.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Access {
+    /// Indicates that the instruction might read.
+    Read,
+
+    /// Indicates that the instruction might write.
+    Write,
+
+    /// Indicates that the instruction may read and/or write.
+    ReadWrite,
+}
+
+impl Access {
+    /// Returns true if the instruction might read.
+    pub fn reads(self) -> bool {
+        matches!(self, Self::Read | Self::ReadWrite)
+    }
+
+    /// Returns true if the instruction might write.
+    pub fn writes(self) -> bool {
+        matches!(self, Self::Write | Self::ReadWrite)
+    }
+}
+
 /// Extra information about an instruction.
 pub trait Metadata {
     /// Returns true if the current instruction changes the program counter (other
@@ -41,6 +66,18 @@ pub trait Metadata {
     /// Returns true if the current instruction causes the EVM to stop executing
     /// the contract.
     fn is_exit(&self) -> bool;
+
+    /// Returns the access mode, if any, for touching account storage.
+    fn storage_access(&self) -> Option<Access>;
+
+    /// Returns the access mode, if any, for touching EVM memory.
+    fn memory_access(&self) -> Option<Access>;
+
+    /// How many stack elements this instruction pops.
+    fn pops(&self) -> usize;
+
+    /// How many stack elements this instruction pushes.
+    fn pushes(&self) -> usize;
 }
 
 macro_rules! tuple {
@@ -229,10 +266,32 @@ macro_rules! or_false {
     };
 }
 
+macro_rules! or_none {
+    () => {
+        None
+    };
+    ($v:expr) => {
+        Some($v)
+    };
+}
+
+macro_rules! or_zero {
+    () => {
+        0
+    };
+    ($v:expr) => {
+        $v
+    };
+}
+
 macro_rules! ops {
     ($($op:ident(
         mnemonic = $mnemonic:literal
         $(, arg = $arg:ident )?
+        $(, pops = $pops:literal)?
+        $(, pushes = $pushes:literal)?
+        $(, memory = $memory:expr)?
+        $(, storage = $storage:expr)?
         $(, exit = $exit:expr)?
         $(, jump = $jmp:expr)?
         $(, jump_target = $jt:expr)?),
@@ -274,6 +333,37 @@ macro_rules! ops {
                 }
             }
 
+            fn storage_access(&self) -> Option<Access> {
+                match self {
+                    $(
+                        pat!($op$(, $arg)?) => or_none!($($storage)?),
+                    )*
+                }
+            }
+
+            fn memory_access(&self) -> Option<Access> {
+                match self {
+                    $(
+                        pat!($op$(, $arg)?) => or_none!($($memory)?),
+                    )*
+                }
+            }
+
+            fn pushes(&self) -> usize {
+                match self {
+                    $(
+                        pat!($op$(, $arg)?) => or_zero!($($pushes)?),
+                    )*
+                }
+            }
+
+            fn pops(&self) -> usize {
+                match self {
+                    $(
+                        pat!($op$(, $arg)?) => or_zero!($($pops)?),
+                    )*
+                }
+            }
         }
 
         impl<I> Op<I> where I: ImmediateTypes {
@@ -616,42 +706,42 @@ impl Op<Spec> {
 
 ops! {
     Stop(mnemonic="stop", exit=true),
-    Add(mnemonic="add"),
-    Mul(mnemonic="mul"),
-    Sub(mnemonic="sub"),
-    Div(mnemonic="div"),
-    SDiv(mnemonic="sdiv"),
-    Mod(mnemonic="mod"),
-    SMod(mnemonic="smod"),
-    AddMod(mnemonic="addmod"),
-    MulMod(mnemonic="mulmod"),
-    Exp(mnemonic="exp"),
-    SignExtend(mnemonic="signextend"),
+    Add(mnemonic="add", pops=2, pushes=1),
+    Mul(mnemonic="mul", pops=2, pushes=1),
+    Sub(mnemonic="sub", pops=2, pushes=1),
+    Div(mnemonic="div", pops=2, pushes=1),
+    SDiv(mnemonic="sdiv", pops=2, pushes=1),
+    Mod(mnemonic="mod", pops=2, pushes=1),
+    SMod(mnemonic="smod", pops=2, pushes=1),
+    AddMod(mnemonic="addmod", pops=3, pushes=1),
+    MulMod(mnemonic="mulmod", pops=3, pushes=1),
+    Exp(mnemonic="exp", pops=2, pushes=1),
+    SignExtend(mnemonic="signextend", pops=2, pushes=1),
 
     Invalid0c(mnemonic="invalid_0c", exit=true),
     Invalid0d(mnemonic="invalid_0d", exit=true),
     Invalid0e(mnemonic="invalid_0e", exit=true),
     Invalid0f(mnemonic="invalid_0f", exit=true),
 
-    Lt(mnemonic="lt"),
-    Gt(mnemonic="gt"),
-    SLt(mnemonic="slt"),
-    SGt(mnemonic="sgt"),
-    Eq(mnemonic="eq"),
-    IsZero(mnemonic="iszero"),
-    And(mnemonic="and"),
-    Or(mnemonic="or"),
-    Xor(mnemonic="xor"),
-    Not(mnemonic="not"),
-    Byte(mnemonic="byte"),
-    Shl(mnemonic="shl"),
-    Shr(mnemonic="shr"),
-    Sar(mnemonic="sar"),
+    Lt(mnemonic="lt", pops=2, pushes=1),
+    Gt(mnemonic="gt", pops=2, pushes=1),
+    SLt(mnemonic="slt", pops=2, pushes=1),
+    SGt(mnemonic="sgt", pops=2, pushes=1),
+    Eq(mnemonic="eq", pops=2, pushes=1),
+    IsZero(mnemonic="iszero", pops=1, pushes=1),
+    And(mnemonic="and", pops=2, pushes=1),
+    Or(mnemonic="or", pops=2, pushes=1),
+    Xor(mnemonic="xor", pops=2, pushes=1),
+    Not(mnemonic="not", pops=1, pushes=1),
+    Byte(mnemonic="byte", pops=2, pushes=1),
+    Shl(mnemonic="shl", pops=2, pushes=1),
+    Shr(mnemonic="shr", pops=2, pushes=1),
+    Sar(mnemonic="sar", pops=2, pushes=1),
 
     Invalid1e(mnemonic="invalid_1e", exit=true),
     Invalid1f(mnemonic="invalid_1f", exit=true),
 
-    Keccak256(mnemonic="keccak256"),
+    Keccak256(mnemonic="keccak256", pops=2, pushes=1, memory=Access::Read),
 
     Invalid21(mnemonic="invalid_21", exit=true),
     Invalid22(mnemonic="invalid_22", exit=true),
@@ -669,29 +759,29 @@ ops! {
     Invalid2e(mnemonic="invalid_2e", exit=true),
     Invalid2f(mnemonic="invalid_2f", exit=true),
 
-    Address(mnemonic="address"),
-    Balance(mnemonic="balance"),
-    Origin(mnemonic="origin"),
-    Caller(mnemonic="caller"),
-    CallValue(mnemonic="callvalue"),
-    CallDataLoad(mnemonic="calldataload"),
-    CallDataSize(mnemonic="calldatasize"),
-    CallDataCopy(mnemonic="calldatacopy"),
-    CodeSize(mnemonic="codesize"),
-    CodeCopy(mnemonic="codecopy"),
-    GasPrice(mnemonic="gasprice"),
-    ExtCodeSize(mnemonic="extcodesize"),
-    ExtCodeCopy(mnemonic="extcodecopy"),
-    ReturnDataSize(mnemonic="returndatasize"),
-    ReturnDataCopy(mnemonic="returndatacopy"),
-    ExtCodeHash(mnemonic="extcodehash"),
-    BlockHash(mnemonic="blockhash"),
-    Coinbase(mnemonic="coinbase"),
-    Timestamp(mnemonic="timestamp"),
-    Number(mnemonic="number"),
-    Difficulty(mnemonic="difficulty"),
-    GasLimit(mnemonic="gaslimit"),
-    ChainId(mnemonic="chainid"),
+    Address(mnemonic="address", pushes=1),
+    Balance(mnemonic="balance", pops=1, pushes=1),
+    Origin(mnemonic="origin", pushes=1),
+    Caller(mnemonic="caller", pushes=1),
+    CallValue(mnemonic="callvalue", pushes=1),
+    CallDataLoad(mnemonic="calldataload", pops=1, pushes=1),
+    CallDataSize(mnemonic="calldatasize", pushes=1),
+    CallDataCopy(mnemonic="calldatacopy", pops=3, memory=Access::Write),
+    CodeSize(mnemonic="codesize", pushes=1),
+    CodeCopy(mnemonic="codecopy", pops=3, memory=Access::Write),
+    GasPrice(mnemonic="gasprice", pushes=1),
+    ExtCodeSize(mnemonic="extcodesize", pops=1, pushes=1),
+    ExtCodeCopy(mnemonic="extcodecopy", pops=4, memory=Access::Write),
+    ReturnDataSize(mnemonic="returndatasize", pushes=1),
+    ReturnDataCopy(mnemonic="returndatacopy", pops=3, memory=Access::Write),
+    ExtCodeHash(mnemonic="extcodehash", pops=1, pushes=1),
+    BlockHash(mnemonic="blockhash", pops=1, pushes=1),
+    Coinbase(mnemonic="coinbase", pushes=1),
+    Timestamp(mnemonic="timestamp", pushes=1),
+    Number(mnemonic="number", pushes=1),
+    Difficulty(mnemonic="difficulty", pushes=1),
+    GasLimit(mnemonic="gaslimit", pushes=1),
+    ChainId(mnemonic="chainid", pushes=1),
 
     Invalid47(mnemonic="invalid_47", exit=true),
     Invalid48(mnemonic="invalid_48", exit=true),
@@ -703,17 +793,17 @@ ops! {
     Invalid4e(mnemonic="invalid_4e", exit=true),
     Invalid4f(mnemonic="invalid_4f", exit=true),
 
-    Pop(mnemonic="pop"),
-    MLoad(mnemonic="mload"),
-    MStore(mnemonic="mstore"),
-    MStore8(mnemonic="mstore8"),
-    SLoad(mnemonic="sload"),
-    SStore(mnemonic="sstore"),
-    Jump(mnemonic="jump", jump=true),
-    JumpI(mnemonic="jumpi", jump=true),
-    GetPc(mnemonic="pc"),
-    MSize(mnemonic="msize"),
-    Gas(mnemonic="gas"),
+    Pop(mnemonic="pop", pops=1),
+    MLoad(mnemonic="mload", pops=1, pushes=1, memory=Access::Read),
+    MStore(mnemonic="mstore", pops=2, memory=Access::Read),
+    MStore8(mnemonic="mstore8", pops=2, memory=Access::Read),
+    SLoad(mnemonic="sload", pops=1, pushes=1, storage=Access::Read),
+    SStore(mnemonic="sstore", pops=2, storage=Access::Write),
+    Jump(mnemonic="jump", pops=1, jump=true),
+    JumpI(mnemonic="jumpi", pops=2, jump=true),
+    GetPc(mnemonic="pc", pushes=1),
+    MSize(mnemonic="msize", pushes=1, memory=Access::Read),
+    Gas(mnemonic="gas", pushes=1),
     JumpDest(mnemonic="jumpdest", jump_target=true),
 
     Invalid5c(mnemonic="invalid_5c", exit=true),
@@ -721,76 +811,76 @@ ops! {
     Invalid5e(mnemonic="invalid_5e", exit=true),
     Invalid5f(mnemonic="invalid_5f", exit=true),
 
-    Push1(mnemonic="push1", arg=P1),
-    Push2(mnemonic="push2", arg=P2),
-    Push3(mnemonic="push3", arg=P3),
-    Push4(mnemonic="push4", arg=P4),
-    Push5(mnemonic="push5", arg=P5),
-    Push6(mnemonic="push6", arg=P6),
-    Push7(mnemonic="push7", arg=P7),
-    Push8(mnemonic="push8", arg=P8),
-    Push9(mnemonic="push9", arg=P9),
-    Push10(mnemonic="push10", arg=P10),
-    Push11(mnemonic="push11", arg=P11),
-    Push12(mnemonic="push12", arg=P12),
-    Push13(mnemonic="push13", arg=P13),
-    Push14(mnemonic="push14", arg=P14),
-    Push15(mnemonic="push15", arg=P15),
-    Push16(mnemonic="push16", arg=P16),
-    Push17(mnemonic="push17", arg=P17),
-    Push18(mnemonic="push18", arg=P18),
-    Push19(mnemonic="push19", arg=P19),
-    Push20(mnemonic="push20", arg=P20),
-    Push21(mnemonic="push21", arg=P21),
-    Push22(mnemonic="push22", arg=P22),
-    Push23(mnemonic="push23", arg=P23),
-    Push24(mnemonic="push24", arg=P24),
-    Push25(mnemonic="push25", arg=P25),
-    Push26(mnemonic="push26", arg=P26),
-    Push27(mnemonic="push27", arg=P27),
-    Push28(mnemonic="push28", arg=P28),
-    Push29(mnemonic="push29", arg=P29),
-    Push30(mnemonic="push30", arg=P30),
-    Push31(mnemonic="push31", arg=P31),
-    Push32(mnemonic="push32", arg=P32),
+    Push1(mnemonic="push1", arg=P1, pushes=1),
+    Push2(mnemonic="push2", arg=P2, pushes=1),
+    Push3(mnemonic="push3", arg=P3, pushes=1),
+    Push4(mnemonic="push4", arg=P4, pushes=1),
+    Push5(mnemonic="push5", arg=P5, pushes=1),
+    Push6(mnemonic="push6", arg=P6, pushes=1),
+    Push7(mnemonic="push7", arg=P7, pushes=1),
+    Push8(mnemonic="push8", arg=P8, pushes=1),
+    Push9(mnemonic="push9", arg=P9, pushes=1),
+    Push10(mnemonic="push10", arg=P10, pushes=1),
+    Push11(mnemonic="push11", arg=P11, pushes=1),
+    Push12(mnemonic="push12", arg=P12, pushes=1),
+    Push13(mnemonic="push13", arg=P13, pushes=1),
+    Push14(mnemonic="push14", arg=P14, pushes=1),
+    Push15(mnemonic="push15", arg=P15, pushes=1),
+    Push16(mnemonic="push16", arg=P16, pushes=1),
+    Push17(mnemonic="push17", arg=P17, pushes=1),
+    Push18(mnemonic="push18", arg=P18, pushes=1),
+    Push19(mnemonic="push19", arg=P19, pushes=1),
+    Push20(mnemonic="push20", arg=P20, pushes=1),
+    Push21(mnemonic="push21", arg=P21, pushes=1),
+    Push22(mnemonic="push22", arg=P22, pushes=1),
+    Push23(mnemonic="push23", arg=P23, pushes=1),
+    Push24(mnemonic="push24", arg=P24, pushes=1),
+    Push25(mnemonic="push25", arg=P25, pushes=1),
+    Push26(mnemonic="push26", arg=P26, pushes=1),
+    Push27(mnemonic="push27", arg=P27, pushes=1),
+    Push28(mnemonic="push28", arg=P28, pushes=1),
+    Push29(mnemonic="push29", arg=P29, pushes=1),
+    Push30(mnemonic="push30", arg=P30, pushes=1),
+    Push31(mnemonic="push31", arg=P31, pushes=1),
+    Push32(mnemonic="push32", arg=P32, pushes=1),
 
-    Dup1(mnemonic="dup1"),
-    Dup2(mnemonic="dup2"),
-    Dup3(mnemonic="dup3"),
-    Dup4(mnemonic="dup4"),
-    Dup5(mnemonic="dup5"),
-    Dup6(mnemonic="dup6"),
-    Dup7(mnemonic="dup7"),
-    Dup8(mnemonic="dup8"),
-    Dup9(mnemonic="dup9"),
-    Dup10(mnemonic="dup10"),
-    Dup11(mnemonic="dup11"),
-    Dup12(mnemonic="dup12"),
-    Dup13(mnemonic="dup13"),
-    Dup14(mnemonic="dup14"),
-    Dup15(mnemonic="dup15"),
-    Dup16(mnemonic="dup16"),
-    Swap1(mnemonic="swap1"),
-    Swap2(mnemonic="swap2"),
-    Swap3(mnemonic="swap3"),
-    Swap4(mnemonic="swap4"),
-    Swap5(mnemonic="swap5"),
-    Swap6(mnemonic="swap6"),
-    Swap7(mnemonic="swap7"),
-    Swap8(mnemonic="swap8"),
-    Swap9(mnemonic="swap9"),
-    Swap10(mnemonic="swap10"),
-    Swap11(mnemonic="swap11"),
-    Swap12(mnemonic="swap12"),
-    Swap13(mnemonic="swap13"),
-    Swap14(mnemonic="swap14"),
-    Swap15(mnemonic="swap15"),
-    Swap16(mnemonic="swap16"),
-    Log0(mnemonic="log0"),
-    Log1(mnemonic="log1"),
-    Log2(mnemonic="log2"),
-    Log3(mnemonic="log3"),
-    Log4(mnemonic="log4"),
+    Dup1(mnemonic="dup1", pops=1, pushes=2),
+    Dup2(mnemonic="dup2", pops=2, pushes=3),
+    Dup3(mnemonic="dup3", pops=3, pushes=4),
+    Dup4(mnemonic="dup4", pops=4, pushes=5),
+    Dup5(mnemonic="dup5", pops=5, pushes=6),
+    Dup6(mnemonic="dup6", pops=6, pushes=7),
+    Dup7(mnemonic="dup7", pops=7, pushes=8),
+    Dup8(mnemonic="dup8", pops=8, pushes=9),
+    Dup9(mnemonic="dup9", pops=9, pushes=10),
+    Dup10(mnemonic="dup10", pops=10, pushes=11),
+    Dup11(mnemonic="dup11", pops=11, pushes=12),
+    Dup12(mnemonic="dup12", pops=12, pushes=13),
+    Dup13(mnemonic="dup13", pops=13, pushes=14),
+    Dup14(mnemonic="dup14", pops=14, pushes=15),
+    Dup15(mnemonic="dup15", pops=15, pushes=16),
+    Dup16(mnemonic="dup16", pops=16, pushes=17),
+    Swap1(mnemonic="swap1", pops=2, pushes=2),
+    Swap2(mnemonic="swap2", pops=3, pushes=3),
+    Swap3(mnemonic="swap3", pops=4, pushes=4),
+    Swap4(mnemonic="swap4", pops=5, pushes=5),
+    Swap5(mnemonic="swap5", pops=6, pushes=6),
+    Swap6(mnemonic="swap6", pops=7, pushes=7),
+    Swap7(mnemonic="swap7", pops=8, pushes=8),
+    Swap8(mnemonic="swap8", pops=9, pushes=9),
+    Swap9(mnemonic="swap9", pops=10, pushes=10),
+    Swap10(mnemonic="swap10", pops=11, pushes=11),
+    Swap11(mnemonic="swap11", pops=12, pushes=12),
+    Swap12(mnemonic="swap12", pops=13, pushes=13),
+    Swap13(mnemonic="swap13", pops=14, pushes=14),
+    Swap14(mnemonic="swap14", pops=15, pushes=15),
+    Swap15(mnemonic="swap15", pops=16, pushes=16),
+    Swap16(mnemonic="swap16", pops=17, pushes=17),
+    Log0(mnemonic="log0", pops=2, memory=Access::Read),
+    Log1(mnemonic="log1", pops=3, memory=Access::Read),
+    Log2(mnemonic="log2", pops=4, memory=Access::Read),
+    Log3(mnemonic="log3", pops=5, memory=Access::Read),
+    Log4(mnemonic="log4", pops=6, memory=Access::Read),
 
     InvalidA5(mnemonic="invalid_a5", exit=true),
     InvalidA6(mnemonic="invalid_a6", exit=true),
@@ -803,23 +893,17 @@ ops! {
     InvalidAd(mnemonic="invalid_ad", exit=true),
     InvalidAe(mnemonic="invalid_ae", exit=true),
     InvalidAf(mnemonic="invalid_af", exit=true),
-
-    JumpTo(mnemonic="jumpto", jump=true),
-    JumpIf(mnemonic="jumpif", jump=true),
-    JumpSub(mnemonic="jumpsub", jump=true),
-
+    InvalidB0(mnemonic="invalid_b0", exit=true),
+    InvalidB1(mnemonic="invalid_b1", exit=true),
+    InvalidB2(mnemonic="invalid_b2", exit=true),
     InvalidB3(mnemonic="invalid_b3", exit=true),
-
-    JumpSubV(mnemonic="jumpsubv", jump=true),
-    BeginSub(mnemonic="beginsub", jump_target=true),
-    BeginData(mnemonic="begindata"),
-
+    InvalidB4(mnemonic="invalid_b4", exit=true),
+    InvalidB5(mnemonic="invalid_b5", exit=true),
+    InvalidB6(mnemonic="invalid_b6", exit=true),
     InvalidB7(mnemonic="invalid_b7", exit=true),
-
-    ReturnSub(mnemonic="returnsub", jump=true),
-    PutLocal(mnemonic="putlocal"),
-    GetLocal(mnemonic="getlocal"),
-
+    InvalidB8(mnemonic="invalid_b8", exit=true),
+    InvalidB9(mnemonic="invalid_b9", exit=true),
+    InvalidBa(mnemonic="invalid_ba", exit=true),
     InvalidBb(mnemonic="invalid_bb", exit=true),
     InvalidBc(mnemonic="invalid_bc", exit=true),
     InvalidBd(mnemonic="invalid_bd", exit=true),
@@ -858,11 +942,9 @@ ops! {
     InvalidDe(mnemonic="invalid_de", exit=true),
     InvalidDf(mnemonic="invalid_df", exit=true),
     InvalidE0(mnemonic="invalid_e0", exit=true),
-
-    SLoadBytes(mnemonic="sloadbytes"),
-    SStoreBytes(mnemonic="sstorebytes"),
-    SSize(mnemonic="ssize"),
-
+    InvalidE1(mnemonic="invalid_e1", exit=true),
+    InvalidE2(mnemonic="invalid_e2", exit=true),
+    InvalidE3(mnemonic="invalid_e3", exit=true),
     InvalidE4(mnemonic="invalid_e4", exit=true),
     InvalidE5(mnemonic="invalid_e5", exit=true),
     InvalidE6(mnemonic="invalid_e6", exit=true),
@@ -876,26 +958,26 @@ ops! {
     InvalidEe(mnemonic="invalid_ee", exit=true),
     InvalidEf(mnemonic="invalid_ef", exit=true),
 
-    Create(mnemonic="create"),
-    Call(mnemonic="call"),
-    CallCode(mnemonic="callcode"),
-    Return(mnemonic="return", exit=true),
-    DelegateCall(mnemonic="delegatecall"),
-    Create2(mnemonic="create2"),
+    Create(mnemonic="create", pops=3, pushes=1, memory=Access::Read),
+    Call(mnemonic="call", pops=7, pushes=1, memory=Access::ReadWrite),
+    CallCode(mnemonic="callcode", pops=7, pushes=1, memory=Access::ReadWrite),
+    Return(mnemonic="return", pops=2, memory=Access::Read, exit=true),
+    DelegateCall(mnemonic="delegatecall", pops=6, pushes=1, memory=Access::ReadWrite),
+    Create2(mnemonic="create2", pops=4, pushes=1, memory=Access::Read),
 
     InvalidF6(mnemonic="invalid_f6", exit=true),
     InvalidF7(mnemonic="invalid_f7", exit=true),
     InvalidF8(mnemonic="invalid_f8", exit=true),
     InvalidF9(mnemonic="invalid_f9", exit=true),
 
-    StaticCall(mnemonic="staticcall"),
+    StaticCall(mnemonic="staticcall", pops=6, pushes=1, memory=Access::ReadWrite),
 
     InvalidFb(mnemonic="invalid_fb", exit=true),
+    InvalidFc(mnemonic="invalid_fc", exit=true),
 
-    TxExecGas(mnemonic="txexecgas"),
-    Revert(mnemonic="revert", exit=true),
+    Revert(mnemonic="revert", pops=2, memory=Access::ReadWrite, exit=true),
     Invalid(mnemonic="invalid", exit=true),
-    SelfDestruct(mnemonic="selfdestruct", exit=true),
+    SelfDestruct(mnemonic="selfdestruct", pops=1, exit=true),
 }
 
 /// Like an [`Op`], except it also supports virtual instructions.
@@ -1052,6 +1134,38 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.is_exit(),
             Self::Push(_) => false,
             Self::Label(_) => false,
+        }
+    }
+
+    fn memory_access(&self) -> Option<Access> {
+        match self {
+            Self::Op(op) => op.storage_access(),
+            Self::Push(_) => None,
+            Self::Label(_) => None,
+        }
+    }
+
+    fn storage_access(&self) -> Option<Access> {
+        match self {
+            Self::Op(op) => op.storage_access(),
+            Self::Push(_) => None,
+            Self::Label(_) => None,
+        }
+    }
+
+    fn pops(&self) -> usize {
+        match self {
+            Self::Op(op) => op.pops(),
+            Self::Push(_) => 0,
+            Self::Label(_) => 0,
+        }
+    }
+
+    fn pushes(&self) -> usize {
+        match self {
+            Self::Op(op) => op.pushes(),
+            Self::Push(_) => 1,
+            Self::Label(_) => 0,
         }
     }
 }
