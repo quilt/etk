@@ -348,7 +348,10 @@ impl<'a> Annotator<'a> {
             }
 
             ConcreteOp::Address => stack.push(Expr::address()),
-            ConcreteOp::Balance => stack.push(Expr::balance()),
+            ConcreteOp::Balance => {
+                let address = stack.pop();
+                stack.push(Expr::balance(&address));
+            }
             ConcreteOp::Origin => stack.push(Expr::origin()),
             ConcreteOp::Caller => stack.push(Expr::caller()),
             ConcreteOp::CallValue => stack.push(Expr::call_value()),
@@ -362,7 +365,10 @@ impl<'a> Annotator<'a> {
                 let address = stack.pop();
                 stack.push(Expr::ext_code_size(&address));
             }
-            ConcreteOp::BlockHash => stack.push(Expr::block_hash()),
+            ConcreteOp::BlockHash => {
+                let address = stack.pop();
+                stack.push(Expr::block_hash(&address));
+            }
             ConcreteOp::Coinbase => stack.push(Expr::coinbase()),
             ConcreteOp::Timestamp => stack.push(Expr::timestamp()),
             ConcreteOp::Number => stack.push(Expr::number()),

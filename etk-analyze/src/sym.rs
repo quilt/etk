@@ -60,12 +60,6 @@ impl Expr {
         }
     }
 
-    pub fn balance() -> Self {
-        Self {
-            ops: vec![Sym::Balance],
-        }
-    }
-
     pub fn origin() -> Self {
         Self {
             ops: vec![Sym::Origin],
@@ -105,12 +99,6 @@ impl Expr {
     pub fn return_data_size() -> Self {
         Self {
             ops: vec![Sym::ReturnDataSize],
-        }
-    }
-
-    pub fn block_hash() -> Self {
-        Self {
-            ops: vec![Sym::BlockHash],
         }
     }
 
@@ -340,6 +328,14 @@ impl Expr {
 
     pub fn not(&self) -> Self {
         Self::concat(Sym::Not, &[self])
+    }
+
+    pub fn block_hash(&self) -> Self {
+        Self::concat(Sym::BlockHash, &[self])
+    }
+
+    pub fn balance(&self) -> Self {
+        Self::concat(Sym::Balance, &[self])
     }
 
     pub fn call_data_load(&self) -> Self {
@@ -598,9 +594,10 @@ enum Sym {
     ExtCodeHash,
     MLoad,
     SLoad,
+    Balance,
+    BlockHash,
 
     Address,
-    Balance,
     Origin,
     Caller,
     CallValue,
@@ -608,7 +605,6 @@ enum Sym {
     CodeSize,
     GasPrice,
     ReturnDataSize,
-    BlockHash,
     Coinbase,
     Timestamp,
     Number,
@@ -662,11 +658,12 @@ impl Sym {
             | Sym::CallDataLoad
             | Sym::ExtCodeSize
             | Sym::ExtCodeHash
+            | Sym::BlockHash
+            | Sym::Balance
             | Sym::MLoad
             | Sym::SLoad => 1,
 
             Sym::Address
-            | Sym::Balance
             | Sym::Origin
             | Sym::Caller
             | Sym::CallValue
@@ -674,7 +671,6 @@ impl Sym {
             | Sym::CodeSize
             | Sym::GasPrice
             | Sym::ReturnDataSize
-            | Sym::BlockHash
             | Sym::Coinbase
             | Sym::Timestamp
             | Sym::Number
