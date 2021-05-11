@@ -2,7 +2,7 @@ program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+)* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
-expr = _{ op | push | inst_macro | label_defn }
+expr = _{ label_defn | inst_macro | push | op }
 
 op = @{
 	"origin" | "stop" | "mulmod" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
@@ -40,7 +40,7 @@ selector = { "selector(\"" ~ function_declaration ~ "\")" }
 function_declaration = { function_name ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
 function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
 
-label = @{ (ASCII_ALPHA ~ "_"*) ~ (ASCII_ALPHANUMERIC | "_")* }
+label = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 label_defn = { label ~ ":" }
 
 arguments = _{ "(" ~ arguments_list? ~ ")" }

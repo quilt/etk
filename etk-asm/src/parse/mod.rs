@@ -328,6 +328,21 @@ mod tests {
     }
 
     #[test]
+    fn parse_push_op_as_label() {
+        let asm = r#"
+            push1:
+            push1 push1
+            jumpi
+        "#;
+        let expected = nodes![
+            AbstractOp::Label("push1".into()),
+            Op::Push1(Imm::from("push1")),
+            Op::JumpI
+        ];
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+    }
+
+    #[test]
     fn parse_selector() {
         let asm = r#"
             push4 selector("name()")
