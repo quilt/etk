@@ -1,7 +1,7 @@
 etk-analyze
 ===========
 
-The Ethereum Toolkit's analysis tools:
+The EVM Toolkit's analysis tools:
 
  - `disease` disassembler
 

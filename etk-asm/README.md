@@ -1,7 +1,7 @@
 etk-asm
 =======
 
-The Ethereum Toolkit Assembler.
+The EVM Toolkit Assembler.
 
 ## Documentation
 
