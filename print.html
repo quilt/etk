@@ -280,7 +280,7 @@ stop                ; This halts execution
 
 stmt = _{ expr }
 
-expr = _{ op | push | inst_macro | label_defn }
+expr = _{ label_defn | inst_macro | push | op }
 
 op = @{
 	&quot;origin&quot; | &quot;stop&quot; | &quot;mulmod&quot; | &quot;mul&quot; | &quot;sub&quot; | &quot;div&quot; | &quot;sdiv&quot; | &quot;mod&quot; | &quot;smod&quot; |
@@ -318,7 +318,7 @@ selector = { &quot;selector(\&quot;&quot; ~ function_declaration ~ &quot;\&quot;
 function_declaration = { function_name ~ &quot;(&quot; ~ ASCII_ALPHANUMERIC* ~ (&quot;,&quot; ~ ASCII_ALPHANUMERIC+)* ~ &quot;)&quot; }
 function_name = @{ ( ASCII_ALPHA | &quot;_&quot; ) ~ ( ASCII_ALPHANUMERIC | &quot;_&quot; )* }
 
-label = @{ (ASCII_ALPHA ~ &quot;_&quot;*) ~ (ASCII_ALPHANUMERIC | &quot;_&quot;)* }
+label = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | &quot;_&quot;)* }
 label_defn = { label ~ &quot;:&quot; }
 
 arguments = _{ &quot;(&quot; ~ arguments_list? ~ &quot;)&quot; }
