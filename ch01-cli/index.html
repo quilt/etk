@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Command-Line Tools - Ethereum Toolkit (ETK)</title>
+        <title>Command-Line Tools - EVM Toolkit (ETK)</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">Ethereum Toolkit</a></li><li class="chapter-item expanded "><a href="../ch01-cli/index.html" class="active"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch01-cli/ch01-eas.html"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="../ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="../ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch02-labels.html"><strong aria-hidden="true">2.2.</strong> Labels &amp; Pushes</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch03-macros/index.html"><strong aria-hidden="true">2.3.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch03-macros/ch01-builtins.html"><strong aria-hidden="true">2.3.1.</strong> Built-In Macros</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.3.2.</strong> User Defined Macros</div></li></ol></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">EVM Toolkit</a></li><li class="chapter-item expanded "><a href="../ch01-cli/index.html" class="active"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch01-cli/ch01-eas.html"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="../ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="../ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch02-labels.html"><strong aria-hidden="true">2.2.</strong> Labels &amp; Pushes</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch03-macros/index.html"><strong aria-hidden="true">2.3.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch03-macros/ch01-builtins.html"><strong aria-hidden="true">2.3.1.</strong> Built-In Macros</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.3.2.</strong> User Defined Macros</div></li></ol></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -127,7 +127,7 @@
                         
                     </div>
 
-                    <h1 class="menu-title">Ethereum Toolkit (ETK)</h1>
+                    <h1 class="menu-title">EVM Toolkit (ETK)</h1>
 
                     <div class="right-buttons">
                         
@@ -172,7 +172,7 @@
 <h2 id="install-from-source"><a class="header" href="#install-from-source">Install from Source</a></h2>
 <p>ETK and its tools can be installed by compiling the source code on your local machine.</p>
 <h3 id="pre-requisite"><a class="header" href="#pre-requisite">Pre-requisite</a></h3>
-<p>ETK is written in <a href="https://www.rust-lang.org/">Rust</a> and needs to be compiled with <strong>cargo</strong>. If you don't have Rust installed, <a href="https://www.rust-lang.org/tools/install">install</a> it now.</p>
+<p>ETK is written in <a href="https://www.rust-lang.org/">Rust</a> and needs to be compiled with <strong>cargo</strong>. The minimum supported Rust version <code>1.51</code>. If you don't have Rust installed, <a href="https://www.rust-lang.org/tools/install">install</a> it now.</p>
 <h3 id="install-development-version"><a class="header" href="#install-development-version">Install Development Version</a></h3>
 <p>The development version contains all the latest features, bugs, and maybe even some bug-fixes that will eventually be released in the next version. If you can't wait for the next release, you can install the development version from git yourself.</p>
 <p>Open a terminal and use cargo to install ETK:</p>
@@ -184,10 +184,12 @@
 </code></pre>
 <h3 id="install-released-version"><a class="header" href="#install-released-version">Install Released Version</a></h3>
 <p>Once you have Rust and cargo installed, you just have to type this snippet in your terminal:</p>
-<pre><code class="language-bash">cargo install etk-asm etk-analyze
+<pre><code class="language-bash">cargo install --features cli etk-asm etk-analyze
 </code></pre>
 <h2 id="install-from-binaries"><a class="header" href="#install-from-binaries">Install from Binaries</a></h2>
 <p>Precompiled binaries will be provided for select platforms on a best-effort basis. Visit <a href="https://github.com/quilt/etk/releases">the releases page</a> to download the appropriate version, once we create one, for your platform.</p>
+<h2 id="install-syntax-highlighting"><a class="header" href="#install-syntax-highlighting">Install Syntax Highlighting</a></h2>
+<p>Syntax highlighting for <code>vim</code> is available via <a href="https://github.com/quilt/vim-etk"><code>vim-etk</code></a>.</p>
 
                     </main>
 
