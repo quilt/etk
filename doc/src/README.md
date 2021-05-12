@@ -1,6 +1,6 @@
-# Ethereum Toolkit (ETK)
+# EVM Toolkit (ETK)
 
-The **Ethereum Toolkit** (or _ETK_) is a collection of tools for creating and analyzing smart contract programs on the [Ethereum Virtual Machine][evm]. So far it consists of an assembler (`eas`) and a disassembler (`disease`).
+The **EVM Toolkit** (or _ETK_) is a collection of tools for creating and analyzing smart contract programs on the [Ethereum Virtual Machine][evm]. So far it consists of an assembler (`eas`) and a disassembler (`disease`).
 
 ETK is new, and highly experimental. Use at your own risk.
 

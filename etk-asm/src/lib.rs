@@ -1,4 +1,4 @@
-//! The Ethereum Toolkit Assembler.
+//! The EVM Toolkit Assembler.
 //!
 //! You can find more information about the command-line tools in
 //! [The ETK Book](https://quilt.github.io/etk/).

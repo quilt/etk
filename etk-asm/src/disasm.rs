@@ -1,4 +1,4 @@
-//! A simple disassembler from the Ethereum Toolkit.
+//! A simple disassembler from the EVM Toolkit.
 //!
 //! Converts a stream of bytes into an iterator of [`ConcreteOp'].
 //!

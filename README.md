@@ -1,134 +1,50 @@
-# EVM Toolkit (ETK)
+# EVM Toolkit (`etk`)
 
 [![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](https://github.com/quilt/etk)
+[![chat](https://img.shields.io/badge/chat-telegram-informational)](https://t.me/joinchat/c-Cusp7Zh1tiM2Vh)
 [![ci status](https://github.com/lightclient/eipv/workflows/ci/badge.svg)](https://github.com/quilt/etk/actions)
 
-ETK is a collection of tools for writing, reading, and analyzing EVM bytecode.
+`etk` is a collection of tools for writing, reading, and analyzing EVM bytecode.
 
-## The ETK Book
+## Documentation
 
-ETK has some more friendly documentation!
+The [`etk` book](https://quilt.github.io/etk) is the most comprehensive guide to using `etk`.
+* [Introduction](https://quilt.github.io/etk)
+* [Usage](https://quilt.github.io/etk/ch01-cli/index.html)
+    * [`eas`](https://quilt.github.io/etk/ch01-cli/ch01-eas.html)
+    * [`disease`](https://quilt.github.io/etk/ch01-cli/ch02-disease.html)
+* [Language & Syntax](https://quilt.github.io/etk/ch02-lang/index.html)
 
- - [For the `master` branch](https://quilt.github.io/etk)
+There are also several examples in the [`etk-asm/tests/asm`](etk-asm/tests/asm) directory. For further questions, join us on [Telegram](https://t.me/joinchat/c-Cusp7Zh1tiM2Vh).
 
 ## Quickstart
 
-### Tools
-
-* Assembler (eas)
-* Disassembler (disease)
-
 ### Installation
 
+`etk` requires `rustc` version `1.51`.
+
 ```console
-cargo install \
-    --git https://github.com/quilt/etk.git \
-    --features cli \
-    etk-asm \
-    etk-analyze
+cargo install --features cli etk-asm etk-analyze
 ```
+
+#### Syntax Highlighting
+* [`vim-etk`](https://github.com/quilt/vim-etk)
 
 ### Usage
-
+`contract.etk`:
+```asm
+push1 42
+push1 13
+add
+pop
+```
 ```console
-$ eas contract.etk out.hex
-$ disease --hex-file out.hex
-    0:  calldatasize
-    1:  push1 0x01
-    2:  dup1
-    ...
+$ eas contract.etc out.hex
+$ disease out.hex
+   0:   PUSH1 0x2a
+   2:   PUSH1 0x0d
+   4:   ADD
+   5:   POP
 ```
 
-### Assembly Format
 
-#### Opcodes
-
-Opcodes can be used via their [mnemonic](etk-asm/src/parse/asm.pest).
-
-#### Immediates
-
-Some opcodes accept immediate operands. The only EVM instruction that suports
-immediates natively is the `PUSH` family. ETK also allows for `jumpdest`
-instructions to take an immediate label.
-
-```asm
-; push a constant
-push1 1
-
-; push a label
-push4 label
-
-; label a jumpdest
-label:
-jumpdest
-```
-
-#### Expanders
-
-Expanders are built-in macros for common use cases. For example, selector
-generation is a requirement for being ABI compatible.
-
-```asm
-; push the first four bytes of `keccak("transfer(address, uint256)")` to the
-; stack.
-push4 selector("transfer(address, uint256)")
-```
-
-#### Macros
-
-Coming soon!
-
-### Example Program
-
-```asm
-; -- Instructions --            -- Current stack layout --
-
-; Read the calldata into memory.
-calldatasize                    ; [calldatasize]
-push1 0                         ; [calldatasize, calldata_ptr]
-dup1                            ; [calldatasize, calldata_ptr, mem_ptr]
-calldatacopy                    ; []
-
-; Extract only the function selector
-push1 0                         ; [selector_ptr]
-mload                           ; [dirty_selector]
-push1 0xe0                      ; [dirty_selector, 28*8]
-shr                             ; [selector]
-
-; Jump to the coresponding function.
-dup1                            ; [selector, selector]
-push4 selector("flag()")        ; [selector, selector, decimals]
-eq                              ; [selector, is_decimals]
-push4 flag                      ; [selector, is_decimals, decimals]
-jumpi                           ; [selector]
-
-dup1                            ; [selector, selector]
-push4 selector("set_flag()")    ; [selector, selector, decimals]
-eq                              ; [selector, is_decimals]
-push4 set                       ; [selector, is_decimals, decimals]
-jumpi                           ; [selector]
-
-stop
-
-; return the current value of the flag
-flag:
-jumpdest
-pop                             ; []
-push1 0                         ; [0]
-sload                           ; [flag]
-push1 0                         ; [flag, 0]
-mstore                          ; []
-push1 0                         ; [0]
-push1 32                        ; [0, 32]
-return
-
-; set the flat to "1"
-set:
-jumpdest
-pop                             ; []
-push1 1                         ; [1]
-push1 0                         ; [1, 0]
-mstore                          ; []
-
-stop
-```

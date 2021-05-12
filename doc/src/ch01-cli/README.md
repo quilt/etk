@@ -8,7 +8,7 @@ ETK and its tools can be installed by compiling the source code on your local ma
 
 ### Pre-requisite
 
-ETK is written in [Rust][rust] and needs to be compiled with **cargo**. If you don't have Rust installed, [install] it now.
+ETK is written in [Rust][rust] and needs to be compiled with **cargo**. The minimum supported Rust version `1.51`. If you don't have Rust installed, [install] it now.
 
 [rust]: https://www.rust-lang.org/
 [install]: https://www.rust-lang.org/tools/install
@@ -32,7 +32,7 @@ cargo install \
 Once you have Rust and cargo installed, you just have to type this snippet in your terminal:
 
 ```bash
-cargo install etk-asm etk-analyze
+cargo install --features cli etk-asm etk-analyze
 ```
 
 ## Install from Binaries
@@ -40,3 +40,7 @@ cargo install etk-asm etk-analyze
 Precompiled binaries will be provided for select platforms on a best-effort basis. Visit [the releases page][releases] to download the appropriate version, once we create one, for your platform.
 
 [releases]: https://github.com/quilt/etk/releases
+
+## Install Syntax Highlighting
+
+Syntax highlighting for `vim` is available via [`vim-etk`](https://github.com/quilt/vim-etk).

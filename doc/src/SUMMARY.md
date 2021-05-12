@@ -1,6 +1,6 @@
 # Summary
 
-[Ethereum Toolkit](./README.md)
+[EVM Toolkit](./README.md)
 
 - [Command-Line Tools](./ch01-cli/README.md)
     - [`eas`](./ch01-cli/ch01-eas.md)
