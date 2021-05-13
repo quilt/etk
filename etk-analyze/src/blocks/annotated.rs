@@ -3,19 +3,89 @@ use crate::sym::{Expr, Var};
 use etk_asm::ops::{ConcreteOp, Metadata};
 
 use std::collections::{HashMap, VecDeque};
-use std::convert::TryInto;
 
 use super::BasicBlock;
 
 #[derive(Debug, Clone)]
-pub enum Exit {
+pub enum Exit<T = Expr> {
     Terminate,
-    Always(Expr),
+    FallThrough(usize),
+    Unconditional(T),
     Branch {
-        condition: Expr,
-        when_true: Expr,
+        condition: T,
+        when_true: T,
         when_false: usize,
     },
+}
+
+impl<T> Exit<T> {
+    pub fn fall_through(&self) -> Option<usize> {
+        match self {
+            Self::FallThrough(f) => Some(*f),
+            Self::Branch { when_false, .. } => Some(*when_false),
+            _ => None,
+        }
+    }
+
+    pub fn is_fall_through(&self) -> bool {
+        matches!(self, Self::FallThrough(_))
+    }
+
+    pub fn is_terminate(&self) -> bool {
+        matches!(self, Self::Terminate)
+    }
+
+    pub fn is_unconditional(&self) -> bool {
+        matches!(self, Self::Unconditional(_))
+    }
+
+    pub fn is_branch(&self) -> bool {
+        matches!(self, Self::Branch { .. })
+    }
+}
+
+#[cfg(feature = "z3")]
+mod z3_exit {
+    use super::*;
+
+    use z3::ast::BV;
+
+    impl Exit<Expr> {
+        pub(crate) fn erase(&self) -> Exit<()> {
+            match self {
+                Self::Terminate => Exit::Terminate,
+                Self::FallThrough(f) => Exit::FallThrough(*f),
+                Self::Unconditional(_) => Exit::Unconditional(()),
+                Self::Branch { when_false, .. } => Exit::Branch {
+                    condition: (),
+                    when_true: (),
+                    when_false: *when_false,
+                },
+            }
+        }
+
+        pub(crate) fn to_z3<'z>(&self, context: &'z z3::Context) -> Exit<BV<'z>> {
+            match self {
+                Self::Terminate => Exit::Terminate,
+                Self::FallThrough(f) => Exit::FallThrough(*f),
+                Self::Unconditional(e) => Exit::Unconditional(e.to_z3(context)),
+                Self::Branch {
+                    when_true,
+                    when_false,
+                    condition,
+                } => {
+                    let when_true = when_true.to_z3(&context);
+                    let condition = condition.to_z3(&context);
+
+                    Exit::Branch {
+                        when_false: *when_false,
+                        when_true,
+                        condition,
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +112,7 @@ pub struct AnnotatedBlock {
     pub outputs: Outputs,
     pub exit: Exit,
     pub jump_target: bool,
+    pub size: usize,
 }
 
 impl AnnotatedBlock {
@@ -66,6 +137,7 @@ impl AnnotatedBlock {
 
         Self {
             jump_target,
+            size: basic.size(),
             offset: basic.offset,
             outputs: Outputs {
                 stack: stack_outputs.into(),
@@ -604,7 +676,7 @@ impl<'a> Annotator<'a> {
 
             ConcreteOp::Jump => {
                 let dest = stack.pop();
-                return Some(Exit::Always(dest));
+                return Some(Exit::Unconditional(dest));
             }
 
             ConcreteOp::JumpI => {
@@ -843,7 +915,8 @@ impl<'a> Annotator<'a> {
                 let exit_matches = match exit {
                     Exit::Terminate => op.is_exit(),
                     Exit::Branch { .. } => op.is_jump(),
-                    Exit::Always(_) => unreachable!(),
+                    Exit::Unconditional(_) => op.is_jump(),
+                    Exit::FallThrough(_) => unreachable!(),
                 };
 
                 assert!(exit_matches, "bug: exit type doesn't match metadata");
@@ -856,8 +929,7 @@ impl<'a> Annotator<'a> {
             pc += op.size() as usize;
         }
 
-        let exit_off: u128 = pc.try_into().unwrap();
-        Exit::Always(Expr::constant_offset(exit_off))
+        Exit::FallThrough(pc)
     }
 }
 
@@ -874,18 +946,35 @@ mod tests {
         fn check(&self, actual: &Exit) {
             match actual {
                 Exit::Terminate => (),
-                wrong => panic!("expected {:?}, got {:?}", Exit::Terminate, wrong),
+                wrong => panic!("expected {:?}, got {:?}", Exit::<()>::Terminate, wrong),
             }
         }
     }
 
-    struct ExitAlways(Expr);
+    struct ExitFallThrough(usize);
 
-    impl CheckExit for ExitAlways {
+    impl CheckExit for ExitFallThrough {
         fn check(&self, actual: &Exit) {
             let exit = match actual {
-                Exit::Always(expr) => expr,
-                wrong => panic!("expected Exit::Always(...), got {:?}", wrong),
+                Exit::FallThrough(f) => f,
+                wrong => panic!(
+                    "expected {:?}, got {:?}",
+                    Exit::<()>::FallThrough(self.0),
+                    wrong
+                ),
+            };
+
+            assert_eq!(&self.0, exit);
+        }
+    }
+
+    struct ExitUnconditional(Expr);
+
+    impl CheckExit for ExitUnconditional {
+        fn check(&self, actual: &Exit) {
+            let exit = match actual {
+                Exit::Unconditional(expr) => expr,
+                wrong => panic!("expected Exit::Unconditional(...), got {:?}", wrong),
             };
 
             assert_eq!(&self.0, exit);
@@ -956,7 +1045,7 @@ mod tests {
     fn annotate_add() {
         AnnotateTest {
             ops: vec![ConcreteOp::Add],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1235u64)),
+            expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Expr::add(
                 &Var::with_id(1).into(),
@@ -970,7 +1059,7 @@ mod tests {
     fn annotate_mul() {
         AnnotateTest {
             ops: vec![ConcreteOp::Mul],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1235u64)),
+            expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Expr::mul(
                 &Var::with_id(1).into(),
@@ -984,7 +1073,7 @@ mod tests {
     fn annotate_sub() {
         AnnotateTest {
             ops: vec![ConcreteOp::Sub],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1235u64)),
+            expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Expr::sub(
                 &Var::with_id(1).into(),
@@ -1000,7 +1089,7 @@ mod tests {
     fn annotate_swap1() {
         AnnotateTest {
             ops: vec![ConcreteOp::Swap1],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1235u64)),
+            expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Var::with_id(2), Var::with_id(1)],
         }
@@ -1011,7 +1100,7 @@ mod tests {
     fn annotate_swap2() {
         AnnotateTest {
             ops: vec![ConcreteOp::Swap2],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1235u64)),
+            expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2), Var::with_id(3)],
             expected_output_stack: vec![Var::with_id(3), Var::with_id(2), Var::with_id(1)],
         }
@@ -1022,7 +1111,7 @@ mod tests {
     fn annotate_swap3() {
         AnnotateTest {
             ops: vec![ConcreteOp::Swap3],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1235u64)),
+            expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: (1..5).map(Var::with_id),
             expected_output_stack: vec![
                 Var::with_id(4),
@@ -1038,7 +1127,7 @@ mod tests {
     fn annotate_dup1() {
         AnnotateTest {
             ops: vec![ConcreteOp::Dup1],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1235u64)),
+            expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1)],
             expected_output_stack: vec![Var::with_id(1), Var::with_id(1)],
         }
@@ -1049,7 +1138,7 @@ mod tests {
     fn annotate_dup2() {
         AnnotateTest {
             ops: vec![ConcreteOp::Dup2],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1235u64)),
+            expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Var::with_id(2), Var::with_id(1), Var::with_id(2)],
         }
@@ -1060,7 +1149,7 @@ mod tests {
     fn annotate_dup3() {
         AnnotateTest {
             ops: vec![ConcreteOp::Dup3],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1235u64)),
+            expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2), Var::with_id(3)],
             expected_output_stack: vec![
                 Var::with_id(3),
@@ -1076,7 +1165,7 @@ mod tests {
     fn annotate_push1() {
         AnnotateTest {
             ops: vec![ConcreteOp::Push1([77].into())],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1236u64)),
+            expected_exit: ExitFallThrough(0x1236),
             expected_input_stack: Vec::<Expr>::new(),
             expected_output_stack: vec![Expr::constant_offset(77u8)],
         }
@@ -1087,9 +1176,24 @@ mod tests {
     fn annotate_push2() {
         AnnotateTest {
             ops: vec![ConcreteOp::Push2([0x12, 0x34].into())],
-            expected_exit: ExitAlways(Expr::constant_offset(0x1237u64)),
+            expected_exit: ExitFallThrough(0x1237),
             expected_input_stack: Vec::<Expr>::new(),
             expected_output_stack: vec![Expr::constant_offset(0x1234u64)],
+        }
+        .check();
+    }
+
+    #[test]
+    fn annotate_jump() {
+        AnnotateTest {
+            ops: vec![
+                ConcreteOp::Push1([0xbb].into()),
+                ConcreteOp::Push1([0xaa].into()),
+                ConcreteOp::Jump,
+            ],
+            expected_exit: ExitUnconditional(Expr::constant_offset(0xaau64)),
+            expected_input_stack: Vec::<Expr>::new(),
+            expected_output_stack: vec![Expr::constant_offset(0xbbu64)],
         }
         .check();
     }

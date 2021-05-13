@@ -231,3 +231,18 @@ pub trait Immediate<const N: usize>: Debug + Clone + Eq + PartialEq {
 impl<T, const N: usize> Immediate<N> for [T; N] where T: Debug + Clone + Eq + PartialEq {}
 impl<const N: usize> Immediate<N> for Imm<[u8; N]> {}
 impl<const N: usize> Immediate<N> for () {}
+
+#[cfg(test)]
+mod tests {
+    use assert_matches::assert_matches;
+
+    use hex_literal::hex;
+
+    use super::*;
+
+    #[test]
+    fn imm4_from_array() {
+        let imm = Imm::from(hex!("95ea7b30"));
+        assert_matches!(imm, Imm::Constant([0x95, 0xea, 0x7b, 0x30]));
+    }
+}
