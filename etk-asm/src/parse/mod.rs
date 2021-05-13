@@ -101,7 +101,7 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseErro
             let raw = operand.into_inner().next().unwrap().as_str();
             let mut hasher = Keccak256::new();
             hasher.update(raw.as_bytes());
-            AbstractOp::with_immediate(spec, &hasher.finalize()[0..4])
+            AbstractOp::with_immediate(spec, &hasher.finalize()[0..(spec.size() - 1) as usize])
                 .ok()
                 .context(error::ImmediateTooLarge)?
         }
@@ -348,12 +348,16 @@ mod tests {
             push4 selector("name()")
             push4 selector("balanceOf(address)")
             push4 selector("transfer(address,uint256)")
+            push32 selector("transfer(address,uint256)")
 
         "#;
         let expected = nodes![
             Op::Push4(Imm::from(hex!("06fdde03"))),
             Op::Push4(Imm::from(hex!("70a08231"))),
             Op::Push4(Imm::from(hex!("a9059cbb"))),
+            Op::Push32(Imm::from(hex!(
+                "a9059cbb2ab09eb219583f4a59a5d0623ade346d962bcd4e46b11da047c9049b"
+            ))),
         ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
