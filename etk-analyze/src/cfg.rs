@@ -105,18 +105,21 @@ impl ControlFlowGraph {
 
             let exit = block.exit.erase();
 
+            let mut fall_through_idx = None;
+
             // Add edge to fall-through (aka the next instruction after this block.)
             if let Some(fall_through) = block.exit.fall_through() {
                 let next = by_offset.get(&fall_through);
                 if let Some(next_idx) = next {
                     // If the fallthrough matches a block, add an edge to it.
                     graph.add_edge(idx, *next_idx, Edge);
+                    fall_through_idx = Some(next_idx);
                 } else {
                     // If the fallthough doesn't match a block, add an edge to
                     // <terminate>.
                     graph.add_edge(idx, terminate, Edge);
                 }
-            }
+            };
 
             match exit {
                 Exit::Unconditional(_) => (),
@@ -136,6 +139,11 @@ impl ControlFlowGraph {
             graph.add_edge(idx, bad_jump, Edge);
 
             for jump_target in jump_targets.iter() {
+                if Some(jump_target) == fall_through_idx {
+                    // Edge was added earlier.
+                    continue;
+                }
+
                 // Assume all jumps can go to any jump target.
                 graph.add_edge(idx, *jump_target, Edge);
             }
