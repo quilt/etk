@@ -460,14 +460,14 @@ impl<'a> Annotator<'a> {
                 let _dest_offset = stack.pop();
                 let _offset = stack.pop();
                 let _len = stack.pop();
-                todo!("set memory")
+                // TODO: Set memory
             }
 
             ConcreteOp::CodeCopy => {
                 let _dest_offset = stack.pop();
                 let _offset = stack.pop();
                 let _len = stack.pop();
-                todo!("set memory")
+                // TODO: Set memory
             }
 
             ConcreteOp::ExtCodeCopy => {
@@ -475,14 +475,14 @@ impl<'a> Annotator<'a> {
                 let _dest_offset = stack.pop();
                 let _offset = stack.pop();
                 let _len = stack.pop();
-                todo!("set memory")
+                // TODO: Set memory
             }
             ConcreteOp::ReturnDataSize => stack.push(Expr::return_data_size()),
             ConcreteOp::ReturnDataCopy => {
                 let _dest_offset = stack.pop();
                 let _offset = stack.pop();
                 let _len = stack.pop();
-                todo!()
+                // TODO: Set memory
             }
             ConcreteOp::ExtCodeHash => {
                 let addr = stack.pop();
@@ -495,12 +495,12 @@ impl<'a> Annotator<'a> {
             ConcreteOp::MStore => {
                 let _addr = stack.pop();
                 let _value = stack.pop();
-                todo!("set memory");
+                // TODO: set memory
             }
             ConcreteOp::MStore8 => {
                 let _addr = stack.pop();
                 let _value = stack.pop();
-                todo!("set memory");
+                // TODO: set memory
             }
             ConcreteOp::SLoad => {
                 let addr = stack.pop();
@@ -509,7 +509,7 @@ impl<'a> Annotator<'a> {
             ConcreteOp::SStore => {
                 let _key = stack.pop();
                 let _value = stack.pop();
-                todo!("set storage");
+                // TODO: set storage
             }
             ConcreteOp::GetPc => stack.push(Expr::pc(pc as u16)),
 

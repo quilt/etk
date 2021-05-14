@@ -546,4 +546,103 @@ mod tests {
         }
         .check();
     }
+
+    #[test]
+    fn memory_jump() {
+        let source = r#"
+            push1 target
+            push1 0
+            mstore
+            push1 0
+            mload
+            jump
+
+            target:
+                jumpdest
+        "#;
+
+        CfgTest {
+            source,
+            connected: &[(0, N::Offset(9)), (9, N::Terminate)],
+            unconnected: &[
+                // TODO: Until the memory stuff is better, can't prove:
+                // (0, N::BadJump),
+                (0, N::Terminate),
+                (9, N::BadJump),
+                (9, N::Offset(0)),
+            ],
+        }
+        .check();
+    }
+
+    #[test]
+    fn storage_jump() {
+        let source = r#"
+            push1 target
+            push1 0
+            sstore
+            push1 0
+            sload
+            jump
+
+            target:
+                jumpdest
+        "#;
+
+        CfgTest {
+            source,
+            connected: &[(0, N::Offset(9)), (9, N::Terminate)],
+            unconnected: &[
+                // TODO: Until the storage stuff is better, can't prove:
+                // (0, N::BadJump),
+                (0, N::Terminate),
+                (9, N::BadJump),
+                (9, N::Offset(0)),
+            ],
+        }
+        .check();
+    }
+
+    #[test]
+    fn shr_branch() {
+        let source = r#"
+            push32 0x23b872dd00000000000000000000000000000000000000000000000000000000
+            push1 224
+            shr
+            push4 0x23b872dd
+            eq
+            push4 transfer_from
+            jumpi
+
+            stop
+
+            transfer_from:
+            jumpdest
+            stop
+        "#;
+
+        CfgTest {
+            source,
+            connected: &[
+                (0, N::Offset(0x31)),
+                (0x30, N::Terminate),
+                (0x31, N::Terminate),
+            ],
+            unconnected: &[
+                (0, N::Offset(0)),
+                (0, N::Offset(0x30)),
+                (0, N::BadJump),
+                (0, N::Terminate),
+                (0x30, N::Offset(0x30)),
+                (0x30, N::Offset(0x31)),
+                (0x30, N::Offset(0)),
+                (0x30, N::BadJump),
+                (0x31, N::Offset(0x31)),
+                (0x31, N::Offset(0x30)),
+                (0x31, N::Offset(0)),
+                (0x31, N::BadJump),
+            ],
+        }
+        .check();
+    }
 }
