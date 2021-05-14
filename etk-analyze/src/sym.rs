@@ -302,8 +302,8 @@ impl Expr {
         Self::concat(Sym::Shl, &[self, rhs])
     }
 
-    pub fn shr(&self, rhs: &Self) -> Self {
-        Self::concat(Sym::Shr, &[self, rhs])
+    pub fn shr(&self, value: &Self) -> Self {
+        Self::concat(Sym::Shr, &[self, value])
     }
 
     pub fn sar(&self, rhs: &Self) -> Self {
@@ -434,9 +434,6 @@ impl<'a, 'b> Visit for DisplayVisit<'a, 'b> {
             Sym::And => " & ",
             Sym::Or => " | ",
             Sym::Xor => " ^ ",
-            Sym::Shl => " <<< ",
-            Sym::Shr => " >>> ",
-            Sym::Sar => " >> ",
             q if q.children() < 2 => unreachable!(),
             _ => ", ",
         };
@@ -486,6 +483,9 @@ impl<'a, 'b> Visit for DisplayVisit<'a, 'b> {
             Sym::Call => write!(self.0, "call("),
             Sym::StaticCall => write!(self.0, "staticcall("),
             Sym::DelegateCall => write!(self.0, "delegatecall("),
+            Sym::Shl => write!(self.0, "shl("),
+            Sym::Shr => write!(self.0, "shr("),
+            Sym::Sar => write!(self.0, "sar("),
             _ => write!(self.0, "("),
         }
     }
@@ -905,21 +905,21 @@ mod z3_visit {
                     let rhs = self.arguments.pop().unwrap();
                     let lhs = self.arguments.pop().unwrap();
 
-                    lhs.bvshl(&rhs)
+                    rhs.bvshl(&lhs)
                 }
 
                 Sym::Shr => {
                     let rhs = self.arguments.pop().unwrap();
                     let lhs = self.arguments.pop().unwrap();
 
-                    lhs.bvlshr(&rhs)
+                    rhs.bvlshr(&lhs)
                 }
 
                 Sym::Sar => {
                     let rhs = self.arguments.pop().unwrap();
                     let lhs = self.arguments.pop().unwrap();
 
-                    lhs.bvashr(&rhs)
+                    rhs.bvashr(&lhs)
                 }
 
                 Sym::Not => {
@@ -1755,9 +1755,26 @@ mod z3_tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[1]).shl(&Expr::constant(&[4]));
+        let expr = Expr::constant(&[4]).shl(&Expr::constant(&[1]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0x10, 256);
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn shr_selector_by_224() {
+        let config = z3::Config::new();
+        let ctx = z3::Context::new(&config);
+
+        let mut value = [0u8; 32];
+        value[0] = 0x23;
+        value[1] = 0xb8;
+        value[2] = 0x72;
+        value[3] = 0xdd;
+
+        let expr = Expr::constant(&[224]).shr(&Expr::constant(&value));
+        let ast = expr.to_z3(&ctx).simplify();
+        let expected = BV::from_u64(&ctx, 0x23b872dd, 256);
         assert_eq!(ast, expected);
     }
 
@@ -1766,7 +1783,7 @@ mod z3_tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0xff; 32]).shr(&Expr::constant(&[248]));
+        let expr = Expr::constant(&[248]).shr(&Expr::constant(&[0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0xff, 256);
         assert_eq!(ast, expected);
@@ -1777,7 +1794,7 @@ mod z3_tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0xff; 32]).sar(&Expr::constant(&[248]));
+        let expr = Expr::constant(&[248]).sar(&Expr::constant(&[0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = Expr::constant(&[0xff; 32]).to_z3(&ctx);
         assert_eq!(ast, expected);
