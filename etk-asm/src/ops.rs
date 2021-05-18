@@ -782,9 +782,9 @@ ops! {
     Difficulty(mnemonic="difficulty", pushes=1),
     GasLimit(mnemonic="gaslimit", pushes=1),
     ChainId(mnemonic="chainid", pushes=1),
+    SelfBalance(mnemonic="selfbalance", pushes=1),
+    BaseFee(mnemonic="basefee", pushes=1),
 
-    Invalid47(mnemonic="invalid_47", exit=true),
-    Invalid48(mnemonic="invalid_48", exit=true),
     Invalid49(mnemonic="invalid_49", exit=true),
     Invalid4a(mnemonic="invalid_4a", exit=true),
     Invalid4b(mnemonic="invalid_4b", exit=true),

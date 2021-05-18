@@ -447,6 +447,8 @@ impl<'a> Annotator<'a> {
             ConcreteOp::Difficulty => stack.push(Expr::difficulty()),
             ConcreteOp::GasLimit => stack.push(Expr::gas_limit()),
             ConcreteOp::ChainId => stack.push(Expr::chain_id()),
+            ConcreteOp::SelfBalance => stack.push(Expr::self_balance()),
+            ConcreteOp::BaseFee => stack.push(Expr::base_fee()),
 
             ConcreteOp::MSize => stack.push(Expr::m_size()),
             ConcreteOp::Gas => stack.push(Expr::gas()),
@@ -799,8 +801,6 @@ impl<'a> Annotator<'a> {
             | ConcreteOp::Invalid2d
             | ConcreteOp::Invalid2e
             | ConcreteOp::Invalid2f
-            | ConcreteOp::Invalid47
-            | ConcreteOp::Invalid48
             | ConcreteOp::Invalid49
             | ConcreteOp::Invalid4a
             | ConcreteOp::Invalid4b

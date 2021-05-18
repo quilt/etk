@@ -16,7 +16,8 @@ op = @{
 	"pop" | "mload" | "mstore8" | "mstore" | "sload" | "sstore" | "jumpdest" |
 	"jumpi" | "jump" | "pc" | "msize" | "gas" | swap | dup | log |
 	"create2" | "callcode" | "call" | "return" | "delegatecall" | "create" |
-	"staticcall" | "revert" | "selfdestruct" | "byte" | "chainid" | "invalid"
+	"staticcall" | "revert" | "selfdestruct" | "byte" | "chainid" | "selfbalance" |
+	"basefee" | "invalid"
 }
 
 push = ${ "push" ~  word_size ~ WHITESPACE ~ numeric_argument }

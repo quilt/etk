@@ -132,6 +132,8 @@ fn every_op() -> Result<(), Error> {
         44
         45
         46
+        47
+        48
 
         50
         51

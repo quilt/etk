@@ -138,6 +138,18 @@ impl Expr {
         }
     }
 
+    pub fn self_balance() -> Self {
+        Self {
+            ops: vec![Sym::SelfBalance],
+        }
+    }
+
+    pub fn base_fee() -> Self {
+        Self {
+            ops: vec![Sym::BaseFee],
+        }
+    }
+
     pub fn pc(offset: u16) -> Self {
         Self {
             ops: vec![Sym::GetPc(offset)],
@@ -475,6 +487,8 @@ impl<'a, 'b> Visit for DisplayVisit<'a, 'b> {
             Sym::Difficulty => write!(self.0, "difficulty("),
             Sym::GasLimit => write!(self.0, "gaslimit("),
             Sym::ChainId => write!(self.0, "chainid("),
+            Sym::SelfBalance => write!(self.0, "selfbalance("),
+            Sym::BaseFee => write!(self.0, "basefee("),
             Sym::GetPc(pc) => write!(self.0, "pc({}", pc),
             Sym::MSize => write!(self.0, "msize("),
             Sym::Gas => write!(self.0, "gas("),
@@ -607,6 +621,8 @@ enum Sym {
     Difficulty,
     GasLimit,
     ChainId,
+    SelfBalance,
+    BaseFee,
     GetPc(u16),
     MSize,
     Gas,
@@ -672,6 +688,8 @@ impl Sym {
             | Sym::Difficulty
             | Sym::GasLimit
             | Sym::ChainId
+            | Sym::SelfBalance
+            | Sym::BaseFee
             | Sym::GetPc(_)
             | Sym::MSize
             | Sym::Gas
@@ -764,6 +782,8 @@ mod z3_visit {
                 Sym::Difficulty => BV::new_const(self.context, "difficulty", 256),
                 Sym::GasLimit => BV::new_const(self.context, "gaslimit", 256),
                 Sym::ChainId => BV::new_const(self.context, "chainid", 256),
+                Sym::SelfBalance => BV::new_const(self.context, "selfbalance", 256),
+                Sym::BaseFee => BV::new_const(self.context, "basefee", 256),
                 Sym::GetPc(pc) => BV::from_u64(self.context, *pc as u64, 256),
                 Sym::MSize => BV::fresh_const(self.context, "msize", 256),
                 Sym::Gas => BV::fresh_const(self.context, "gas", 256),
