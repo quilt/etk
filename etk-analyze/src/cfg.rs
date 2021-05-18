@@ -149,7 +149,7 @@ impl ControlFlowGraph {
             }
         }
 
-        Self { graph, by_offset }
+        Self { by_offset, graph }
     }
 
     fn shallow_block(&mut self, from: NodeIndex, to: NodeIndex) -> bool {
