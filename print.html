@@ -296,7 +296,8 @@ op = @{
 	&quot;pop&quot; | &quot;mload&quot; | &quot;mstore8&quot; | &quot;mstore&quot; | &quot;sload&quot; | &quot;sstore&quot; | &quot;jumpdest&quot; |
 	&quot;jumpi&quot; | &quot;jump&quot; | &quot;pc&quot; | &quot;msize&quot; | &quot;gas&quot; | swap | dup | log |
 	&quot;create2&quot; | &quot;callcode&quot; | &quot;call&quot; | &quot;return&quot; | &quot;delegatecall&quot; | &quot;create&quot; |
-	&quot;staticcall&quot; | &quot;revert&quot; | &quot;selfdestruct&quot; | &quot;byte&quot; | &quot;chainid&quot; | &quot;invalid&quot;
+	&quot;staticcall&quot; | &quot;revert&quot; | &quot;selfdestruct&quot; | &quot;byte&quot; | &quot;chainid&quot; | &quot;selfbalance&quot; |
+	&quot;basefee&quot; | &quot;invalid&quot;
 }
 
 push = ${ &quot;push&quot; ~  word_size ~ WHITESPACE ~ numeric_argument }
@@ -394,6 +395,8 @@ number
 difficulty
 gaslimit
 chainid
+selfbalance
+basefee
 
 pop
 mload
