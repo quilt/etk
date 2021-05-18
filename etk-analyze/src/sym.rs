@@ -782,7 +782,7 @@ mod z3_visit {
                 Sym::Difficulty => BV::new_const(self.context, "difficulty", 256),
                 Sym::GasLimit => BV::new_const(self.context, "gaslimit", 256),
                 Sym::ChainId => BV::new_const(self.context, "chainid", 256),
-                Sym::SelfBalance => BV::new_const(self.context, "selfbalance", 256),
+                Sym::SelfBalance => BV::fresh_const(self.context, "selfbalance", 256),
                 Sym::BaseFee => BV::new_const(self.context, "basefee", 256),
                 Sym::GetPc(pc) => BV::from_u64(self.context, *pc as u64, 256),
                 Sym::MSize => BV::fresh_const(self.context, "msize", 256),
