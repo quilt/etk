@@ -12,14 +12,29 @@ keywords = ["etk", "ethereum", "disassembler"]
 categories = ["cryptography::cryptocurrencies", "command-line-utilities", "development-tools"]
 
 [features]
-cli = ["structopt", "etk-cli"]
+cli = ["structopt", "etk-cli", "cfg"]
+cfg = ["z3", "petgraph"]
 
 [dependencies]
 hex = "0.4.3"
 etk-asm = { path = "../etk-asm", version = "0.2.0-dev" }
 structopt = { optional = true, version = "0.3.21" }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.2.0-dev" }
+z3 = { optional = true, version = "0.10.0" }
+
+[dependencies.petgraph]
+optional = true
+version = "0.5.1"
+default-features = false
+
+[dev-dependencies]
+hex-literal = "0.3.1"
+assert_matches = "1.5.0"
 
 [[bin]]
 name = "disease"
+required-features = ["cli"]
+
+[[bin]]
+name = "ecfg"
 required-features = ["cli"]

@@ -1,10 +1,19 @@
 use etk_asm::disasm::Offset;
 use etk_asm::ops::{ConcreteOp, Metadata};
 
+use std::convert::TryInto;
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct BasicBlock {
     pub offset: usize,
     pub ops: Vec<ConcreteOp>,
+}
+
+impl BasicBlock {
+    pub fn size(&self) -> usize {
+        let sum: u32 = self.ops.iter().map(ConcreteOp::size).sum();
+        sum.try_into().unwrap()
+    }
 }
 
 #[derive(Debug, Default)]

@@ -1,4 +1,4 @@
-//! Analysis tools from the Etherem Toolkit.
+//! Analysis tools from the Ethereum Toolkit.
 //!
 //! Highly unstable and incomplete.
 
@@ -8,4 +8,6 @@
 #![deny(missing_debug_implementations)]
 
 pub mod blocks;
+#[cfg(feature = "cfg")]
+pub mod cfg;
 mod sym;
