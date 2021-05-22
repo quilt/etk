@@ -1,4 +1,4 @@
-program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+)* ~ stmt? ~ EOI }
+program = _{ SOI ~ NEWLINE* ~ (stmt ~ (NEWLINE+|";"))* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
@@ -57,4 +57,4 @@ include_hex = !{ "include_hex" ~ arguments }
 push_macro = !{ "push" ~ arguments }
 
 WHITESPACE = _{ " " | "\t" }
-COMMENT = _{ ";" ~ (!"\n" ~ ANY)* }
+COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* }
