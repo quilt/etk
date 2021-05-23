@@ -191,9 +191,32 @@ mod tests {
     }
 
     #[test]
+    fn parse_single_line() {
+        let asm = r#"
+            push1 0b0; push1 0b1
+        "#;
+        let expected = nodes![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+    }
+
+    #[test]
+    fn parse_mixed_lines() {
+        let asm = r#"
+            push1 0b0; push1 0b1
+            push1 0b1
+        "#;
+        let expected = nodes![
+            Op::Push1(Imm::from([0])),
+            Op::Push1(Imm::from([1])),
+            Op::Push1(Imm::from([1]))
+        ];
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+    }
+
+    #[test]
     fn parse_push_binary() {
         let asm = r#"
-            ; simple cases
+            # simple cases
             push1 0b0
             push1 0b1
         "#;
@@ -204,7 +227,7 @@ mod tests {
     #[test]
     fn parse_push_octal() {
         let asm = r#"
-            ; simple cases
+            # simple cases
             push1 0o0
             push1 0o7
             push2 0o400
@@ -220,17 +243,17 @@ mod tests {
     #[test]
     fn parse_push_decimal() {
         let asm = r#"
-            ; simple cases
+            # simple cases
             push1 0
             push1 1
 
-            ; left-pad values too small
+            # left-pad values too small
             push2 42
 
-            ; barely enough for 2 bytes
+            # barely enough for 2 bytes
             push2 256
 
-            ; just enough for 4 bytes
+            # just enough for 4 bytes
             push4 4294967295
         "#;
         let expected = nodes![
@@ -249,7 +272,7 @@ mod tests {
     #[test]
     fn parse_push_hex() {
         let asm = r#"
-            push1 0x01 ; comment
+            push1 0x01 # comment
             push1 0x42
             push2 0x0102
             push4 0x01020304

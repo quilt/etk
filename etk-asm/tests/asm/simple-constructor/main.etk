@@ -1,6 +1,6 @@
-;;;
-; Hello World
-;;;
+###
+# Hello World
+###
 
 push1 32
 push1 31

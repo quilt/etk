@@ -26,7 +26,7 @@ loop:
     jumpi
 
 pop
-stop                ; This halts execution
+stop                # This halts execution
 # "#;
 # let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
 # ingest.ingest(file!(), src).unwrap();

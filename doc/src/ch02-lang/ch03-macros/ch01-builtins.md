@@ -47,8 +47,8 @@ The path is resolved relative to the current file.
 #### Source: `main.etk`
 
 ```ignore
-some_label:                 ; <- Not visible in `other.etk`.
-    push1 some_label        ; <- Pushes a zero on the stack.
+some_label:                 # <- Not visible in `other.etk`.
+    push1 some_label        # <- Pushes a zero on the stack.
 
 %include("other.etk")
 ```
@@ -56,8 +56,8 @@ some_label:                 ; <- Not visible in `other.etk`.
 #### Source: `other.etk`
 
 ```ignore
-different_label:            ; <- Not visible in `main.etk`.
-    push1 different_label   ; <- ALSO pushes a zero on the stack.
+different_label:            # <- Not visible in `main.etk`.
+    push1 different_label   # <- ALSO pushes a zero on the stack.
 ```
 
 #### After Expansion
@@ -109,7 +109,7 @@ For example:
 ```rust
 # extern crate etk_asm;
 # let src = r#"
-push4 selector("_burn(address,bytes32,uint256)")    ; <- expands to 0x63936327
+push4 selector("_burn(address,bytes32,uint256)")    # <- expands to 0x63936327
 # "#;
 # let mut output = Vec::new();
 # let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
