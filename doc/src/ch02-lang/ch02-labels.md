@@ -6,15 +6,15 @@ Manually counting out jump destination addresses would be a monumentally pointle
 # extern crate etk_asm;
 # let src = r#"
 label0:             # <- This is a label called "label0",
-                    #    and it has the value 0, since it is
-                    #    before any instructions in scope.
+                    ##    and it has the value 0, since it is
+                    ##    before any instructions in scope.
 
     jumpdest
     push1 label0    # <- Here we push the value of "label0",
-                    #    which is zero, onto the stack.
+                    ##    which is zero, onto the stack.
 
     jump            # Now we jump to zero, which is a
-                    # `jumpdest` instruction, looping forever.
+                    ## `jumpdest` instruction, looping forever.
 # "#;
 # let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
 # ingest.ingest(file!(), src).unwrap();
