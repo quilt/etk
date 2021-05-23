@@ -266,7 +266,7 @@ loop:
     jumpi
 
 pop
-stop                ; This halts execution
+stop                # This halts execution
 <span class="boring">&quot;#;
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
@@ -278,7 +278,7 @@ stop                ; This halts execution
 <p>There are a couple other features, like macros, which will be covered in later chapters.</p>
 <h3 id="formal-syntax"><a class="header" href="#formal-syntax">Formal Syntax</a></h3>
 <p>For the language nerds, the ETK assembly language syntax is defined by the following <a href="https://pest.rs/">Pest</a> grammar:</p>
-<pre><code class="language-pest">program = _{ SOI ~ &quot;\n&quot;* ~ (stmt ~ &quot;\n&quot;+)* ~ stmt? ~ EOI }
+<pre><code class="language-pest">program = _{ SOI ~ NEWLINE* ~ (stmt ~ (NEWLINE+|&quot;;&quot;))* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
@@ -337,7 +337,7 @@ include_hex = !{ &quot;include_hex&quot; ~ arguments }
 push_macro = !{ &quot;push&quot; ~ arguments }
 
 WHITESPACE = _{ &quot; &quot; | &quot;\t&quot; }
-COMMENT = _{ &quot;;&quot; ~ (!&quot;\n&quot; ~ ANY)* }
+COMMENT = _{ &quot;#&quot; ~ (!NEWLINE ~ ANY)* }
 </code></pre>
 <h1 id="instructions"><a class="header" href="#instructions">Instructions</a></h1>
 <p>Instructions, also known as opcodes or <code>Op</code>s internally, are the building blocks of ETK smart contracts. Each instruction has a human-readable mnemonic (like <code>dup3</code>) and the machine readable equivalent (which would be <code>0x82</code>). The <code>push</code> family of instructions also encode an immediate value (or argument.)</p>
@@ -501,16 +501,16 @@ selfdestruct
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>label0:             ; &lt;- This is a label called &quot;label0&quot;,
-                    ;    and it has the value 0, since it is
-                    ;    before any instructions in scope.
+</span>label0:             # &lt;- This is a label called &quot;label0&quot;,
+                    #    and it has the value 0, since it is
+                    #    before any instructions in scope.
 
     jumpdest
-    push1 label0    ; &lt;- Here we push the value of &quot;label0&quot;,
-                    ;    which is zero, onto the stack.
+    push1 label0    # &lt;- Here we push the value of &quot;label0&quot;,
+                    #    which is zero, onto the stack.
 
-    jump            ; Now we jump to zero, which is a
-                    ; `jumpdest` instruction, looping forever.
+    jump            # Now we jump to zero, which is a
+                    # `jumpdest` instruction, looping forever.
 <span class="boring">&quot;#;
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
@@ -529,7 +529,7 @@ selfdestruct
 </span><span class="boring">let src = r#&quot;
 </span>push1 start
 push1 end
-sub                 ; &lt;- Will leave a 3 on the stack.
+sub                 # &lt;- Will leave a 3 on the stack.
 stop
 
 start:
@@ -620,14 +620,14 @@ stop
 </ul>
 <p>The path is resolved relative to the current file.</p>
 <h4 id="source-mainetk-1"><a class="header" href="#source-mainetk-1">Source: <code>main.etk</code></a></h4>
-<pre><code class="language-ignore">some_label:                 ; &lt;- Not visible in `other.etk`.
-    push1 some_label        ; &lt;- Pushes a zero on the stack.
+<pre><code class="language-ignore">some_label:                 # &lt;- Not visible in `other.etk`.
+    push1 some_label        # &lt;- Pushes a zero on the stack.
 
 %include(&quot;other.etk&quot;)
 </code></pre>
 <h4 id="source-otheretk-1"><a class="header" href="#source-otheretk-1">Source: <code>other.etk</code></a></h4>
-<pre><code class="language-ignore">different_label:            ; &lt;- Not visible in `main.etk`.
-    push1 different_label   ; &lt;- ALSO pushes a zero on the stack.
+<pre><code class="language-ignore">different_label:            # &lt;- Not visible in `main.etk`.
+    push1 different_label   # &lt;- ALSO pushes a zero on the stack.
 </code></pre>
 <h4 id="after-expansion-1"><a class="header" href="#after-expansion-1">After Expansion</a></h4>
 <pre><code class="language-ignore">push1 0x00
@@ -667,7 +667,7 @@ jumpdest
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>push4 selector(&quot;_burn(address,bytes32,uint256)&quot;)    ; &lt;- expands to 0x63936327
+</span>push4 selector(&quot;_burn(address,bytes32,uint256)&quot;)    # &lt;- expands to 0x63936327
 <span class="boring">&quot;#;
 </span><span class="boring">let mut output = Vec::new();
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);

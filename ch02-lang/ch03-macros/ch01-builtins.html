@@ -198,14 +198,14 @@ stop
 </ul>
 <p>The path is resolved relative to the current file.</p>
 <h4 id="source-mainetk-1"><a class="header" href="#source-mainetk-1">Source: <code>main.etk</code></a></h4>
-<pre><code class="language-ignore">some_label:                 ; &lt;- Not visible in `other.etk`.
-    push1 some_label        ; &lt;- Pushes a zero on the stack.
+<pre><code class="language-ignore">some_label:                 # &lt;- Not visible in `other.etk`.
+    push1 some_label        # &lt;- Pushes a zero on the stack.
 
 %include(&quot;other.etk&quot;)
 </code></pre>
 <h4 id="source-otheretk-1"><a class="header" href="#source-otheretk-1">Source: <code>other.etk</code></a></h4>
-<pre><code class="language-ignore">different_label:            ; &lt;- Not visible in `main.etk`.
-    push1 different_label   ; &lt;- ALSO pushes a zero on the stack.
+<pre><code class="language-ignore">different_label:            # &lt;- Not visible in `main.etk`.
+    push1 different_label   # &lt;- ALSO pushes a zero on the stack.
 </code></pre>
 <h4 id="after-expansion-1"><a class="header" href="#after-expansion-1">After Expansion</a></h4>
 <pre><code class="language-ignore">push1 0x00
@@ -245,7 +245,7 @@ jumpdest
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>push4 selector(&quot;_burn(address,bytes32,uint256)&quot;)    ; &lt;- expands to 0x63936327
+</span>push4 selector(&quot;_burn(address,bytes32,uint256)&quot;)    # &lt;- expands to 0x63936327
 <span class="boring">&quot;#;
 </span><span class="boring">let mut output = Vec::new();
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);

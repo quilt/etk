@@ -190,7 +190,7 @@ loop:
     jumpi
 
 pop
-stop                ; This halts execution
+stop                # This halts execution
 <span class="boring">&quot;#;
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
@@ -202,7 +202,7 @@ stop                ; This halts execution
 <p>There are a couple other features, like macros, which will be covered in later chapters.</p>
 <h3 id="formal-syntax"><a class="header" href="#formal-syntax">Formal Syntax</a></h3>
 <p>For the language nerds, the ETK assembly language syntax is defined by the following <a href="https://pest.rs/">Pest</a> grammar:</p>
-<pre><code class="language-pest">program = _{ SOI ~ &quot;\n&quot;* ~ (stmt ~ &quot;\n&quot;+)* ~ stmt? ~ EOI }
+<pre><code class="language-pest">program = _{ SOI ~ NEWLINE* ~ (stmt ~ (NEWLINE+|&quot;;&quot;))* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
@@ -261,7 +261,7 @@ include_hex = !{ &quot;include_hex&quot; ~ arguments }
 push_macro = !{ &quot;push&quot; ~ arguments }
 
 WHITESPACE = _{ &quot; &quot; | &quot;\t&quot; }
-COMMENT = _{ &quot;;&quot; ~ (!&quot;\n&quot; ~ ANY)* }
+COMMENT = _{ &quot;#&quot; ~ (!NEWLINE ~ ANY)* }
 </code></pre>
 
                     </main>

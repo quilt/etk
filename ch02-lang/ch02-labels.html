@@ -174,16 +174,16 @@
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>label0:             ; &lt;- This is a label called &quot;label0&quot;,
-                    ;    and it has the value 0, since it is
-                    ;    before any instructions in scope.
+</span>label0:             # &lt;- This is a label called &quot;label0&quot;,
+                    #    and it has the value 0, since it is
+                    #    before any instructions in scope.
 
     jumpdest
-    push1 label0    ; &lt;- Here we push the value of &quot;label0&quot;,
-                    ;    which is zero, onto the stack.
+    push1 label0    # &lt;- Here we push the value of &quot;label0&quot;,
+                    #    which is zero, onto the stack.
 
-    jump            ; Now we jump to zero, which is a
-                    ; `jumpdest` instruction, looping forever.
+    jump            # Now we jump to zero, which is a
+                    # `jumpdest` instruction, looping forever.
 <span class="boring">&quot;#;
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
@@ -202,7 +202,7 @@
 </span><span class="boring">let src = r#&quot;
 </span>push1 start
 push1 end
-sub                 ; &lt;- Will leave a 3 on the stack.
+sub                 # &lt;- Will leave a 3 on the stack.
 stop
 
 start:
