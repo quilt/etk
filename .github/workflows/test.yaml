@@ -1,4 +1,7 @@
-on: [push]
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
 
 name: ci
 
