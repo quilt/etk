@@ -141,8 +141,11 @@ struct Root {
 
 impl Root {
     fn new(mut file: PathBuf) -> Result<Self, Error> {
-        // Pop the filename.
-        if !file.pop() {
+        if file.is_file() {
+            // If we have a file, use the current directory.
+            file = PathBuf::from(".");
+        } else if !file.pop() {
+            // Pop the filename.
             file = std::env::current_dir().context(error::Io { path: None })?;
         }
 
