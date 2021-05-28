@@ -46,5 +46,5 @@ $ disease out.hex
    4:   ADD
    5:   POP
 ```
-
-
+### Dependencies
+`ecfg` requires z3 to build
