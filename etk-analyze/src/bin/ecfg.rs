@@ -3,18 +3,29 @@ mod opts;
 
 use crate::opts::Opts;
 
+use etk_cli::errors::WithSources;
+
 use etk_analyze::blocks::basic::Separator;
 use etk_analyze::blocks::AnnotatedBlock;
 use etk_analyze::cfg::ControlFlowGraph;
 
 use etk_asm::disasm::Disassembler;
 
+use snafu::{Backtrace, Snafu};
+
 use std::fs::File;
 use std::io::Write;
 
 use structopt::StructOpt;
 
-type Error = Box<dyn std::error::Error + 'static>;
+#[derive(Debug, Snafu)]
+enum Error {
+    #[snafu(context(false))]
+    Io {
+        source: std::io::Error,
+        backtrace: Backtrace,
+    },
+}
 
 fn main() {
     let result = run();
@@ -24,15 +35,8 @@ fn main() {
         Err(e) => e,
     };
 
-    let mut current = Some(&*root as &dyn std::error::Error);
-
-    while let Some(e) = current.take() {
-        eprintln!("Error: {}", e);
-        eprintln!("Caused by:");
-        current = e.source();
-    }
-
-    eprintln!("Nothing.");
+    eprintln!("{}", WithSources(root));
+    std::process::exit(1);
 }
 
 fn run() -> Result<(), Error> {

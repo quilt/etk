@@ -53,7 +53,7 @@ mod error {
         /// An error that occurred while parsing a file.
         #[snafu(context(false))]
         #[non_exhaustive]
-        #[snafu(display("{}", source))]
+        #[snafu(display("parsing failed"))]
         Parse {
             /// The underlying source of this error.
             #[snafu(backtrace)]
@@ -63,7 +63,7 @@ mod error {
         /// An error that occurred while assembling a file.
         #[snafu(context(false))]
         #[non_exhaustive]
-        #[snafu(display("{}", source))]
+        #[snafu(display("assembling failed"))]
         Assemble {
             /// The underlying source of this error.
             #[snafu(backtrace)]

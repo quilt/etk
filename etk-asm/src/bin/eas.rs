@@ -1,3 +1,4 @@
+use etk_cli::errors::WithSources;
 use etk_cli::io::HexWrite;
 
 use etk_asm::ingest::{Error, Ingest};
@@ -24,7 +25,17 @@ fn create(path: PathBuf) -> File {
     }
 }
 
-fn main() -> Result<(), Error> {
+fn main() {
+    let err = match run() {
+        Ok(_) => return,
+        Err(e) => e,
+    };
+
+    eprintln!("{}", WithSources(err));
+    std::process::exit(1);
+}
+
+fn run() -> Result<(), Error> {
     let opt = Opt::from_args();
 
     let mut out: Box<dyn Write> = match opt.out {
