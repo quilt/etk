@@ -31,13 +31,17 @@ mod error {
 
         /// An i/o error.
         #[snafu(display(
-            "an i/o error occurred on path `{}`",
+            "an i/o error occurred on path `{}` ({})",
             path.as_ref().map(|p| p.display().to_string()).unwrap_or_default(),
+            message,
         ))]
         #[non_exhaustive]
         Io {
             /// The underlying source of this error.
             source: std::io::Error,
+
+            /// Extra information about the i/o error.
+            message: String,
 
             /// The location of the error.
             backtrace: Backtrace,
@@ -104,6 +108,7 @@ use std::path::{Path, PathBuf};
 
 fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, Error> {
     let asm = read_to_string(path.as_ref()).with_context(|| error::Io {
+        message: "reading file before parsing",
         path: path.as_ref().to_owned(),
     })?;
     let nodes = parse_asm(&asm)?;
@@ -143,21 +148,37 @@ impl Root {
     fn new(mut file: PathBuf) -> Result<Self, Error> {
         // Pop the filename.
         if !file.pop() {
-            file = std::env::current_dir().context(error::Io { path: None })?;
+            return Err(io::Error::from(io::ErrorKind::NotFound)).context(error::Io {
+                message: "no parent",
+                path: Some(file),
+            });
         }
 
-        let metadata = file
-            .metadata()
-            .with_context(|| error::Io { path: file.clone() })?;
+        let file = std::env::current_dir()
+            .context(error::Io {
+                message: "getting cwd",
+                path: None,
+            })?
+            .join(file);
+
+        let metadata = file.metadata().with_context(|| error::Io {
+            message: "getting metadata",
+            path: file.clone(),
+        })?;
 
         // Root must be a directory.
         if !metadata.is_dir() {
             let err = io::Error::from(io::ErrorKind::NotFound);
-            return Err(err).context(error::Io { path: file });
+            return Err(err).context(error::Io {
+                message: "root is not directory",
+                path: file,
+            });
         }
 
-        let canonicalized =
-            std::fs::canonicalize(&file).with_context(|| error::Io { path: file.clone() })?;
+        let canonicalized = std::fs::canonicalize(&file).with_context(|| error::Io {
+            message: "canonicalizing root",
+            path: file.clone(),
+        })?;
 
         Ok(Self {
             original: file,
@@ -172,6 +193,7 @@ impl Root {
         let path = path.as_ref();
 
         let canonicalized = std::fs::canonicalize(path).with_context(|| error::Io {
+            message: "canonicalizing include/import",
             path: path.to_owned(),
         })?;
 
@@ -281,9 +303,10 @@ where
         }
 
         if self.sources.is_empty() {
-            self.output
-                .write_all(&raw)
-                .context(error::Io { path: None })?;
+            self.output.write_all(&raw).context(error::Io {
+                message: "writing output",
+                path: None,
+            })?;
             Ok(())
         } else {
             self.write(RawOp::Raw(raw))
@@ -369,10 +392,15 @@ where
     {
         let path = path.into();
 
-        let mut file = File::open(&path).with_context(|| error::Io { path: path.clone() })?;
+        let mut file = File::open(&path).with_context(|| error::Io {
+            message: "opening source",
+            path: path.clone(),
+        })?;
         let mut text = String::new();
-        file.read_to_string(&mut text)
-            .with_context(|| error::Io { path: path.clone() })?;
+        file.read_to_string(&mut text).with_context(|| error::Io {
+            message: "reading source",
+            path: path.clone(),
+        })?;
 
         self.ingest(path, &text)
     }
@@ -418,6 +446,7 @@ where
 
                     let file =
                         std::fs::read_to_string(partial.path()).with_context(|| error::Io {
+                            message: "reading hex include",
                             path: partial.path().to_owned(),
                         })?;
 
