@@ -18,7 +18,7 @@ pub enum ParseError {
     },
 
     /// The source code did not lex correctly.
-    #[snafu(display("lexing failed: {}", source))]
+    #[snafu(display("lexing failed"))]
     #[non_exhaustive]
     Lexer {
         /// The underlying source of this error.

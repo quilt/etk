@@ -5,5 +5,6 @@
 #![deny(unreachable_pub)]
 #![deny(missing_debug_implementations)]
 
+pub mod errors;
 pub mod io;
 pub mod parse;
