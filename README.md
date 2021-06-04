@@ -48,3 +48,9 @@ $ disease out.hex
 ```
 ### Dependencies
 `ecfg` requires z3 to build
+Example: Ubuntu Installation Instructions:
+```console
+sudo apt-get update -y
+sudo apt-get install -y z3
+```
+Check the system logs to confirm that there are no related errors.
