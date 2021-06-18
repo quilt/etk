@@ -12,7 +12,7 @@ keywords = ["etk", "ethereum", "disassembler"]
 categories = ["cryptography::cryptocurrencies", "command-line-utilities", "development-tools"]
 
 [features]
-cli = ["structopt", "etk-cli", "cfg", "snafu"]
+cli = ["structopt", "etk-cli", "cfg", "snafu", "etk-4byte"]
 cfg = ["z3", "petgraph"]
 
 [dependencies]
@@ -20,6 +20,7 @@ hex = "0.4.3"
 etk-asm = { path = "../etk-asm", version = "0.2.0-dev" }
 structopt = { optional = true, version = "0.3.21" }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.2.0-dev" }
+etk-4byte = { optional = true, path = "../etk-4byte", version = "0.2.0-dev" }
 z3 = { optional = true, version = "0.10.0" }
 snafu = { optional = true, version = "0.6.10" }
 

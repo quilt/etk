@@ -227,6 +227,7 @@ name = "etk-analyze"
 version = "0.2.0-dev"
 dependencies = [
  "assert_matches",
+ "etk-4byte",
  "etk-asm",
  "etk-cli",
  "hex",
