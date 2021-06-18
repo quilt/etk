@@ -46,5 +46,11 @@ $ disease out.hex
    4:   ADD
    5:   POP
 ```
-
-
+### Dependencies
+`ecfg` requires z3 to build
+Ubuntu Installation Instructions (example):
+```console
+sudo apt-get update -y
+sudo apt-get install -y z3
+```
+Check the system logs to confirm that there are no related errors.
