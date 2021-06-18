@@ -1,2 +1,2 @@
 [workspace]
-members = ["etk-asm", "etk-analyze", "etk-cli"]
+members = ["etk-asm", "etk-analyze", "etk-cli", "etk-4byte"]
