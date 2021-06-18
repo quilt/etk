@@ -1,7 +1,10 @@
 #[path = "disease/opts.rs"]
 mod opts;
+#[path = "disease/selectors.rs"]
+mod selectors;
 
 use crate::opts::Opts;
+use crate::selectors::DisplayOp;
 
 use etk_analyze::blocks::basic::Separator;
 
@@ -63,7 +66,7 @@ fn run() -> Result<(), Error> {
         let mut offset = block.offset;
         for op in block.ops {
             let len = op.size();
-            let off = Offset::new(offset, op);
+            let off = Offset::new(offset, DisplayOp(op));
             offset += len as usize;
 
             writeln!(out, "{}", off)?;
