@@ -36,7 +36,7 @@ The first line&mdash;`push1 0x00`&mdash;describes a push instruction of length o
 
 Next, we have `loop:`, which introduces a label named _loop_. Labels can be used as arguments to push instructions, usually for jumps or subroutines.
 
-Finally, we have `; This halts execution`, which is a comment. Comments are introduced with `;` and continue to the end of the line. Comments are ignored as far as the assembler is concerned.
+Finally, we have `# This halts execution`, which is a comment. Comments are introduced with `#` and continue to the end of the line. Comments are ignored as far as the assembler is concerned.
 
 There are a couple other features, like macros, which will be covered in later chapters.
 

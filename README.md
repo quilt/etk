@@ -39,8 +39,8 @@ add
 pop
 ```
 ```console
-$ eas contract.etc out.hex
-$ disease out.hex
+$ eas contract.etk out.hex
+$ disease --hex-file out.hex
    0:   PUSH1 0x2a
    2:   PUSH1 0x0d
    4:   ADD
@@ -52,5 +52,6 @@ Ubuntu Installation Instructions (example):
 ```console
 sudo apt-get update -y
 sudo apt-get install -y z3
+sudo apt-get install -y libz3-dev
 ```
 Check the system logs to confirm that there are no related errors.
