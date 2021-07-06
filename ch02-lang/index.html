@@ -198,7 +198,7 @@ stop                # This halts execution
 </span></code></pre></pre>
 <p>The first line—<code>push1 0x00</code>—describes a push instruction of length one, with a value of <code>0</code>. When assembled, this line would become <code>0x6000</code>.</p>
 <p>Next, we have <code>loop:</code>, which introduces a label named <em>loop</em>. Labels can be used as arguments to push instructions, usually for jumps or subroutines.</p>
-<p>Finally, we have <code>; This halts execution</code>, which is a comment. Comments are introduced with <code>;</code> and continue to the end of the line. Comments are ignored as far as the assembler is concerned.</p>
+<p>Finally, we have <code># This halts execution</code>, which is a comment. Comments are introduced with <code>#</code> and continue to the end of the line. Comments are ignored as far as the assembler is concerned.</p>
 <p>There are a couple other features, like macros, which will be covered in later chapters.</p>
 <h3 id="formal-syntax"><a class="header" href="#formal-syntax">Formal Syntax</a></h3>
 <p>For the language nerds, the ETK assembly language syntax is defined by the following <a href="https://pest.rs/">Pest</a> grammar:</p>
