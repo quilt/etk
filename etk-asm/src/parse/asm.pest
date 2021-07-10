@@ -1,9 +1,14 @@
-program = _{ SOI ~ NEWLINE* ~ (stmt ~ (NEWLINE+|";"))* ~ stmt? ~ EOI }
-
+///////////////////////
+// program structure //
+///////////////////////
+program = _{ SOI ~ inner ~ EOI }
+inner = _{ NEWLINE* ~ (stmt ~ (NEWLINE+|";"))* ~ stmt? }
 stmt = _{ expr }
+expr = _{ label_definition | builtin | push | op }
 
-expr = _{ label_defn | inst_macro | push | op }
-
+//////////////////////
+// opcode mnemonics //
+//////////////////////
 op = @{
 	"origin" | "stop" | "mulmod" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
 	"addmod" | "exp" | "signextend" | "lt" | "gt" | "slt" |
@@ -19,42 +24,55 @@ op = @{
 	"staticcall" | "revert" | "selfdestruct" | "byte" | "chainid" | "selfbalance" |
 	"basefee" | "invalid"
 }
-
-push = ${ "push" ~  word_size ~ WHITESPACE ~ numeric_argument }
+push = ${ "push" ~  word_size ~ WHITESPACE ~ operand }
 swap = { "swap" ~ half_word_size }
 dup  = { "dup" ~ half_word_size }
 log = { "log" ~ '0'..'4' }
 
-string = @{ "\"" ~ string_char* ~ "\"" }
-string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }
-
 word_size = @{ ('1'..'2' ~ '0'..'9') | ("3" ~ '0'..'2') | '1'..'9' }
 half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
 
-binary = @{ "0b" ~ ASCII_BIN_DIGIT+ }
-octal = @{ "0o" ~ ASCII_OCT_DIGIT+ }
-decimal = @{ ASCII_DIGIT+ }
-hex = @{ "0x" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT+ }
-number = _{ binary | octal | hex | decimal }
-
-selector = { "selector(\"" ~ function_declaration ~ "\")" }
-function_declaration = { function_name ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
-function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
-
-label = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
-label_defn = { label ~ ":" }
-
-arguments = _{ "(" ~ arguments_list? ~ ")" }
-arguments_list = _{ ( argument ~ "," )* ~ argument? }
-argument = _{ string | numeric_argument }
-numeric_argument = _{ number | selector | label }
-
-inst_macro = ${ "%" ~ ( import | include | include_hex | push_macro ) }
+////////////////////////
+// instruction macros //
+////////////////////////
+builtin = ${ "%" ~ ( import | include | include_hex | push_macro ) }
 
 import = !{ "import" ~ arguments }
 include = !{ "include" ~ arguments }
 include_hex = !{ "include_hex" ~ arguments }
 push_macro = !{ "push" ~ arguments }
 
+arguments = _{ "(" ~ arguments_list? ~ ")" }
+arguments_list = _{ ( argument ~ "," )* ~ argument? }
+argument = _{ string | operand }
+
+string = @{ "\"" ~ string_char* ~ "\"" }
+string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }
+
+///////////////////////
+// expression macros //
+///////////////////////
+selector = { "selector(\"" ~ function_declaration ~ "\")" }
+function_declaration = { function_name ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
+function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
+
+//////////////
+// operands //
+//////////////
+operand = _{ number | selector | label }
+
+number = _{ binary | octal | hex | decimal }
+
+binary = @{ "0b" ~ ASCII_BIN_DIGIT+ }
+octal = @{ "0o" ~ ASCII_OCT_DIGIT+ }
+decimal = @{ ASCII_DIGIT+ }
+hex = @{ "0x" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT+ }
+
+label = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+label_definition = { label ~ ":" }
+
+///////////////
+// overrides //
+///////////////
 WHITESPACE = _{ " " | "\t" }
 COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* }

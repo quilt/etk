@@ -31,14 +31,14 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let pairs = AsmParser::parse(Rule::program, asm)?;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::inst_macro => {
+            Rule::builtin => {
                 let mut pairs = pair.into_inner();
                 let inst_macro = pairs.next().unwrap();
                 assert!(pairs.next().is_none());
                 let node = parse_inst_macro(inst_macro)?;
                 program.push(node);
             }
-            Rule::label_defn => {
+            Rule::label_definition => {
                 let mut pair = pair.into_inner();
                 let label = pair.next().unwrap();
                 let txt = label.as_str();
