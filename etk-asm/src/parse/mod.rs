@@ -31,11 +31,14 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let pairs = AsmParser::parse(Rule::program, asm)?;
     for pair in pairs {
         match pair.as_rule() {
+            Rule::instruction_macro => {
+                program.push(parse_instruction_macro(pair)?.into());
+            }
             Rule::builtin => {
                 let mut pairs = pair.into_inner();
-                let inst_macro = pairs.next().unwrap();
+                let builtin = pairs.next().unwrap();
                 assert!(pairs.next().is_none());
-                let node = parse_inst_macro(inst_macro)?;
+                let node = parse_builtin(builtin)?;
                 program.push(node);
             }
             Rule::label_definition => {
@@ -115,7 +118,36 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseErro
     Ok(op)
 }
 
-fn parse_inst_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
+fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
+    let mut pairs = pair.into_inner();
+    let name = pairs.next().unwrap();
+    let mut content = Vec::<AbstractOp>::new();
+
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::label_definition => {
+                let mut pair = pair.into_inner();
+                let label = pair.next().unwrap();
+                let txt = label.as_str();
+                content.push(AbstractOp::Label(txt.into()).into());
+            }
+            Rule::push => {
+                content.push(parse_push(pair)?.into());
+            }
+            Rule::op => {
+                let spec: Specifier = pair.as_str().parse().unwrap();
+                let op = Op::new(spec).unwrap();
+                let aop = AbstractOp::Op(op);
+                content.push(aop.into());
+            }
+            _ => continue,
+        }
+    }
+
+    return Ok(AbstractOp::Macro(name.as_str().to_string(), content).into());
+}
+
+fn parse_builtin(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
     let rule = pair.as_rule();
 
     let node = match rule {
@@ -123,24 +155,20 @@ fn parse_inst_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseErro
             let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
             Node::Import(args.0)
         }
-
         Rule::include => {
             let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
             Node::Include(args.0)
         }
-
         Rule::include_hex => {
             let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
             Node::IncludeHex(args.0)
         }
-
         Rule::push_macro => {
             // TODO: This should accept labels or literals, not just labels.
             let args = <(Label,)>::parse_arguments(pair.into_inner())?;
             let arg = Imm::from(args.0 .0);
             Node::Op(AbstractOp::Push(arg))
         }
-
         _ => unreachable!(),
     };
     Ok(node)
@@ -519,6 +547,23 @@ mod tests {
             AbstractOp::Push("hello".into()),
             Op::Push1(Imm::from(2)),
         ];
+        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+    }
+
+    #[test]
+    fn parse_instruction_macro() {
+        let asm = format!(
+            r#"
+            %macro my_macro()
+                gasprice
+                pop
+            %end
+            "#,
+        );
+        let expected = nodes![AbstractOp::Macro(
+            "my_macro()".into(),
+            vec![Op::GasPrice.into(), Op::Pop.into()]
+        ),];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
 }
