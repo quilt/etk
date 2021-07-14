@@ -994,6 +994,12 @@ pub enum AbstractOp {
 
     /// A variable sized push, which is a virtual instruction.
     Push(Imm<Vec<u8>>),
+
+    /// A user-defined instruction macro definition, which is a virtual instruction.
+    MacroDefinition(String, Vec<AbstractOp>),
+
+    /// A user-defined instruction macro, which is a virtual instruction.
+    Macro(String),
 }
 
 impl AbstractOp {
@@ -1034,6 +1040,8 @@ impl AbstractOp {
             Self::Push(Imm::Label(lbl)) => Some(lbl),
             Self::Push(_) => None,
             Self::Label(_) => None,
+            Self::Macro(_) => None,
+            Self::MacroDefinition(_, _) => None,
         }
     }
 
@@ -1050,6 +1058,8 @@ impl AbstractOp {
             }
             Self::Op(op) => Self::Op(op.realize(address)?),
             Self::Label(_) => panic!("labels cannot be realized"),
+            Self::Macro(_) => panic!("macros cannot be realized"),
+            Self::MacroDefinition(_, _) => panic!("macro definitions cannot be realized"),
         };
 
         Ok(ret)
@@ -1069,6 +1079,8 @@ impl AbstractOp {
                 Op::<Concrete>::with_immediate(spec, trimmed).unwrap()
             }
             Self::Label(_) => panic!("labels cannot be concretized"),
+            Self::Macro(_) => panic!("macros cannot be concretized"),
+            Self::MacroDefinition(_, _) => panic!("macro definitions cannot be concretized"),
         };
 
         Some(res)
@@ -1084,6 +1096,8 @@ impl AbstractOp {
             Self::Op(op) => Some(op.size()),
             Self::Label(_) => Some(0),
             Self::Push(_) => None,
+            Self::Macro(_) => None,
+            Self::MacroDefinition(_, _) => None,
         }
     }
 
@@ -1108,6 +1122,8 @@ impl fmt::Display for AbstractOp {
             Self::Op(op) => write!(f, "{}", op),
             Self::Push(txt) => write!(f, r#"%push({})"#, txt),
             Self::Label(lbl) => write!(f, r#".{}:"#, lbl),
+            Self::Macro(name) => write!(f, r#"%{}"#, name),
+            Self::MacroDefinition(name, content) => write!(f, r#"%{}: {:?}"#, name, content),
         }
     }
 }
@@ -1118,6 +1134,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.is_jump(),
             Self::Push(_) => false,
             Self::Label(_) => false,
+            Self::Macro(_) => false,
+            Self::MacroDefinition(_, _) => false,
         }
     }
 
@@ -1126,6 +1144,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.is_jump_target(),
             Self::Push(_) => false,
             Self::Label(_) => false,
+            Self::Macro(_) => false,
+            Self::MacroDefinition(_, _) => false,
         }
     }
 
@@ -1134,6 +1154,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.is_exit(),
             Self::Push(_) => false,
             Self::Label(_) => false,
+            Self::Macro(_) => false,
+            Self::MacroDefinition(_, _) => false,
         }
     }
 
@@ -1142,6 +1164,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.storage_access(),
             Self::Push(_) => None,
             Self::Label(_) => None,
+            Self::Macro(_) => None,
+            Self::MacroDefinition(_, _) => None,
         }
     }
 
@@ -1150,6 +1174,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.storage_access(),
             Self::Push(_) => None,
             Self::Label(_) => None,
+            Self::Macro(_) => None,
+            Self::MacroDefinition(_, _) => None,
         }
     }
 
@@ -1158,6 +1184,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.pops(),
             Self::Push(_) => 0,
             Self::Label(_) => 0,
+            Self::Macro(_) => 0,
+            Self::MacroDefinition(_, _) => 0,
         }
     }
 
@@ -1166,6 +1194,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.pushes(),
             Self::Push(_) => 1,
             Self::Label(_) => 0,
+            Self::Macro(_) => 0,
+            Self::MacroDefinition(_, _) => 0,
         }
     }
 }
