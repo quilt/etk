@@ -25,6 +25,17 @@ mod error {
             backtrace: Backtrace,
         },
 
+        /// A label was declared multiple times.
+        #[snafu(display("macro `{}` declared multiple times", macro_name))]
+        #[non_exhaustive]
+        DuplicateMacro {
+            /// The name of the conflicting label.
+            macro_name: String,
+
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
+
         /// A push instruction was too small for the address of a label.
         #[snafu(display("value of label `{}` was too large for the given opcode", label))]
         #[non_exhaustive]
@@ -51,6 +62,17 @@ mod error {
         UndeclaredLabel {
             /// The label that was used without being defined.
             label: String,
+
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
+
+        /// A macro was used without being defined.
+        #[snafu(display("macro `{}` was never defined", macro_name))]
+        #[non_exhaustive]
+        UndeclaredMacro {
+            /// The macro that was used without being defined.
+            macro_name: String,
 
             /// The location of the error.
             backtrace: Backtrace,
@@ -155,9 +177,16 @@ pub struct Assembler {
     /// Labels, in `pending`, associated with an `AbstractOp::Label`.
     declared_labels: HashMap<String, Option<u32>>,
 
+    /// Macros, in `pending`, associate with an `AbstractOp::Macro`.
+    declared_macros: HashMap<String, Vec<AbstractOp>>,
+
     /// Labels, in `pending`, that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
     undeclared_labels: HashSet<String>,
+
+    /// Macros, in `pending`, that have been referred to, but have not been declared with an
+    /// `AbstractOp::Macro`.
+    undeclared_macros: HashSet<String>,
 }
 
 impl Default for Assembler {
@@ -168,7 +197,9 @@ impl Default for Assembler {
             pending_len: Some(0),
             concrete_len: 0,
             declared_labels: Default::default(),
+            declared_macros: Default::default(),
             undeclared_labels: Default::default(),
+            undeclared_macros: Default::default(),
         }
     }
 }
@@ -184,9 +215,12 @@ impl Assembler {
     pub fn finish(self) -> Result<(), Error> {
         if let Some(undef) = self.pending.front() {
             return match undef {
-                RawOp::Op(op) => {
+                RawOp::Op(AbstractOp::Op(op)) => {
                     let label = op.immediate_label().unwrap();
                     error::UndeclaredLabel { label }.fail()
+                }
+                RawOp::Op(AbstractOp::Macro(macro_name)) => {
+                    error::UndeclaredMacro { macro_name }.fail()
                 }
                 _ => unreachable!(),
             };
@@ -230,21 +264,41 @@ impl Assembler {
     {
         let rop = rop.into();
 
-        if let RawOp::Op(AbstractOp::Label(ref label)) = rop {
-            match self.declared_labels.entry(label.to_owned()) {
-                hash_map::Entry::Occupied(_) => {
-                    return error::DuplicateLabel { label }.fail();
-                }
-                hash_map::Entry::Vacant(v) => {
-                    v.insert(None);
-                    self.undeclared_labels.remove(label);
+        match rop {
+            RawOp::Op(AbstractOp::Label(ref label)) => {
+                match self.declared_labels.entry(label.to_owned()) {
+                    hash_map::Entry::Occupied(_) => {
+                        return error::DuplicateLabel { label }.fail();
+                    }
+                    hash_map::Entry::Vacant(v) => {
+                        v.insert(None);
+                        self.undeclared_labels.remove(label);
+                    }
                 }
             }
+            RawOp::Op(AbstractOp::MacroDefinition(ref name, ref contents)) => {
+                match self.declared_macros.entry(name.to_owned()) {
+                    hash_map::Entry::Occupied(_) => {
+                        return error::DuplicateMacro { macro_name: name }.fail()
+                    }
+                    hash_map::Entry::Vacant(v) => {
+                        v.insert(contents.to_owned());
+                        self.undeclared_macros.remove(name);
+                    }
+                }
+            }
+            _ => (),
         }
 
         if let Some(label) = rop.immediate_label() {
             if !self.declared_labels.contains_key(label) {
                 self.undeclared_labels.insert(label.to_owned());
+            }
+        }
+
+        if let RawOp::Op(AbstractOp::Macro(ref macro_name)) = rop {
+            if !self.declared_labels.contains_key(macro_name) {
+                self.undeclared_labels.insert(macro_name.to_owned());
             }
         }
 
@@ -269,6 +323,58 @@ impl Assembler {
                     .expect("label should exist");
                 assert_eq!(old, None, "label should have been undefined");
                 Ok(())
+            }
+            RawOp::Op(AbstractOp::MacroDefinition(name, contents)) => {
+                let _ = self
+                    .declared_macros
+                    .insert(name, contents)
+                    .expect("macro should exist");
+                // assert_eq!(old, None, "macro should have been undefined");
+                Ok(())
+            }
+            RawOp::Op(AbstractOp::Macro(ref name)) => {
+                // Remap labels to macro scope.
+                if let Some(mut content) = self.declared_macros.get(name).cloned() {
+                    let mut labels = HashMap::<String, String>::new();
+
+                    // First pass, find locally defined macros and rename them.
+                    for op in content.iter_mut() {
+                        match op {
+                            AbstractOp::Label(ref mut label) => {
+                                if labels.contains_key(label) {
+                                    return error::DuplicateLabel {
+                                        label: label.clone(),
+                                    }
+                                    .fail();
+                                }
+
+                                // add hash extension later
+                                let scoped_label = format!("{}_macro", label);
+                                labels.insert(label.to_owned(), scoped_label.clone());
+                                *label = scoped_label;
+                            }
+                            _ => continue,
+                        }
+                    }
+
+                    // Second pass, update local macro invocations.
+                    for op in content.iter_mut() {
+                        if let Some(label) = op.immediate_label() {
+                            if let Some(label) = labels.get(label) {
+                                *op = AbstractOp::with_label(op.specifier().unwrap(), label);
+                            }
+                        }
+                    }
+
+                    self.push_all(content.clone())?;
+                    return Ok(());
+                } else {
+                    assert_eq!(self.pending_len, Some(0));
+                    self.pending_len = rop.size();
+                    self.pending.push_back(rop);
+
+                    Ok(());
+                }
             }
             RawOp::Op(mut op) => {
                 if let Some(label) = op.immediate_label() {
@@ -311,6 +417,12 @@ impl Assembler {
                 size = raw.len() as u32;
                 self.ready.extend(raw);
             }
+            // RawOp::Macro(name) => {
+            //     if let Some(content) = self.declared_labels.get(name).cloned() {
+            //         if self.pending.is_empty() {
+            //             self.ready
+            //     }
+            // }
             RawOp::Op(aop) => {
                 let cop = aop.concretize().context(error::UnsizedPushTooLarge {})?;
                 size = cop.size();
@@ -753,4 +865,86 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn assemble_instruction_macro() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::MacroDefinition(
+                "my_macro()".into(),
+                vec![
+                    AbstractOp::Label("a".into()),
+                    AbstractOp::Op(Op::JumpDest),
+                    AbstractOp::Op(Op::Push1(Imm::from("a"))),
+                    AbstractOp::Op(Op::Push1(Imm::from("b"))),
+                ],
+            ),
+            AbstractOp::Label("b".into()),
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Op(Op::Push1(Imm::from("b"))),
+            AbstractOp::Macro("my_macro()".into()),
+        ];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 8);
+        let out = asm.take();
+        assert_eq!(out, hex!("5b60005b60036000"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_undeclared_instruction_macro() -> Result<(), Error> {
+        let ops = vec![AbstractOp::Macro("my_macro()".into())];
+        let mut asm = Assembler::new();
+        asm.push_all(ops)?;
+        let err = asm.finish().unwrap_err();
+        assert_matches!(err, Error::UndeclaredMacro { macro_name, .. } if macro_name == "my_macro()");
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_duplicate_instruction_macro() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::MacroDefinition("my_macro()".into(), vec![AbstractOp::Op(Op::Caller)]),
+            AbstractOp::MacroDefinition("my_macro()".into(), vec![AbstractOp::Op(Op::GasPrice)]),
+        ];
+        let mut asm = Assembler::new();
+        let err = asm.push_all(ops).unwrap_err();
+        assert_matches!(err, Error::DuplicateMacro { macro_name, .. } if macro_name == "my_macro()");
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_duplicate_labels_in_instruction_macro() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::MacroDefinition(
+                "my_macro()".into(),
+                vec![AbstractOp::Label("a".into()), AbstractOp::Label("a".into())],
+            ),
+            AbstractOp::Macro("my_macro()".into()),
+        ];
+        let mut asm = Assembler::new();
+        let err = asm.push_all(ops).unwrap_err();
+        assert_matches!(err, Error::DuplicateLabel { label, .. } if label == "a");
+
+        Ok(())
+    }
+
+    // #[test]
+    // fn assemble_pending_instruction_macro() -> Result<(), Error> {
+    //     let ops = vec![
+    //         AbstractOp::Macro("my_macro()".into()),
+    //         AbstractOp::MacroDefinition("my_macro()".into(), vec![AbstractOp::Op(Op::Caller)]),
+    //     ];
+    //     let mut asm = Assembler::new();
+    //     let sz = asm.push_all(ops)?;
+    //     assert_eq!(sz, 1);
+    //     let out = asm.take();
+    //     assert_eq!(out, hex!("33"));
+
+    //     Ok(())
+    // }
 }

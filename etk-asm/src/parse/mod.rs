@@ -144,7 +144,7 @@ fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, Pa
         }
     }
 
-    return Ok(AbstractOp::Macro(name.as_str().to_string(), content).into());
+    return Ok(AbstractOp::MacroDefinition(name.as_str().to_string(), content).into());
 }
 
 fn parse_builtin(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
@@ -560,7 +560,7 @@ mod tests {
             %end
             "#,
         );
-        let expected = nodes![AbstractOp::Macro(
+        let expected = nodes![AbstractOp::MacroDefinition(
             "my_macro()".into(),
             vec![Op::GasPrice.into(), Op::Pop.into()]
         ),];
