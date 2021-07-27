@@ -139,7 +139,7 @@ impl From<Vec<u8>> for RawOp {
     }
 }
 
-/// Assembles a series of [`RawOp`] into raw bytes, tracking and resolving labels
+/// Assembles a series of [`RawOp`] into raw bytes, tracking and resolving macros and labels,
 /// and handling dynamic pushes.
 ///
 /// ## Example
@@ -177,16 +177,12 @@ pub struct Assembler {
     /// Labels, in `pending`, associated with an `AbstractOp::Label`.
     declared_labels: HashMap<String, Option<u32>>,
 
-    /// Macros, in `pending`, associate with an `AbstractOp::Macro`.
+    /// Macros, in `pending`, associated with an `AbstractOp::Macro`.
     declared_macros: HashMap<String, Vec<AbstractOp>>,
 
     /// Labels, in `pending`, that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
     undeclared_labels: HashSet<String>,
-
-    /// Macros, in `pending`, that have been referred to, but have not been declared with an
-    /// `AbstractOp::Macro`.
-    undeclared_macros: HashSet<String>,
 }
 
 impl Default for Assembler {
@@ -199,7 +195,6 @@ impl Default for Assembler {
             declared_labels: Default::default(),
             declared_macros: Default::default(),
             undeclared_labels: Default::default(),
-            undeclared_macros: Default::default(),
         }
     }
 }
@@ -246,8 +241,6 @@ impl Assembler {
         I: IntoIterator<Item = O>,
         O: Into<RawOp>,
     {
-        let ops = ops.into_iter().map(Into::into);
-
         for op in ops {
             self.push(op)?;
         }
@@ -276,16 +269,18 @@ impl Assembler {
                     }
                 }
             }
-            RawOp::Op(AbstractOp::MacroDefinition(ref name, ref contents)) => {
+            RawOp::Op(AbstractOp::MacroDefinition(ref name, ref content)) => {
                 match self.declared_macros.entry(name.to_owned()) {
                     hash_map::Entry::Occupied(_) => {
                         return error::DuplicateMacro { macro_name: name }.fail()
                     }
                     hash_map::Entry::Vacant(v) => {
-                        v.insert(contents.to_owned());
-                        self.undeclared_macros.remove(name);
+                        v.insert(content.to_owned());
                     }
                 }
+            }
+            RawOp::Op(AbstractOp::Macro(ref name)) => {
+                self.expand_macro(name)?;
             }
             _ => (),
         }
@@ -293,12 +288,6 @@ impl Assembler {
         if let Some(label) = rop.immediate_label() {
             if !self.declared_labels.contains_key(label) {
                 self.undeclared_labels.insert(label.to_owned());
-            }
-        }
-
-        if let RawOp::Op(AbstractOp::Macro(ref macro_name)) = rop {
-            if !self.declared_labels.contains_key(macro_name) {
-                self.undeclared_labels.insert(macro_name.to_owned());
             }
         }
 
@@ -324,57 +313,14 @@ impl Assembler {
                 assert_eq!(old, None, "label should have been undefined");
                 Ok(())
             }
-            RawOp::Op(AbstractOp::MacroDefinition(name, contents)) => {
-                let _ = self
-                    .declared_macros
-                    .insert(name, contents)
-                    .expect("macro should exist");
-                // assert_eq!(old, None, "macro should have been undefined");
-                Ok(())
-            }
+            RawOp::Op(AbstractOp::MacroDefinition(_, _)) => Ok(()),
             RawOp::Op(AbstractOp::Macro(ref name)) => {
-                // Remap labels to macro scope.
-                if let Some(mut content) = self.declared_macros.get(name).cloned() {
-                    let mut labels = HashMap::<String, String>::new();
-
-                    // First pass, find locally defined macros and rename them.
-                    for op in content.iter_mut() {
-                        match op {
-                            AbstractOp::Label(ref mut label) => {
-                                if labels.contains_key(label) {
-                                    return error::DuplicateLabel {
-                                        label: label.clone(),
-                                    }
-                                    .fail();
-                                }
-
-                                // add hash extension later
-                                let scoped_label = format!("{}_macro", label);
-                                labels.insert(label.to_owned(), scoped_label.clone());
-                                *label = scoped_label;
-                            }
-                            _ => continue,
-                        }
-                    }
-
-                    // Second pass, update local macro invocations.
-                    for op in content.iter_mut() {
-                        if let Some(label) = op.immediate_label() {
-                            if let Some(label) = labels.get(label) {
-                                *op = AbstractOp::with_label(op.specifier().unwrap(), label);
-                            }
-                        }
-                    }
-
-                    self.push_all(content.clone())?;
-                    return Ok(());
-                } else {
+                if !self.declared_macros.contains_key(name) {
                     assert_eq!(self.pending_len, Some(0));
-                    self.pending_len = rop.size();
+                    self.pending_len = None;
                     self.pending.push_back(rop);
-
-                    Ok(());
                 }
+                Ok(())
             }
             RawOp::Op(mut op) => {
                 if let Some(label) = op.immediate_label() {
@@ -407,6 +353,7 @@ impl Assembler {
         }
     }
 
+    // TODO: move below `push_pending`
     fn pop_pending(&mut self) -> Result<(), Error> {
         let popped = self.pending.pop_front().unwrap();
 
@@ -417,12 +364,13 @@ impl Assembler {
                 size = raw.len() as u32;
                 self.ready.extend(raw);
             }
-            // RawOp::Macro(name) => {
-            //     if let Some(content) = self.declared_labels.get(name).cloned() {
-            //         if self.pending.is_empty() {
-            //             self.ready
-            //     }
-            // }
+            RawOp::Op(op @ AbstractOp::Macro(_)) => {
+                if let Some(content) = op.expand(&self.declared_macros) {
+                    size = self.push_all(content)? as u32;
+                } else {
+                    size = 0;
+                }
+            }
             RawOp::Op(aop) => {
                 let cop = aop.concretize().context(error::UnsizedPushTooLarge {})?;
                 size = cop.size();
@@ -443,14 +391,11 @@ impl Assembler {
 
     fn push_pending(&mut self, rop: RawOp) -> Result<(), Error> {
         // Update total size of pending ops.
-        match (&mut self.pending_len, rop.size()) {
-            (Some(p), Some(me)) => {
-                *p += me;
+        if let Some(ref mut pending_len) = self.pending_len {
+            match rop.size() {
+                Some(size) => *pending_len += size,
+                None => self.pending_len = None,
             }
-            (p, None) => {
-                *p = None;
-            }
-            (None, _) => (),
         }
 
         // Handle labels.
@@ -467,6 +412,7 @@ impl Assembler {
                     self.choose_sizes()?;
                 }
             }
+            (_, RawOp::Op(AbstractOp::MacroDefinition(_, _))) => (),
             (_, rop) => {
                 // Not a label.
                 self.pending.push_back(rop);
@@ -596,6 +542,45 @@ impl Assembler {
         self.declared_labels = subasm.declared_labels;
 
         Ok(())
+    }
+
+    fn expand_macro(&mut self, name: &str) -> Result<Option<usize>, Error> {
+        // Remap labels to macro scope.
+        if let Some(mut content) = self.declared_macros.get(name).cloned() {
+            let mut labels = HashMap::<String, String>::new();
+
+            // First pass, find locally defined labels and rename them.
+            for op in content.iter_mut() {
+                match op {
+                    AbstractOp::Label(ref mut label) => {
+                        // TODO: add mangled extension later
+                        let mangled = format!("{}_macro", label);
+                        let old = labels.insert(label.to_owned(), mangled.clone());
+                        if old.is_some() {
+                            return error::DuplicateLabel {
+                                label: label.to_string(),
+                            }
+                            .fail();
+                        }
+                        *label = mangled;
+                    }
+                    _ => continue,
+                }
+            }
+
+            // Second pass, update local label invocations.
+            for op in content.iter_mut() {
+                if let Some(label) = op.immediate_label() {
+                    if let Some(label) = labels.get(label) {
+                        *op = AbstractOp::with_label(op.specifier().unwrap(), label);
+                    }
+                }
+            }
+
+            Ok(Some(self.push_all(content)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -933,18 +918,49 @@ mod tests {
         Ok(())
     }
 
-    // #[test]
-    // fn assemble_pending_instruction_macro() -> Result<(), Error> {
-    //     let ops = vec![
-    //         AbstractOp::Macro("my_macro()".into()),
-    //         AbstractOp::MacroDefinition("my_macro()".into(), vec![AbstractOp::Op(Op::Caller)]),
-    //     ];
-    //     let mut asm = Assembler::new();
-    //     let sz = asm.push_all(ops)?;
-    //     assert_eq!(sz, 1);
-    //     let out = asm.take();
-    //     assert_eq!(out, hex!("33"));
+    #[test]
+    fn assemble_pending_instruction_macro() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::Macro("my_macro()".into()),
+            AbstractOp::MacroDefinition("my_macro()".into(), vec![AbstractOp::Op(Op::Caller)]),
+        ];
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 1);
 
-    //     Ok(())
-    // }
+        let out = asm.take();
+        asm.finish()?;
+
+        assert_eq!(out, hex!("33"));
+
+        Ok(())
+    }
+
+    // TODO: do we allow label shadowing in macros?
+    #[test]
+    fn assemble_conflicting_labels_in_instruction_macro() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::Label("a".into()),
+            AbstractOp::Op(Op::Caller),
+            AbstractOp::MacroDefinition(
+                "my_macro()".into(),
+                vec![
+                    AbstractOp::Label("a".into()),
+                    AbstractOp::Op(Op::Push1("a".into())),
+                ],
+            ),
+            AbstractOp::Macro("my_macro()".into()),
+            AbstractOp::Op(Op::Push1("a".into())),
+        ];
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 5);
+
+        let out = asm.take();
+        asm.finish()?;
+
+        assert_eq!(out, hex!("3360016000"));
+
+        Ok(())
+    }
 }
