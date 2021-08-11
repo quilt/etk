@@ -31,8 +31,14 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let pairs = AsmParser::parse(Rule::program, asm)?;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::instruction_macro => {
+            Rule::instruction_macro_definition => {
                 program.push(parse_instruction_macro(pair)?.into());
+            }
+            Rule::instruction_macro => {
+                let mut pairs = pair.into_inner();
+                let macro_name = pairs.next().unwrap().into_inner();
+                assert!(pairs.next().is_none());
+                program.push(AbstractOp::Macro(macro_name.as_str().into()).into());
             }
             Rule::builtin => {
                 let mut pairs = pair.into_inner();
@@ -120,7 +126,8 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseErro
 
 fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
     let mut pairs = pair.into_inner();
-    let name = pairs.next().unwrap();
+    let macro_defn = pairs.next().unwrap();
+    let macro_name = macro_defn.into_inner();
     let mut content = Vec::<AbstractOp>::new();
 
     for pair in pairs {
@@ -144,7 +151,7 @@ fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, Pa
         }
     }
 
-    return Ok(AbstractOp::MacroDefinition(name.as_str().to_string(), content).into());
+    return Ok(AbstractOp::MacroDefinition(macro_name.as_str().to_string(), content).into());
 }
 
 fn parse_builtin(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
@@ -558,12 +565,16 @@ mod tests {
                 gasprice
                 pop
             %end
+            %my_macro()
             "#,
         );
-        let expected = nodes![AbstractOp::MacroDefinition(
-            "my_macro()".into(),
-            vec![Op::GasPrice.into(), Op::Pop.into()]
-        ),];
+        let expected = nodes![
+            AbstractOp::MacroDefinition(
+                "my_macro".into(),
+                vec![Op::GasPrice.into(), Op::Pop.into()]
+            ),
+            AbstractOp::Macro("my_macro".into())
+        ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
 }

@@ -4,7 +4,7 @@
 program = _{ SOI ~ inner ~ EOI }
 inner = _{ NEWLINE* ~ (stmt ~ (NEWLINE+|";"))* ~ stmt? }
 stmt = _{ expr }
-expr = _{ label_definition | instruction_macro | builtin | push | op }
+expr = _{ label_definition | builtin | instruction_macro_definition | instruction_macro | push | op }
 
 //////////////////////
 // opcode mnemonics //
@@ -35,7 +35,8 @@ half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
 ////////////////////////
 // instruction macros //
 ////////////////////////
-instruction_macro = !{ "%macro" ~ function_declaration ~ NEWLINE* ~ ((label_definition | push | op) ~ NEWLINE)* ~ "%end" }
+instruction_macro_definition = !{ "%macro" ~ function_declaration ~ NEWLINE* ~ ((label_definition | push | op) ~ NEWLINE)* ~ "%end" }
+instruction_macro = !{ "%" ~ function_declaration }
 
 builtin = ${ "%" ~ ( import | include | include_hex | push_macro ) }
 
