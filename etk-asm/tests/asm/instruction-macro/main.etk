@@ -1,0 +1,16 @@
+%macro foo()
+	push1 start
+	jump
+%end
+
+%macro bar()
+	start:
+	push1 0x40
+	push1 start
+%end
+
+start:
+	jumpdest
+	pc
+	%foo()
+	%bar()

@@ -70,6 +70,18 @@ fn variable_jump() -> Result<(), Error> {
 }
 
 #[test]
+fn instruction_macro() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["instruction-macro", "main.etk"]))?;
+
+    println!("hello!");
+    assert_eq!(output, hex!("5b5860005660406005"));
+
+    Ok(())
+}
+
+#[test]
 fn every_op() -> Result<(), Error> {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);

@@ -112,6 +112,7 @@ fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, Error> {
         path: path.as_ref().to_owned(),
     })?;
     let nodes = parse_asm(&asm)?;
+
     Ok(nodes)
 }
 
