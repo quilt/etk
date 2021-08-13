@@ -981,6 +981,35 @@ ops! {
     SelfDestruct(mnemonic="selfdestruct", pops=1, exit=true),
 }
 
+/// Instruction macro definition op fields.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct InstructionMacroDefinition {
+    /// The name that identifies the macro.
+    pub name: String,
+    /// The name identifiers for the macro's parameters.
+    pub parameters: Vec<String>,
+    /// The body of the macro.
+    pub contents: Vec<AbstractOp>,
+}
+
+/// Instruction macro invocation op.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct InstructionMacroInvocation {
+    /// The name of the macro being invoked.
+    pub name: String,
+    /// The parameters that are being passed into the invocation.
+    pub parameters: Vec<Imm<Vec<u8>>>,
+}
+
+impl InstructionMacroInvocation {
+    /// Construct an instruction macro invocation with zero parameters.
+    pub fn with_zero_parameters(name: String) -> Self {
+        Self {
+            name,
+            parameters: vec![],
+        }
+    }
+}
 /// Like an [`Op`], except it also supports virtual instructions.
 ///
 /// In addition to the real EVM instructions, `AbstractOp` also supports defining
@@ -997,10 +1026,10 @@ pub enum AbstractOp {
     Push(Imm<Vec<u8>>),
 
     /// A user-defined instruction macro definition, which is a virtual instruction.
-    MacroDefinition(String, Vec<AbstractOp>),
+    MacroDefinition(InstructionMacroDefinition),
 
     /// A user-defined instruction macro, which is a virtual instruction.
-    Macro(String),
+    Macro(InstructionMacroInvocation),
 }
 
 impl AbstractOp {
@@ -1042,7 +1071,7 @@ impl AbstractOp {
             Self::Push(_) => None,
             Self::Label(_) => None,
             Self::Macro(_) => None,
-            Self::MacroDefinition(_, _) => None,
+            Self::MacroDefinition(_) => None,
         }
     }
 
@@ -1061,7 +1090,7 @@ impl AbstractOp {
             Self::Op(op) => Self::Op(op.realize(address)?),
             Self::Label(_) => panic!("labels cannot be realized"),
             Self::Macro(_) => panic!("macros cannot be realized"),
-            Self::MacroDefinition(_, _) => panic!("macro definitions cannot be realized"),
+            Self::MacroDefinition(_) => panic!("macro definitions cannot be realized"),
         };
 
         Ok(ret)
@@ -1082,7 +1111,7 @@ impl AbstractOp {
             }
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),
-            Self::MacroDefinition(_, _) => panic!("macro definitions cannot be concretized"),
+            Self::MacroDefinition(_) => panic!("macro definitions cannot be concretized"),
         };
 
         Some(res)
@@ -1090,9 +1119,9 @@ impl AbstractOp {
 
     pub(crate) fn expand(self, declared: &HashMap<String, Vec<AbstractOp>>) -> Option<Vec<Self>> {
         match self {
-            Self::Macro(ref name) => {
+            Self::Macro(ref m) => {
                 // Remap labels to macro scope.
-                if let Some(mut content) = declared.get(name).cloned() {
+                if let Some(mut content) = declared.get(&m.name).cloned() {
                     let mut labels = HashMap::<String, String>::new();
 
                     // First pass, find locally defined macros and rename them.
@@ -1138,7 +1167,7 @@ impl AbstractOp {
             Self::Label(_) => Some(0),
             Self::Push(_) => None,
             Self::Macro(_) => None,
-            Self::MacroDefinition(_, _) => None,
+            Self::MacroDefinition(_) => None,
         }
     }
 
@@ -1163,8 +1192,10 @@ impl fmt::Display for AbstractOp {
             Self::Op(op) => write!(f, "{}", op),
             Self::Push(txt) => write!(f, r#"%push({})"#, txt),
             Self::Label(lbl) => write!(f, r#".{}:"#, lbl),
-            Self::Macro(name) => write!(f, r#"%{}"#, name),
-            Self::MacroDefinition(name, content) => write!(f, r#"%{}: {:?}"#, name, content),
+            Self::Macro(invocation) => {
+                write!(f, r#"%{}: {:?}"#, invocation.name, invocation.parameters)
+            }
+            Self::MacroDefinition(defn) => write!(f, r#"%{}: {:?}"#, defn.name, defn.contents),
         }
     }
 }
@@ -1176,7 +1207,7 @@ impl Metadata for AbstractOp {
             Self::Push(_) => false,
             Self::Label(_) => false,
             Self::Macro(_) => false,
-            Self::MacroDefinition(_, _) => false,
+            Self::MacroDefinition(_) => false,
         }
     }
 
@@ -1186,7 +1217,7 @@ impl Metadata for AbstractOp {
             Self::Push(_) => false,
             Self::Label(_) => false,
             Self::Macro(_) => false,
-            Self::MacroDefinition(_, _) => false,
+            Self::MacroDefinition(_) => false,
         }
     }
 
@@ -1196,7 +1227,7 @@ impl Metadata for AbstractOp {
             Self::Push(_) => false,
             Self::Label(_) => false,
             Self::Macro(_) => false,
-            Self::MacroDefinition(_, _) => false,
+            Self::MacroDefinition(_) => false,
         }
     }
 
@@ -1206,7 +1237,7 @@ impl Metadata for AbstractOp {
             Self::Push(_) => None,
             Self::Label(_) => None,
             Self::Macro(_) => None,
-            Self::MacroDefinition(_, _) => None,
+            Self::MacroDefinition(_) => None,
         }
     }
 
@@ -1216,7 +1247,7 @@ impl Metadata for AbstractOp {
             Self::Push(_) => None,
             Self::Label(_) => None,
             Self::Macro(_) => None,
-            Self::MacroDefinition(_, _) => None,
+            Self::MacroDefinition(_) => None,
         }
     }
 
@@ -1226,7 +1257,7 @@ impl Metadata for AbstractOp {
             Self::Push(_) => 0,
             Self::Label(_) => 0,
             Self::Macro(_) => 0,
-            Self::MacroDefinition(_, _) => 0,
+            Self::MacroDefinition(_) => 0,
         }
     }
 
@@ -1236,7 +1267,7 @@ impl Metadata for AbstractOp {
             Self::Push(_) => 1,
             Self::Label(_) => 0,
             Self::Macro(_) => 0,
-            Self::MacroDefinition(_, _) => 0,
+            Self::MacroDefinition(_) => 0,
         }
     }
 }

@@ -11,7 +11,9 @@ mod parser {
 }
 
 use crate::ast::Node;
-use crate::ops::{AbstractOp, Imm, Op, Specifier};
+use crate::ops::{
+    AbstractOp, Imm, InstructionMacroDefinition, InstructionMacroInvocation, Op, Specifier,
+};
 
 use pest::Parser;
 
@@ -36,9 +38,16 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
             }
             Rule::instruction_macro => {
                 let mut pairs = pair.into_inner();
-                let macro_name = pairs.next().unwrap().into_inner();
-                assert!(pairs.next().is_none());
-                program.push(AbstractOp::Macro(macro_name.as_str().into()).into());
+                let name = pairs.next().unwrap().into_inner();
+                let mut parameters = Vec::<Imm<Vec<u8>>>::new();
+                for pair in pairs {
+                    parameters.push(pair.as_str().into());
+                }
+                let invocation = InstructionMacroInvocation {
+                    name: name.as_str().to_string(),
+                    parameters,
+                };
+                program.push(AbstractOp::Macro(invocation).into());
             }
             Rule::builtin => {
                 let mut pairs = pair.into_inner();
@@ -126,9 +135,15 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseErro
 
 fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
     let mut pairs = pair.into_inner();
-    let macro_defn = pairs.next().unwrap();
-    let macro_name = macro_defn.into_inner();
-    let mut content = Vec::<AbstractOp>::new();
+
+    let mut macro_defn = pairs.next().unwrap().into_inner();
+    let name = macro_defn.next().unwrap();
+    let mut parameters = Vec::<String>::new();
+    for pair in macro_defn {
+        parameters.push(pair.as_str().into());
+    }
+
+    let mut contents = Vec::<AbstractOp>::new();
 
     for pair in pairs {
         match pair.as_rule() {
@@ -136,22 +151,27 @@ fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, Pa
                 let mut pair = pair.into_inner();
                 let label = pair.next().unwrap();
                 let txt = label.as_str();
-                content.push(AbstractOp::Label(txt.into()).into());
+                contents.push(AbstractOp::Label(txt.into()).into());
             }
             Rule::push => {
-                content.push(parse_push(pair)?.into());
+                contents.push(parse_push(pair)?.into());
             }
             Rule::op => {
                 let spec: Specifier = pair.as_str().parse().unwrap();
                 let op = Op::new(spec).unwrap();
                 let aop = AbstractOp::Op(op);
-                content.push(aop.into());
+                contents.push(aop.into());
             }
             _ => continue,
         }
     }
 
-    return Ok(AbstractOp::MacroDefinition(macro_name.as_str().to_string(), content).into());
+    let defn = InstructionMacroDefinition {
+        name: name.as_str().to_string(),
+        parameters,
+        contents,
+    };
+    return Ok(AbstractOp::MacroDefinition(defn).into());
 }
 
 fn parse_builtin(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
@@ -569,11 +589,15 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            AbstractOp::MacroDefinition(
-                "my_macro".into(),
-                vec![Op::GasPrice.into(), Op::Pop.into()]
-            ),
-            AbstractOp::Macro("my_macro".into())
+            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![Op::GasPrice.into(), Op::Pop.into()]
+            }),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![]
+            })
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
