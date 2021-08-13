@@ -25,7 +25,6 @@ pub use self::types::{Abstract, Concrete, Spec};
 use snafu::OptionExt;
 
 use std::cmp::{Eq, PartialEq};
-use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
@@ -1115,45 +1114,6 @@ impl AbstractOp {
         };
 
         Some(res)
-    }
-
-    pub(crate) fn expand(self, declared: &HashMap<String, Vec<AbstractOp>>) -> Option<Vec<Self>> {
-        match self {
-            Self::Macro(ref m) => {
-                // Remap labels to macro scope.
-                if let Some(mut content) = declared.get(&m.name).cloned() {
-                    let mut labels = HashMap::<String, String>::new();
-
-                    // First pass, find locally defined macros and rename them.
-                    for op in content.iter_mut() {
-                        match op {
-                            AbstractOp::Label(ref mut label) => {
-                                // add hash extension later
-                                let scoped_label = format!("{}_macro", label);
-                                let old = labels.insert(label.to_owned(), scoped_label.clone());
-                                assert_eq!(old, None, "label should have been undefined");
-                                *label = scoped_label;
-                            }
-                            _ => continue,
-                        }
-                    }
-
-                    // Second pass, update local macro invocations.
-                    for op in content.iter_mut() {
-                        if let Some(label) = op.immediate_label() {
-                            if let Some(label) = labels.get(label) {
-                                *op = AbstractOp::with_label(op.specifier().unwrap(), label);
-                            }
-                        }
-                    }
-
-                    Some(content)
-                } else {
-                    None
-                }
-            }
-            _ => panic!("only macros can be expanded"),
-        }
     }
 
     /// Return the total encoded size for this instruction, including the

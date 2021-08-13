@@ -368,13 +368,10 @@ impl Assembler {
                 size = raw.len() as u32;
                 self.ready.extend(raw);
             }
-            RawOp::Op(op @ AbstractOp::Macro(_)) => {
-                if let Some(content) = op.expand(&self.declared_macros) {
-                    size = self.push_all(content)? as u32;
-                } else {
-                    size = 0;
-                }
-            }
+            RawOp::Op(AbstractOp::Macro(m)) => match self.expand_macro(&m.name)? {
+                Some(n) => size = n as u32,
+                None => size = 0,
+            },
             RawOp::Op(aop) => {
                 let cop = aop.concretize().context(error::UnsizedPushTooLarge {})?;
                 size = cop.size();
