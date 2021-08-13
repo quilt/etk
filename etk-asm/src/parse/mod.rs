@@ -34,7 +34,7 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     for pair in pairs {
         match pair.as_rule() {
             Rule::instruction_macro_definition => {
-                program.push(parse_instruction_macro(pair)?.into());
+                program.push(parse_instruction_macro(pair)?);
             }
             Rule::instruction_macro => {
                 let mut pairs = pair.into_inner();
@@ -60,7 +60,7 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
                 let mut pair = pair.into_inner();
                 let label = pair.next().unwrap();
                 let txt = label.as_str();
-                program.push(AbstractOp::Label(txt.into()).into());
+                program.push(AbstractOp::Label(txt.to_string()).into());
             }
             Rule::push => {
                 program.push(parse_push(pair)?.into());
@@ -151,16 +151,16 @@ fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, Pa
                 let mut pair = pair.into_inner();
                 let label = pair.next().unwrap();
                 let txt = label.as_str();
-                contents.push(AbstractOp::Label(txt.into()).into());
+                contents.push(AbstractOp::Label(txt.to_string()));
             }
             Rule::push => {
-                contents.push(parse_push(pair)?.into());
+                contents.push(parse_push(pair)?);
             }
             Rule::op => {
                 let spec: Specifier = pair.as_str().parse().unwrap();
                 let op = Op::new(spec).unwrap();
                 let aop = AbstractOp::Op(op);
-                contents.push(aop.into());
+                contents.push(aop);
             }
             _ => continue,
         }
@@ -171,7 +171,7 @@ fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, Pa
         parameters,
         contents,
     };
-    return Ok(AbstractOp::MacroDefinition(defn).into());
+    Ok(AbstractOp::MacroDefinition(defn).into())
 }
 
 fn parse_builtin(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {

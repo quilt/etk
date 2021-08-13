@@ -119,7 +119,7 @@ fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, Error> {
 #[derive(Debug)]
 enum Scope {
     Same,
-    Independent(Assembler),
+    Independent(Box<Assembler>),
 }
 
 impl Scope {
@@ -128,7 +128,7 @@ impl Scope {
     }
 
     fn independent() -> Self {
-        Self::Independent(Assembler::new())
+        Self::Independent(Box::new(Assembler::new()))
     }
 }
 
