@@ -36,7 +36,7 @@ half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
 // instruction macros //
 ////////////////////////
 instruction_macro_definition = !{ "%macro" ~ function_declaration ~ NEWLINE* ~ ((label_definition | push | op) ~ NEWLINE)* ~ "%end" }
-instruction_macro = !{ "%" ~ function_declaration }
+instruction_macro = !{ "%" ~ function_invocation }
 
 builtin = ${ "%" ~ ( import | include | include_hex | push_macro ) }
 
@@ -56,8 +56,10 @@ string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }
 // expression macros //
 ///////////////////////
 selector = { "selector(\"" ~ function_declaration ~ "\")" }
-function_declaration = { function_name ~ "(" ~ ASCII_ALPHANUMERIC* ~ ("," ~ ASCII_ALPHANUMERIC+)* ~ ")" }
+function_declaration = { function_name ~ "(" ~ function_parameter* ~ ("," ~ function_parameter)* ~ ")" }
+function_invocation = { function_name ~ "(" ~ operand* ~ ("," ~ operand)* ~ ")" }
 function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
+function_parameter = { ASCII_ALPHA+ }
 
 //////////////
 // operands //

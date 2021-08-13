@@ -214,9 +214,10 @@ impl Assembler {
                     let label = op.immediate_label().unwrap();
                     error::UndeclaredLabel { label }.fail()
                 }
-                RawOp::Op(AbstractOp::Macro(macro_name)) => {
-                    error::UndeclaredMacro { macro_name }.fail()
+                RawOp::Op(AbstractOp::Macro(m)) => error::UndeclaredMacro {
+                    macro_name: &m.name,
                 }
+                .fail(),
                 _ => unreachable!(),
             };
         }
@@ -269,18 +270,21 @@ impl Assembler {
                     }
                 }
             }
-            RawOp::Op(AbstractOp::MacroDefinition(ref name, ref content)) => {
-                match self.declared_macros.entry(name.to_owned()) {
+            RawOp::Op(AbstractOp::MacroDefinition(ref defn)) => {
+                match self.declared_macros.entry(defn.name.to_owned()) {
                     hash_map::Entry::Occupied(_) => {
-                        return error::DuplicateMacro { macro_name: name }.fail()
+                        return error::DuplicateMacro {
+                            macro_name: &defn.name,
+                        }
+                        .fail()
                     }
                     hash_map::Entry::Vacant(v) => {
-                        v.insert(content.to_owned());
+                        v.insert(defn.contents.to_owned());
                     }
                 }
             }
-            RawOp::Op(AbstractOp::Macro(ref name)) => {
-                self.expand_macro(name)?;
+            RawOp::Op(AbstractOp::Macro(ref invocation)) => {
+                self.expand_macro(&invocation.name)?;
             }
             _ => (),
         }
@@ -313,9 +317,9 @@ impl Assembler {
                 assert_eq!(old, None, "label should have been undefined");
                 Ok(())
             }
-            RawOp::Op(AbstractOp::MacroDefinition(_, _)) => Ok(()),
-            RawOp::Op(AbstractOp::Macro(ref name)) => {
-                if !self.declared_macros.contains_key(name) {
+            RawOp::Op(AbstractOp::MacroDefinition(_)) => Ok(()),
+            RawOp::Op(AbstractOp::Macro(ref m)) => {
+                if !self.declared_macros.contains_key(&m.name) {
                     assert_eq!(self.pending_len, Some(0));
                     self.pending_len = None;
                     self.pending.push_back(rop);
@@ -412,7 +416,7 @@ impl Assembler {
                     self.choose_sizes()?;
                 }
             }
-            (_, RawOp::Op(AbstractOp::MacroDefinition(_, _))) => (),
+            (_, RawOp::Op(AbstractOp::MacroDefinition(_))) => (),
             (_, rop) => {
                 // Not a label.
                 self.pending.push_back(rop);
@@ -588,7 +592,7 @@ impl Assembler {
 mod tests {
     use assert_matches::assert_matches;
 
-    use crate::ops::{Imm, Op};
+    use crate::ops::{Imm, InstructionMacroDefinition, InstructionMacroInvocation, Op};
 
     use hex_literal::hex;
 
@@ -854,19 +858,23 @@ mod tests {
     #[test]
     fn assemble_instruction_macro() -> Result<(), Error> {
         let ops = vec![
-            AbstractOp::MacroDefinition(
-                "my_macro()".into(),
-                vec![
+            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![
                     AbstractOp::Label("a".into()),
                     AbstractOp::Op(Op::JumpDest),
                     AbstractOp::Op(Op::Push1(Imm::from("a"))),
                     AbstractOp::Op(Op::Push1(Imm::from("b"))),
                 ],
-            ),
+            }),
             AbstractOp::Label("b".into()),
             AbstractOp::Op(Op::JumpDest),
             AbstractOp::Op(Op::Push1(Imm::from("b"))),
-            AbstractOp::Macro("my_macro()".into()),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![],
+            }),
         ];
 
         let mut asm = Assembler::new();
@@ -880,11 +888,13 @@ mod tests {
 
     #[test]
     fn assemble_undeclared_instruction_macro() -> Result<(), Error> {
-        let ops = vec![AbstractOp::Macro("my_macro()".into())];
+        let ops = vec![AbstractOp::Macro(
+            InstructionMacroInvocation::with_zero_parameters("my_macro".into()),
+        )];
         let mut asm = Assembler::new();
         asm.push_all(ops)?;
         let err = asm.finish().unwrap_err();
-        assert_matches!(err, Error::UndeclaredMacro { macro_name, .. } if macro_name == "my_macro()");
+        assert_matches!(err, Error::UndeclaredMacro { macro_name, .. } if macro_name == "my_macro");
 
         Ok(())
     }
@@ -892,12 +902,20 @@ mod tests {
     #[test]
     fn assemble_duplicate_instruction_macro() -> Result<(), Error> {
         let ops = vec![
-            AbstractOp::MacroDefinition("my_macro()".into(), vec![AbstractOp::Op(Op::Caller)]),
-            AbstractOp::MacroDefinition("my_macro()".into(), vec![AbstractOp::Op(Op::GasPrice)]),
+            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![AbstractOp::Op(Op::Caller)],
+            }),
+            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![AbstractOp::Op(Op::Caller)],
+            }),
         ];
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
-        assert_matches!(err, Error::DuplicateMacro { macro_name, .. } if macro_name == "my_macro()");
+        assert_matches!(err, Error::DuplicateMacro { macro_name, .. } if macro_name == "my_macro");
 
         Ok(())
     }
@@ -905,11 +923,14 @@ mod tests {
     #[test]
     fn assemble_duplicate_labels_in_instruction_macro() -> Result<(), Error> {
         let ops = vec![
-            AbstractOp::MacroDefinition(
-                "my_macro()".into(),
-                vec![AbstractOp::Label("a".into()), AbstractOp::Label("a".into())],
-            ),
-            AbstractOp::Macro("my_macro()".into()),
+            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![AbstractOp::Label("a".into()), AbstractOp::Label("a".into())],
+            }),
+            AbstractOp::Macro(InstructionMacroInvocation::with_zero_parameters(
+                "my_macro".into(),
+            )),
         ];
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
@@ -921,8 +942,14 @@ mod tests {
     #[test]
     fn assemble_pending_instruction_macro() -> Result<(), Error> {
         let ops = vec![
-            AbstractOp::Macro("my_macro()".into()),
-            AbstractOp::MacroDefinition("my_macro()".into(), vec![AbstractOp::Op(Op::Caller)]),
+            AbstractOp::Macro(InstructionMacroInvocation::with_zero_parameters(
+                "my_macro".into(),
+            )),
+            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![AbstractOp::Op(Op::Caller)],
+            }),
         ];
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;
@@ -942,14 +969,17 @@ mod tests {
         let ops = vec![
             AbstractOp::Label("a".into()),
             AbstractOp::Op(Op::Caller),
-            AbstractOp::MacroDefinition(
-                "my_macro()".into(),
-                vec![
+            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+                name: "my_macro()".into(),
+                parameters: vec![],
+                contents: vec![
                     AbstractOp::Label("a".into()),
                     AbstractOp::Op(Op::Push1("a".into())),
                 ],
-            ),
-            AbstractOp::Macro("my_macro()".into()),
+            }),
+            AbstractOp::Macro(InstructionMacroInvocation::with_zero_parameters(
+                "my_macro()".into(),
+            )),
             AbstractOp::Op(Op::Push1("a".into())),
         ];
         let mut asm = Assembler::new();
