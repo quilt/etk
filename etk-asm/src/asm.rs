@@ -90,7 +90,7 @@ mod error {
     }
 }
 
-use crate::ops::{AbstractOp, Imm, Specifier};
+use crate::ops::{AbstractOp, Imm, InstructionMacroDefinition, Specifier};
 
 pub use self::error::Error;
 
@@ -178,7 +178,7 @@ pub struct Assembler {
     declared_labels: HashMap<String, Option<u32>>,
 
     /// Macros, in `pending`, associated with an `AbstractOp::Macro`.
-    declared_macros: HashMap<String, Vec<AbstractOp>>,
+    declared_macros: HashMap<String, InstructionMacroDefinition>,
 
     /// Labels, in `pending`, that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
@@ -279,12 +279,12 @@ impl Assembler {
                         .fail()
                     }
                     hash_map::Entry::Vacant(v) => {
-                        v.insert(defn.contents.to_owned());
+                        v.insert(defn.to_owned());
                     }
                 }
             }
-            RawOp::Op(AbstractOp::Macro(ref invocation)) => {
-                self.expand_macro(&invocation.name)?;
+            RawOp::Op(AbstractOp::Macro(ref m)) => {
+                self.expand_macro(&m.name, &m.parameters)?;
             }
             _ => (),
         }
@@ -368,7 +368,7 @@ impl Assembler {
                 size = raw.len() as u32;
                 self.ready.extend(raw);
             }
-            RawOp::Op(AbstractOp::Macro(m)) => match self.expand_macro(&m.name)? {
+            RawOp::Op(AbstractOp::Macro(m)) => match self.expand_macro(&m.name, &m.parameters)? {
                 Some(n) => size = n as u32,
                 None => size = 0,
             },
@@ -545,13 +545,21 @@ impl Assembler {
         Ok(())
     }
 
-    fn expand_macro(&mut self, name: &str) -> Result<Option<usize>, Error> {
+    fn expand_macro(
+        &mut self,
+        name: &str,
+        parameters: &[Imm<Vec<u8>>],
+    ) -> Result<Option<usize>, Error> {
         // Remap labels to macro scope.
-        if let Some(mut content) = self.declared_macros.get(name).cloned() {
+        if let Some(mut m) = self.declared_macros.get(name).cloned() {
+            if m.parameters.len() != parameters.len() {
+                panic!("invalid number of parameters for macro {}", name);
+            }
+
             let mut labels = HashMap::<String, String>::new();
 
             // First pass, find locally defined labels and rename them.
-            for op in content.iter_mut() {
+            for op in m.contents.iter_mut() {
                 match op {
                     AbstractOp::Label(ref mut label) => {
                         // TODO: add mangled extension later
@@ -570,7 +578,7 @@ impl Assembler {
             }
 
             // Second pass, update local label invocations.
-            for op in content.iter_mut() {
+            for op in m.contents.iter_mut() {
                 if let Some(label) = op.immediate_label() {
                     if let Some(label) = labels.get(label) {
                         *op = AbstractOp::with_label(op.specifier().unwrap(), label);
@@ -578,7 +586,7 @@ impl Assembler {
                 }
             }
 
-            Ok(Some(self.push_all(content)?))
+            Ok(Some(self.push_all(m.contents)?))
         } else {
             Ok(None)
         }

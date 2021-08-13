@@ -981,7 +981,7 @@ ops! {
 }
 
 /// Instruction macro definition op fields.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct InstructionMacroDefinition {
     /// The name that identifies the macro.
     pub name: String,
