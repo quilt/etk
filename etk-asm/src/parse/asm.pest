@@ -59,7 +59,7 @@ selector = { "selector(\"" ~ function_declaration ~ "\")" }
 function_declaration = { function_name ~ "(" ~ function_parameter* ~ ("," ~ function_parameter)* ~ ")" }
 function_invocation = { function_name ~ "(" ~ operand* ~ ("," ~ operand)* ~ ")" }
 function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
-function_parameter = { ASCII_ALPHA+ }
+function_parameter = { ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 
 //////////////
 // operands //
