@@ -1110,7 +1110,8 @@ impl AbstractOp {
         }
     }
 
-    ///
+    /// Realizes a push op with a label into a concrete op with constant operand
+    /// denoting the address.
     pub(crate) fn realize(&self, address: u32) -> Result<Self, TryFromIntError> {
         let ret = match self {
             Self::Push(Imm::Label(_)) => {
