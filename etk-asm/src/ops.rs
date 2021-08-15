@@ -219,7 +219,16 @@ macro_rules! ret_with_label {
         panic!()
     };
     ($imm:ident, $op:ident, $arg:ident) => {
-        Self::$op($imm.into())
+        Self::$op(Imm::with_label($imm))
+    };
+}
+
+macro_rules! ret_with_variable {
+    ($imm:ident, $op:ident) => {
+        panic!()
+    };
+    ($imm:ident, $op:ident, $arg:ident) => {
+        Self::$op(Imm::with_variable($imm))
     };
 }
 
@@ -299,7 +308,7 @@ macro_rules! ops {
         /// Enumeration of all supported instructions.
         ///
         /// There are three flavors of `Op`:
-        ///  - Abstract: `Op` that may use labels or constants.
+        ///  - Abstract: `Op` that may use labels, variables, or constants.
         ///  - Concrete: `Op` that may only use constants.
         ///  - Specifier: `Op` without any arguments.
         #[derive(Debug, Clone, PartialEq, Eq)]
@@ -477,6 +486,22 @@ macro_rules! ops {
                 match spec {
                     $(
                         pat_spec!($op$(, $arg)?) => ret_with_label!(lbl, $op$(, $arg)?),
+                    )*
+                }
+            }
+
+            /// Construct an `Op` with the given variable.
+            ///
+            /// ## Panics
+            ///
+            /// This function panics if the instruction described by the specifier
+            /// does not accept immediate arguments.
+            pub fn with_variable<S: Into<String>>(spec: Op<Spec>, var: S) -> Self {
+                let var = var.into();
+
+                match spec {
+                    $(
+                        pat_spec!($op$(, $arg)?) => ret_with_variable!(var, $op$(, $arg)?),
                     )*
                 }
             }
@@ -1050,6 +1075,16 @@ impl AbstractOp {
         Self::Op(Op::with_label(spec, lbl))
     }
 
+    /// Construct an `AbstractOp` with the given label.
+    ///
+    /// ## Panics
+    ///
+    /// This function panics if the instruction described by the specifier
+    /// does not accept immediate arguments.
+    pub fn with_variable<S: Into<String>>(spec: Op<Spec>, var: S) -> Self {
+        Self::Op(Op::with_variable(spec, var))
+    }
+
     /// Construct an `AbstractOp` with the given immediate argument.
     ///
     /// An error is returned if `imm` doesn't match the immediate size for
@@ -1067,6 +1102,7 @@ impl AbstractOp {
         match self {
             Self::Op(op) => op.immediate_label(),
             Self::Push(Imm::Label(lbl)) => Some(lbl),
+            Self::Push(Imm::Variable(var)) => Some(var),
             Self::Push(_) => None,
             Self::Label(_) => None,
             Self::Macro(_) => None,
@@ -1083,7 +1119,7 @@ impl AbstractOp {
                 let start = bytes.len() - spec.extra_len() as usize;
                 AbstractOp::with_immediate(spec, &bytes[start..]).unwrap()
             }
-            Self::Push(Imm::Constant(_)) => {
+            Self::Push(Imm::Constant(_)) | Self::Push(Imm::Variable(_)) => {
                 panic!("only pushes with a label can be realized");
             }
             Self::Op(op) => Self::Op(op.realize(address)?),
@@ -1108,6 +1144,7 @@ impl AbstractOp {
 
                 Op::<Concrete>::with_immediate(spec, trimmed).unwrap()
             }
+            Self::Push(Imm::Variable(_)) => panic!("variable immediates must be filled first"),
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),
             Self::MacroDefinition(_) => panic!("macro definitions cannot be concretized"),

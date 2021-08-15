@@ -32,17 +32,26 @@ pub enum Imm<T> {
 
     /// A constant argument.
     Constant(T),
+
+    /// A macro variable.
+    Variable(String),
 }
 
-impl<T> From<&str> for Imm<T> {
-    fn from(label: &str) -> Self {
-        Imm::Label(label.to_owned())
+impl<T> Imm<T> {
+    /// Construct an `Imm` with a label.
+    pub fn with_label<S: Into<String>>(s: S) -> Self {
+        Imm::Label(s.into())
+    }
+
+    /// Construct an `Imm` with a variable.
+    pub fn with_variable<S: Into<String>>(s: S) -> Self {
+        Imm::Variable(s.into())
     }
 }
 
-impl<T> From<String> for Imm<T> {
-    fn from(label: String) -> Self {
-        Imm::Label(label)
+impl From<Vec<u8>> for Imm<Vec<u8>> {
+    fn from(konst: Vec<u8>) -> Self {
+        Imm::Constant(konst)
     }
 }
 
@@ -205,6 +214,7 @@ where
         match self {
             Imm::Label(s) => write!(f, r#"Imm::Label("{}")"#, s),
             Imm::Constant(c) => write!(f, "Imm::Constant(0x{})", c.encode_hex::<String>()),
+            Imm::Variable(s) => write!(f, r#"Imm::Variable("{}")"#, s),
         }
     }
 }
@@ -217,6 +227,7 @@ where
         match self {
             Imm::Label(s) => write!(f, ":{}", s),
             Imm::Constant(c) => write!(f, "0x{}", c.encode_hex::<String>()),
+            Imm::Variable(s) => write!(f, "{}", s),
         }
     }
 }
