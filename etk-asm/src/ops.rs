@@ -142,6 +142,11 @@ macro_rules! pat_label {
     ($cap:ident, $op:ident, $arg:ident) => { Self::$op(Imm::Label(ref $cap)) };
 }
 
+macro_rules! pat_variable {
+    ($cap:ident, $op:ident) => { Self::$op };
+    ($cap:ident, $op:ident, $arg:ident) => { Self::$op(Imm::Variable(ref $cap)) };
+}
+
 macro_rules! ret_label {
     ($cap:ident) => {
         None
@@ -536,6 +541,17 @@ macro_rules! ops {
                 }
             }
 
+            /// The variable to be pushed on the stack. Only relevant for push instructions.
+            pub(crate) fn immediate_variable(&self) -> Option<&str> {
+                match self {
+                    $(
+                        pat_variable!(a, $op$(, $arg)?) => ret_label!(a$(, $arg)?),
+                    )*
+
+                    _ => None,
+                }
+            }
+
             // TODO: Rename `realize`
             pub(crate) fn realize(&self, address: u32) -> Result<Self, TryFromIntError> {
                 let op = match self {
@@ -552,6 +568,7 @@ macro_rules! ops {
                     $(
                         pat_const!(a, $op$(, $arg)?) => ret_concretize!($op, a$(, $arg)?),
                     )*
+                    // TODO: this doesn't account for variables
                     _ => panic!("labels must be resolved be concretizing"),
                 }
             }
@@ -1102,6 +1119,16 @@ impl AbstractOp {
         match self {
             Self::Op(op) => op.immediate_label(),
             Self::Push(Imm::Label(lbl)) => Some(lbl),
+            Self::Push(_) => None,
+            Self::Label(_) => None,
+            Self::Macro(_) => None,
+            Self::MacroDefinition(_) => None,
+        }
+    }
+
+    pub(crate) fn immediate_variable(&self) -> Option<&str> {
+        match self {
+            Self::Op(op) => op.immediate_variable(),
             Self::Push(Imm::Variable(var)) => Some(var),
             Self::Push(_) => None,
             Self::Label(_) => None,
