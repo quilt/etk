@@ -607,7 +607,7 @@ mod tests {
     fn assemble_variable_push_const_while_pending() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![
-            AbstractOp::Op(Op::Push1("label1".into())),
+            AbstractOp::Op(Op::Push1(Imm::with_label("label1"))),
             AbstractOp::Push(Imm::Constant(vec![0x00, 0xaa, 0xbb])),
             AbstractOp::Label("label1".into()),
         ])?;
@@ -621,8 +621,8 @@ mod tests {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![
             AbstractOp::Op(Op::JumpDest),
-            AbstractOp::Push("label1".into()),
-            AbstractOp::Push("label2".into()),
+            AbstractOp::Push(Imm::with_label("label1")),
+            AbstractOp::Push(Imm::with_label("label2")),
             AbstractOp::Label("label1".into()),
             AbstractOp::Op(Op::GetPc),
             AbstractOp::Label("label2".into()),
@@ -638,8 +638,8 @@ mod tests {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![
             AbstractOp::Op(Op::JumpDest),
-            AbstractOp::Push("label1".into()),
-            AbstractOp::Push("label2".into()),
+            AbstractOp::Push(Imm::with_label("label1")),
+            AbstractOp::Push(Imm::with_label("label2")),
             AbstractOp::Label("label2".into()),
             AbstractOp::Op(Op::GetPc),
             AbstractOp::Label("label1".into()),
@@ -655,8 +655,8 @@ mod tests {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![
             AbstractOp::Op(Op::JumpDest),
-            AbstractOp::Push("auto".into()),
-            AbstractOp::Push("auto".into()),
+            AbstractOp::Push(Imm::with_label("auto")),
+            AbstractOp::Push(Imm::with_label("auto")),
             AbstractOp::Label("auto".into()),
         ])?;
         assert_eq!(5, sz);
@@ -681,7 +681,7 @@ mod tests {
         let sz = asm.push_all(vec![
             AbstractOp::Op(Op::JumpDest),
             AbstractOp::Label("auto".into()),
-            AbstractOp::Push("auto".into()),
+            AbstractOp::Push(Imm::with_label("auto")),
         ])?;
         assert_eq!(3, sz);
         assert_eq!(asm.take(), hex!("5b6001"));
@@ -692,7 +692,7 @@ mod tests {
     fn assemble_variable_push1() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![
-            AbstractOp::Push("auto".into()),
+            AbstractOp::Push(Imm::with_label("auto")),
             AbstractOp::Label("auto".into()),
             AbstractOp::Op(Op::JumpDest),
         ])?;
@@ -705,10 +705,10 @@ mod tests {
     fn assemble_variable_push1_reuse() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![
-            AbstractOp::Push("auto".into()),
+            AbstractOp::Push(Imm::with_label("auto")),
             AbstractOp::Label("auto".into()),
             AbstractOp::Op(Op::JumpDest),
-            AbstractOp::Op(Op::Push1("auto".into())),
+            AbstractOp::Op(Op::Push1(Imm::with_label("auto"))),
         ])?;
         assert_eq!(5, sz);
         assert_eq!(asm.take(), hex!("60025b6002"));
@@ -718,7 +718,7 @@ mod tests {
     #[test]
     fn assemble_variable_push2() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        asm.push(AbstractOp::Push("auto".into()))?;
+        asm.push(AbstractOp::Push(Imm::with_label("auto")))?;
         for _ in 0..255 {
             asm.push(AbstractOp::Op(Op::GetPc))?;
         }
@@ -741,7 +741,7 @@ mod tests {
     #[test]
     fn assemble_undeclared_label() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        asm.push_all(vec![AbstractOp::Op(Op::Push1("hi".into()))])?;
+        asm.push_all(vec![AbstractOp::Op(Op::Push1(Imm::with_label("hi")))])?;
         let err = asm.finish().unwrap_err();
         assert_matches!(err, Error::UndeclaredLabel { label, .. } if label == "hi");
         Ok(())
@@ -778,7 +778,7 @@ mod tests {
         let ops = vec![
             AbstractOp::Label("lbl".into()),
             AbstractOp::Op(Op::JumpDest),
-            AbstractOp::Op(Op::Push1("lbl".into())),
+            AbstractOp::Op(Op::Push1(Imm::with_label("lbl"))),
         ];
 
         let mut asm = Assembler::new();
@@ -792,7 +792,7 @@ mod tests {
     #[test]
     fn assemble_labeled_pc() -> Result<(), Error> {
         let ops = vec![
-            AbstractOp::Op(Op::Push1("lbl".into())),
+            AbstractOp::Op(Op::Push1(Imm::with_label("lbl"))),
             AbstractOp::Label("lbl".into()),
             AbstractOp::Op(Op::GetPc),
         ];
@@ -808,7 +808,7 @@ mod tests {
     #[test]
     fn assemble_jump_jumpdest_with_label() -> Result<(), Error> {
         let ops = vec![
-            AbstractOp::Op(Op::Push1("lbl".into())),
+            AbstractOp::Op(Op::Push1(Imm::with_label("lbl"))),
             AbstractOp::Label("lbl".into()),
             AbstractOp::Op(Op::JumpDest),
         ];
@@ -828,7 +828,7 @@ mod tests {
         ops.push(AbstractOp::Op(Op::JumpDest));
         ops.push(AbstractOp::Label("a".into()));
         ops.push(AbstractOp::Op(Op::JumpDest));
-        ops.push(AbstractOp::Op(Op::Push1(Imm::from("a"))));
+        ops.push(AbstractOp::Op(Op::Push1(Imm::with_label("a"))));
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
         assert_matches!(err, Error::LabelTooLarge { label, .. } if label == "a");
@@ -841,7 +841,7 @@ mod tests {
         ops.push(AbstractOp::Op(Op::JumpDest));
         ops.push(AbstractOp::Label("a".into()));
         ops.push(AbstractOp::Op(Op::JumpDest));
-        ops.push(AbstractOp::Op(Op::Push1(Imm::from("b"))));
+        ops.push(AbstractOp::Op(Op::Push1(Imm::with_label("b"))));
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 259);
@@ -869,13 +869,13 @@ mod tests {
                 contents: vec![
                     AbstractOp::Label("a".into()),
                     AbstractOp::Op(Op::JumpDest),
-                    AbstractOp::Op(Op::Push1(Imm::from("a"))),
-                    AbstractOp::Op(Op::Push1(Imm::from("b"))),
+                    AbstractOp::Op(Op::Push1(Imm::with_label("a"))),
+                    AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
                 ],
             }),
             AbstractOp::Label("b".into()),
             AbstractOp::Op(Op::JumpDest),
-            AbstractOp::Op(Op::Push1(Imm::from("b"))),
+            AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
             AbstractOp::Macro(InstructionMacroInvocation {
                 name: "my_macro".into(),
                 parameters: vec![],
@@ -979,13 +979,13 @@ mod tests {
                 parameters: vec![],
                 contents: vec![
                     AbstractOp::Label("a".into()),
-                    AbstractOp::Op(Op::Push1("a".into())),
+                    AbstractOp::Op(Op::Push1(Imm::with_label("a"))),
                 ],
             }),
             AbstractOp::Macro(InstructionMacroInvocation::with_zero_parameters(
                 "my_macro()".into(),
             )),
-            AbstractOp::Op(Op::Push1("a".into())),
+            AbstractOp::Op(Op::Push1(Imm::with_label("a"))),
         ];
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;

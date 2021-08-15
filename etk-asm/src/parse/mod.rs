@@ -38,10 +38,11 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
             }
             Rule::instruction_macro => {
                 let mut pairs = pair.into_inner();
-                let name = pairs.next().unwrap().into_inner();
+                let name = pairs.next().unwrap();
                 let mut parameters = Vec::<Imm<Vec<u8>>>::new();
                 for pair in pairs {
-                    parameters.push(pair.as_str().into());
+                    let imm = parse_operand(pair, 16)?;
+                    parameters.push(imm);
                 }
                 let invocation = InstructionMacroInvocation {
                     name: name.as_str().to_string(),
@@ -81,56 +82,63 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
 fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let mut pair = pair.into_inner();
     let size = pair.next().unwrap();
-    let size: usize = size.as_str().parse().unwrap();
+    let size: u32 = size.as_str().parse().unwrap();
     let operand = pair.next().unwrap();
 
-    let spec = Specifier::push(size as u32).unwrap();
+    let spec = Specifier::push(size).unwrap();
 
-    let op = match operand.as_rule() {
+    let imm = parse_operand(operand, size)?;
+    match imm {
+        Imm::Label(s) => Ok(AbstractOp::with_label(spec, s)),
+        Imm::Variable(v) => Ok(AbstractOp::with_variable(spec, v)),
+        Imm::Constant(c) => AbstractOp::with_immediate(spec, c.as_ref())
+            .ok()
+            .context(error::ImmediateTooLarge),
+    }
+}
+
+fn parse_operand(
+    operand: pest::iterators::Pair<Rule>,
+    size: u32,
+) -> Result<Imm<Vec<u8>>, ParseError> {
+    let imm = match operand.as_rule() {
         Rule::binary => {
             let raw = operand.as_str();
-            let imm = radix_str_to_vec(&raw[2..], 2, size)?;
-            AbstractOp::with_immediate(spec, imm.as_ref())
-                .ok()
-                .context(error::ImmediateTooLarge)?
+            Imm::from(radix_str_to_vec(&raw[2..], 2, size)?)
         }
         Rule::octal => {
             let raw = operand.as_str();
-            let imm = radix_str_to_vec(&raw[2..], 8, size)?;
-            AbstractOp::with_immediate(spec, imm.as_ref())
-                .ok()
-                .context(error::ImmediateTooLarge)?
+            Imm::from(radix_str_to_vec(&raw[2..], 8, size)?)
         }
         Rule::decimal => {
             let raw = operand.as_str();
-            let imm = radix_str_to_vec(raw, 10, size)?;
-            AbstractOp::with_immediate(spec, imm.as_ref())
-                .ok()
-                .context(error::ImmediateTooLarge)?
+            Imm::from(radix_str_to_vec(raw, 10, size)?)
         }
         Rule::hex => {
             let raw = operand.as_str();
-            let imm = hex::decode(&raw[2..]).unwrap();
-            AbstractOp::with_immediate(spec, imm.as_ref())
-                .ok()
-                .context(error::ImmediateTooLarge)?
+            Imm::from(hex::decode(&raw[2..]).unwrap())
         }
         Rule::selector => {
             let raw = operand.into_inner().next().unwrap().as_str();
             let mut hasher = Keccak256::new();
             hasher.update(raw.as_bytes());
-            AbstractOp::with_immediate(spec, &hasher.finalize()[0..(spec.size() - 1) as usize])
-                .ok()
-                .context(error::ImmediateTooLarge)?
+            Imm::from(hasher.finalize()[0..size as usize].to_vec())
         }
         Rule::label => {
-            let label = operand.as_str().to_string();
-            AbstractOp::with_label(spec, label)
+            let lbl = operand.as_str().to_string();
+            Imm::<Vec<u8>>::Label(lbl)
+        }
+        Rule::instruction_macro_variable => {
+            let variable = operand
+                .as_str()
+                .strip_prefix("$")
+                .expect("variable didn't start with '$'");
+            Imm::<Vec<u8>>::Variable(variable.to_string())
         }
         r => unreachable!(format!("{:?}", r)),
     };
 
-    Ok(op)
+    Ok(imm)
 }
 
 fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
@@ -153,7 +161,7 @@ fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, Pa
                 let txt = label.as_str();
                 contents.push(AbstractOp::Label(txt.to_string()));
             }
-            Rule::push => {
+            Rule::instruction_macro_push => {
                 contents.push(parse_push(pair)?);
             }
             Rule::op => {
@@ -191,9 +199,9 @@ fn parse_builtin(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> 
             Node::IncludeHex(args.0)
         }
         Rule::push_macro => {
-            // TODO: This should accept labels or literals, not just labels.
+            // TODO: This should accept labels, literals, or variables, not just labels.
             let args = <(Label,)>::parse_arguments(pair.into_inner())?;
-            let arg = Imm::from(args.0 .0);
+            let arg = Imm::with_label(args.0 .0);
             Node::Op(AbstractOp::Push(arg))
         }
         _ => unreachable!(),
@@ -201,7 +209,7 @@ fn parse_builtin(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> 
     Ok(node)
 }
 
-fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, ParseError> {
+fn radix_str_to_vec(s: &str, radix: u32, min: u32) -> Result<Vec<u8>, ParseError> {
     let n = u128::from_str_radix(s, radix)
         .ok()
         .context(error::ImmediateTooLarge)?;
@@ -212,7 +220,7 @@ fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, ParseErr
         len += 1;
     }
 
-    len = std::cmp::max(len, min);
+    len = std::cmp::max(len, min as usize);
 
     Ok(n.to_be_bytes()[16 - len..].to_vec())
 }
@@ -401,7 +409,7 @@ mod tests {
             push2 snake_case
             jumpi
         "#;
-        let expected = nodes![Op::Push2(Imm::from("snake_case")), Op::JumpI];
+        let expected = nodes![Op::Push2(Imm::with_label("snake_case")), Op::JumpI];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -414,7 +422,7 @@ mod tests {
         "#;
         let expected = nodes![
             AbstractOp::Label("push1".into()),
-            Op::Push1(Imm::from("push1")),
+            Op::Push1(Imm::with_label("push1")),
             Op::JumpI
         ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
@@ -571,7 +579,7 @@ mod tests {
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
-            AbstractOp::Push("hello".into()),
+            AbstractOp::Push(Imm::with_label("hello")),
             Op::Push1(Imm::from(2)),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
@@ -581,22 +589,32 @@ mod tests {
     fn parse_instruction_macro() {
         let asm = format!(
             r#"
-            %macro my_macro()
+            %macro my_macro(foo, bar)
                 gasprice
                 pop
+                push1 $foo
+                push1 $bar
             %end
-            %my_macro()
+            %my_macro(0x42, 10)
             "#,
         );
         let expected = nodes![
             AbstractOp::MacroDefinition(InstructionMacroDefinition {
                 name: "my_macro".into(),
-                parameters: vec![],
-                contents: vec![Op::GasPrice.into(), Op::Pop.into()]
+                parameters: vec!["foo".into(), "bar".into()],
+                contents: vec![
+                    Op::GasPrice.into(),
+                    Op::Pop.into(),
+                    AbstractOp::Op(Op::Push1(Imm::with_variable("foo"))),
+                    AbstractOp::Op(Op::Push1(Imm::with_variable("bar"))),
+                ]
             }),
             AbstractOp::Macro(InstructionMacroInvocation {
                 name: "my_macro".into(),
-                parameters: vec![]
+                parameters: vec![
+                    Imm::from(vec![0x42]),
+                    Imm::from(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10])
+                ]
             })
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)

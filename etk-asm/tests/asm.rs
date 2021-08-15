@@ -75,7 +75,6 @@ fn instruction_macro() -> Result<(), Error> {
     let mut ingester = Ingest::new(&mut output);
     ingester.ingest_file(source(&["instruction-macro", "main.etk"]))?;
 
-    println!("hello!");
     assert_eq!(output, hex!("5b5860005660406005"));
 
     Ok(())

@@ -81,8 +81,8 @@ impl ImmediateTypes for Concrete {
     type P32 = [u8; 32];
 }
 
-/// Marker type for instructions which may accept labels or constants as
-/// arguments.
+/// Marker type for instructions which may accept labels, variables, or constants
+/// as arguments.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Abstract {}
 
