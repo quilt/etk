@@ -25,11 +25,11 @@ mod error {
             backtrace: Backtrace,
         },
 
-        /// A label was declared multiple times.
+        /// A macro was declared multiple times.
         #[snafu(display("macro `{}` declared multiple times", macro_name))]
         #[non_exhaustive]
         DuplicateMacro {
-            /// The name of the conflicting label.
+            /// The name of the conflicting macro.
             macro_name: String,
 
             /// The location of the error.
