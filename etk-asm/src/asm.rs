@@ -48,6 +48,14 @@ mod error {
             source: TryFromIntError,
         },
 
+        /// The value provided to a sized push was too large.
+        #[snafu(display("value was too large for any push"))]
+        #[non_exhaustive]
+        SizedPushTooLarge {
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
+
         /// The value provided to an unsized push (`%push`) was too large.
         #[snafu(display("value was too large for any push"))]
         #[non_exhaustive]
@@ -90,7 +98,7 @@ mod error {
     }
 }
 
-use crate::ops::{AbstractOp, Imm, InstructionMacroDefinition, Specifier};
+use crate::ops::{AbstractOp, Imm, InstructionMacroDefinition, Metadata, Specifier};
 
 pub use self::error::Error;
 
@@ -583,6 +591,31 @@ impl Assembler {
                     if let Some(label) = labels.get(label) {
                         *op = AbstractOp::with_label(op.specifier().unwrap(), label);
                     }
+                } else if let Some(variable) = op.immediate_variable() {
+                    if let Some(idx) = m.parameters.iter().position(|x| x == variable) {
+                        match &parameters[idx] {
+                            Imm::Label(lbl) => {
+                                *op = AbstractOp::with_label(op.specifier().unwrap(), lbl)
+                            }
+                            Imm::Constant(c) => {
+                                let mut trimmed = &c[..];
+                                while !trimmed.is_empty() && trimmed[0] == 0 {
+                                    trimmed = &trimmed[1..];
+                                }
+                                if trimmed.len() < op.pushes() {
+                                    return error::SizedPushTooLarge {}.fail();
+                                }
+                                let mut normalized =
+                                    vec![0; op.size().unwrap() as usize - 1 - trimmed.len()];
+                                normalized.extend_from_slice(trimmed);
+
+                                *op =
+                                    AbstractOp::with_immediate(op.specifier().unwrap(), &normalized)
+                                        .unwrap()
+                            }
+                            Imm::Variable(_) => unreachable!(),
+                        }
+                    }
                 }
             }
 
@@ -995,6 +1028,35 @@ mod tests {
         asm.finish()?;
 
         assert_eq!(out, hex!("3360016000"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_instruction_macro_with_parameters() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec!["foo".into(), "bar".into()],
+                contents: vec![
+                    AbstractOp::Op(Op::Push1(Imm::with_variable("foo"))),
+                    AbstractOp::Op(Op::Push1(Imm::with_variable("bar"))),
+                ],
+            }),
+            AbstractOp::Label("b".into()),
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![Imm::<Vec<u8>>::from(vec![0x42]), Imm::with_label("b")],
+            }),
+        ];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 7);
+        let out = asm.take();
+        assert_eq!(out, hex!("5b600060426000"));
 
         Ok(())
     }

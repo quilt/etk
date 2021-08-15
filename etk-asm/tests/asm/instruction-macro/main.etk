@@ -9,8 +9,14 @@
 	push1 start
 %end
 
+%macro foobar(tag, gat)
+	push2 $tag
+	push2 $gat
+%end
+
 start:
 	jumpdest
 	pc
 	%foo()
 	%bar()
+	%foobar(start, 0x42)
