@@ -293,6 +293,7 @@ impl Assembler {
             }
             RawOp::Op(AbstractOp::Macro(ref m)) => {
                 self.expand_macro(&m.name, &m.parameters)?;
+                return Ok(self.ready.len());
             }
             _ => (),
         }
@@ -559,69 +560,72 @@ impl Assembler {
         parameters: &[Imm<Vec<u8>>],
     ) -> Result<Option<usize>, Error> {
         // Remap labels to macro scope.
-        if let Some(mut m) = self.declared_macros.get(name).cloned() {
-            if m.parameters.len() != parameters.len() {
-                panic!("invalid number of parameters for macro {}", name);
-            }
-
-            let mut labels = HashMap::<String, String>::new();
-
-            // First pass, find locally defined labels and rename them.
-            for op in m.contents.iter_mut() {
-                match op {
-                    AbstractOp::Label(ref mut label) => {
-                        // TODO: add mangled extension later
-                        let mangled = format!("{}_macro", label);
-                        let old = labels.insert(label.to_owned(), mangled.clone());
-                        if old.is_some() {
-                            return error::DuplicateLabel {
-                                label: label.to_string(),
-                            }
-                            .fail();
-                        }
-                        *label = mangled;
-                    }
-                    _ => continue,
+        match self.declared_macros.get(name).cloned() {
+            Some(mut m) => {
+                if m.parameters.len() != parameters.len() {
+                    panic!("invalid number of parameters for macro {}", name);
                 }
-            }
 
-            // Second pass, update local label invocations.
-            for op in m.contents.iter_mut() {
-                if let Some(label) = op.immediate_label() {
-                    if let Some(label) = labels.get(label) {
-                        *op = AbstractOp::with_label(op.specifier().unwrap(), label);
-                    }
-                } else if let Some(variable) = op.immediate_variable() {
-                    if let Some(idx) = m.parameters.iter().position(|x| x == variable) {
-                        match &parameters[idx] {
-                            Imm::Label(lbl) => {
-                                *op = AbstractOp::with_label(op.specifier().unwrap(), lbl)
-                            }
-                            Imm::Constant(c) => {
-                                let mut trimmed = &c[..];
-                                while !trimmed.is_empty() && trimmed[0] == 0 {
-                                    trimmed = &trimmed[1..];
-                                }
-                                if trimmed.len() < op.pushes() {
-                                    return error::SizedPushTooLarge {}.fail();
-                                }
-                                let mut normalized =
-                                    vec![0; op.size().unwrap() as usize - 1 - trimmed.len()];
-                                normalized.extend_from_slice(trimmed);
+                let mut labels = HashMap::<String, String>::new();
 
-                                *op =
-                                    AbstractOp::with_immediate(op.specifier().unwrap(), &normalized)
-                                        .unwrap()
+                // First pass, find locally defined labels and rename them.
+                for op in m.contents.iter_mut() {
+                    match op {
+                        AbstractOp::Label(ref mut label) => {
+                            // TODO: add mangled extension later
+                            let mangled = format!("{}_{}", m.name, label);
+                            let old = labels.insert(label.to_owned(), mangled.clone());
+                            if old.is_some() {
+                                return error::DuplicateLabel {
+                                    label: label.to_string(),
+                                }
+                                .fail();
                             }
-                            Imm::Variable(_) => unreachable!(),
+                            *label = mangled;
                         }
+                        _ => continue,
                     }
                 }
-            }
 
-            Ok(Some(self.push_all(m.contents)?))
-        } else {
-            Ok(None)
+                // Second pass, update local label invocations.
+                for op in m.contents.iter_mut() {
+                    if let Some(label) = op.immediate_label() {
+                        if let Some(label) = labels.get(label) {
+                            *op = AbstractOp::with_label(op.specifier().unwrap(), label);
+                        }
+                    } else if let Some(variable) = op.immediate_variable() {
+                        if let Some(idx) = m.parameters.iter().position(|x| x == variable) {
+                            match &parameters[idx] {
+                                Imm::Label(lbl) => {
+                                    *op = AbstractOp::with_label(op.specifier().unwrap(), lbl)
+                                }
+                                Imm::Constant(c) => {
+                                    let mut trimmed = &c[..];
+                                    while !trimmed.is_empty() && trimmed[0] == 0 {
+                                        trimmed = &trimmed[1..];
+                                    }
+                                    if trimmed.len() < op.pushes() {
+                                        return error::SizedPushTooLarge {}.fail();
+                                    }
+                                    let mut normalized =
+                                        vec![0; op.size().unwrap() as usize - 1 - trimmed.len()];
+                                    normalized.extend_from_slice(trimmed);
+
+                                    *op = AbstractOp::with_immediate(
+                                        op.specifier().unwrap(),
+                                        &normalized,
+                                    )
+                                    .unwrap()
+                                }
+                                Imm::Variable(_) => unreachable!(),
+                            }
+                        }
+                    }
+                }
+
+                Ok(Some(self.push_all(m.contents)?))
+            }
+            None => error::UndeclaredMacro { macro_name: name }.fail(),
         }
     }
 }
@@ -930,8 +934,7 @@ mod tests {
             InstructionMacroInvocation::with_zero_parameters("my_macro".into()),
         )];
         let mut asm = Assembler::new();
-        asm.push_all(ops)?;
-        let err = asm.finish().unwrap_err();
+        let err = asm.push_all(ops).unwrap_err();
         assert_matches!(err, Error::UndeclaredMacro { macro_name, .. } if macro_name == "my_macro");
 
         Ok(())
@@ -973,30 +976,6 @@ mod tests {
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
         assert_matches!(err, Error::DuplicateLabel { label, .. } if label == "a");
-
-        Ok(())
-    }
-
-    #[test]
-    fn assemble_pending_instruction_macro() -> Result<(), Error> {
-        let ops = vec![
-            AbstractOp::Macro(InstructionMacroInvocation::with_zero_parameters(
-                "my_macro".into(),
-            )),
-            AbstractOp::MacroDefinition(InstructionMacroDefinition {
-                name: "my_macro".into(),
-                parameters: vec![],
-                contents: vec![AbstractOp::Op(Op::Caller)],
-            }),
-        ];
-        let mut asm = Assembler::new();
-        let sz = asm.push_all(ops)?;
-        assert_eq!(sz, 1);
-
-        let out = asm.take();
-        asm.finish()?;
-
-        assert_eq!(out, hex!("33"));
 
         Ok(())
     }
