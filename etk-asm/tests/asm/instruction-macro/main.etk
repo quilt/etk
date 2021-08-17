@@ -19,4 +19,10 @@ start:
 	pc
 	%foo()
 	%bar()
+	push1 delayed
+	push1 delayed2
+
+delayed:
+	%foobar(start, 0x42)
+delayed2:
 	%foobar(start, 0x42)
