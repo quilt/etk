@@ -94,254 +94,16 @@ mod error {
     }
 }
 
-use crate::asm::{Assembler, RawOp};
-use crate::ast::Node;
+use crate::ast::{self, Node};
+use crate::ops::{Abstract, AbstractOp, Concrete, Op};
 use crate::parse::parse_asm;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::PathBuf;
+
+use snafu::ResultExt;
 
 pub use self::error::Error;
-
-use snafu::{ensure, ResultExt};
-
-use std::fs::{read_to_string, File};
-use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
-
-fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, Error> {
-    let asm = read_to_string(path.as_ref()).with_context(|| error::Io {
-        message: "reading file before parsing",
-        path: path.as_ref().to_owned(),
-    })?;
-    let nodes = parse_asm(&asm)?;
-
-    Ok(nodes)
-}
-
-#[derive(Debug)]
-enum Scope {
-    Same,
-    Independent(Box<Assembler>),
-}
-
-impl Scope {
-    fn same() -> Self {
-        Self::Same
-    }
-
-    fn independent() -> Self {
-        Self::Independent(Box::new(Assembler::new()))
-    }
-}
-
-#[derive(Debug)]
-struct Source {
-    path: PathBuf,
-    nodes: std::vec::IntoIter<Node>,
-    scope: Scope,
-}
-
-#[derive(Debug)]
-struct Root {
-    original: PathBuf,
-    canonicalized: PathBuf,
-}
-
-impl Root {
-    fn new(mut file: PathBuf) -> Result<Self, Error> {
-        // Pop the filename.
-        if !file.pop() {
-            return Err(io::Error::from(io::ErrorKind::NotFound)).context(error::Io {
-                message: "no parent",
-                path: Some(file),
-            });
-        }
-
-        let file = std::env::current_dir()
-            .context(error::Io {
-                message: "getting cwd",
-                path: None,
-            })?
-            .join(file);
-
-        let metadata = file.metadata().with_context(|| error::Io {
-            message: "getting metadata",
-            path: file.clone(),
-        })?;
-
-        // Root must be a directory.
-        if !metadata.is_dir() {
-            let err = io::Error::from(io::ErrorKind::NotFound);
-            return Err(err).context(error::Io {
-                message: "root is not directory",
-                path: file,
-            });
-        }
-
-        let canonicalized = std::fs::canonicalize(&file).with_context(|| error::Io {
-            message: "canonicalizing root",
-            path: file.clone(),
-        })?;
-
-        Ok(Self {
-            original: file,
-            canonicalized,
-        })
-    }
-
-    fn check<P>(&self, path: P) -> Result<(), Error>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-
-        let canonicalized = std::fs::canonicalize(path).with_context(|| error::Io {
-            message: "canonicalizing include/import",
-            path: path.to_owned(),
-        })?;
-
-        // Don't allow directory traversals above the first file.
-        if canonicalized.starts_with(&self.canonicalized) {
-            Ok(())
-        } else {
-            error::DirectoryTraversal {
-                root: self.original.clone(),
-                file: path.to_owned(),
-            }
-            .fail()
-        }
-    }
-}
-
-#[must_use]
-struct PartialSource<'a, W> {
-    stack: &'a mut SourceStack<W>,
-    path: PathBuf,
-    scope: Scope,
-}
-
-impl<'a, W> PartialSource<'a, W> {
-    fn path(&self) -> &Path {
-        &self.path
-    }
-
-    fn push(self, nodes: Vec<Node>) -> &'a mut Source {
-        self.stack.sources.push(Source {
-            path: self.path,
-            nodes: nodes.into_iter(),
-            scope: self.scope,
-        });
-
-        self.stack.sources.last_mut().unwrap()
-    }
-}
-
-#[derive(Debug)]
-struct SourceStack<W> {
-    output: W,
-    sources: Vec<Source>,
-    root: Option<Root>,
-}
-
-impl<W> SourceStack<W> {
-    fn new(output: W) -> Self {
-        Self {
-            output,
-            sources: Default::default(),
-            root: Default::default(),
-        }
-    }
-
-    fn resolve(&mut self, path: PathBuf, scope: Scope) -> Result<PartialSource<W>, Error> {
-        ensure!(self.sources.len() <= 255, error::RecursionLimit);
-
-        let path = if let Some(ref root) = self.root {
-            let last = self.sources.last().unwrap();
-            let dir = match last.path.parent() {
-                Some(s) => s,
-                None => Path::new("./"),
-            };
-            let candidate = dir.join(path);
-            root.check(&candidate)?;
-            candidate
-        } else {
-            assert!(self.sources.is_empty());
-            self.root = Some(Root::new(path.clone())?);
-            path
-        };
-
-        Ok(PartialSource {
-            stack: self,
-            path,
-            scope,
-        })
-    }
-
-    fn peek(&mut self) -> Option<&mut Source> {
-        self.sources.last_mut()
-    }
-}
-
-impl<W> SourceStack<W>
-where
-    W: Write,
-{
-    fn pop(&mut self) -> Result<(), Error> {
-        let popped = self.sources.pop().unwrap();
-
-        if self.sources.is_empty() {
-            self.root = None;
-        }
-
-        let mut asm = match popped.scope {
-            Scope::Independent(a) => a,
-            Scope::Same => return Ok(()),
-        };
-
-        let raw = asm.take();
-        asm.finish()?;
-
-        if raw.is_empty() {
-            return Ok(());
-        }
-
-        if self.sources.is_empty() {
-            self.output.write_all(&raw).context(error::Io {
-                message: "writing output",
-                path: None,
-            })?;
-            Ok(())
-        } else {
-            self.write(RawOp::Raw(raw))
-        }
-    }
-
-    fn write(&mut self, mut op: RawOp) -> Result<(), Error> {
-        if self.sources.is_empty() {
-            panic!("no sources!");
-        }
-
-        for frame in self.sources[1..].iter_mut().rev() {
-            let asm = match frame.scope {
-                Scope::Same => continue,
-                Scope::Independent(ref mut a) => a,
-            };
-
-            if 0 == asm.push(op)? {
-                return Ok(());
-            } else {
-                op = RawOp::Raw(asm.take());
-            }
-        }
-
-        let first_asm = match self.sources[0].scope {
-            Scope::Independent(ref mut a) => a,
-            Scope::Same => panic!("sources[0] must be independent"),
-        };
-
-        first_asm.push(op)?;
-
-        Ok(())
-    }
-}
 
 /// A high-level interface for assembling files into EVM bytecode.
 ///
@@ -370,15 +132,13 @@ where
 /// ```
 #[derive(Debug)]
 pub struct Ingest<W> {
-    sources: SourceStack<W>,
+    output: W,
 }
 
 impl<W> Ingest<W> {
     /// Make a new `Ingest` that writes assembled bytes to `output`.
     pub fn new(output: W) -> Self {
-        Self {
-            sources: SourceStack::new(output),
-        }
+        Self { output }
     }
 }
 
@@ -406,68 +166,89 @@ where
         self.ingest(path, &text)
     }
 
-    /// Assemble instructions from `src` as if they were read from a file located
-    /// at `path`.
+    /// Ingests source at path.
     pub fn ingest<P>(&mut self, path: P, src: &str) -> Result<(), Error>
     where
         P: Into<PathBuf>,
     {
-        let nodes = parse_asm(src)?;
-        let partial = self.sources.resolve(path.into(), Scope::independent())?;
-        partial.push(nodes);
-
-        while let Some(source) = self.sources.peek() {
-            let node = match source.nodes.next() {
-                Some(n) => n,
-                None => {
-                    self.sources.pop()?;
-                    continue;
-                }
-            };
-
-            match node {
-                Node::Op(op) => {
-                    self.sources.write(RawOp::Op(op))?;
-                }
-                Node::Raw(raw) => {
-                    self.sources.write(RawOp::Raw(raw))?;
-                }
-                Node::Import(path) => {
-                    let partial = self.sources.resolve(path, Scope::same())?;
-                    let parsed = parse_file(partial.path())?;
-                    partial.push(parsed);
-                }
-                Node::Include(path) => {
-                    let partial = self.sources.resolve(path, Scope::independent())?;
-                    let parsed = parse_file(partial.path())?;
-                    partial.push(parsed);
-                }
-                Node::IncludeHex(path) => {
-                    let partial = self.sources.resolve(path, Scope::same())?;
-
-                    let file =
-                        std::fs::read_to_string(partial.path()).with_context(|| error::Io {
-                            message: "reading hex include",
-                            path: partial.path().to_owned(),
-                        })?;
-
-                    let raw = hex::decode(file)
-                        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
-                        .context(error::InvalidHex {
-                            path: partial.path().to_owned(),
-                        })?;
-
-                    partial.push(vec![Node::Raw(raw)]);
-                }
-            }
-        }
-
-        if !self.sources.sources.is_empty() {
-            panic!("extra sources?");
-        }
-
+        let path: PathBuf = path.into();
+        let mut db = Db::default();
+        db.set_source_text(path.clone(), src.into());
+        let out = db.asm(path);
+        self.output.write(&out).unwrap();
         Ok(())
     }
+}
+
+#[salsa::query_group(AssemblerDbStorage)]
+trait AssemblerDb: salsa::Database {
+    #[salsa::input]
+    fn source_text(&self, path: PathBuf) -> String;
+
+    fn ast(&self, path: PathBuf) -> ast::Program;
+    fn asm(&self, path: PathBuf) -> Vec<u8>;
+    fn hex(&self, path: PathBuf) -> Vec<u8>;
+}
+
+#[salsa::database(AssemblerDbStorage)]
+#[derive(Default)]
+struct Db {
+    storage: salsa::Storage<Self>,
+}
+
+impl salsa::Database for Db {}
+
+fn ast(db: &dyn AssemblerDb, path: PathBuf) -> ast::Program {
+    let src = db.source_text(path);
+    parse_asm(src.as_ref()).unwrap()
+}
+
+fn asm(db: &dyn AssemblerDb, path: PathBuf) -> Vec<u8> {
+    let program = db.ast(path);
+    let mut out = vec![];
+
+    for node in program.body {
+        match node {
+            Node::Op(mut op) => {
+                if let Some(lbl) = op.immediate_label() {
+                    let addr = db.label_address(lbl);
+                    op = op.realize(addr).context(error::LabelTooLarge { label })?;
+                }
+                let concrete = op.concretize().context(asm::error::UnsizedPushTooLarge)?;
+                concrete.assemble(&mut out);
+            }
+            Node::Raw(raw) => {
+                out.extend(raw);
+            }
+            Node::Import(path) => {
+                unimplemented!()
+                // out.extend(db.asm(path.to_string()));
+            }
+            Node::Include(path) => {
+                unimplemented!()
+            }
+            Node::IncludeHex(path) => out.extend(db.hex(path)),
+        }
+    }
+    out
+}
+
+fn hex(db: &dyn AssemblerDb, path: PathBuf) -> Vec<u8> {
+    let file = std::fs::read_to_string(&path)
+        .with_context(|| error::Io {
+            message: "reading hex include",
+            path: path.to_owned(),
+        })
+        .unwrap();
+
+    let raw = hex::decode(file)
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+        .context(error::InvalidHex {
+            path: path.to_owned(),
+        })
+        .unwrap();
+
+    raw
 }
 
 #[cfg(test)]
@@ -491,6 +272,22 @@ mod tests {
 
         write!(f, "{}", s).unwrap();
         (f, root)
+    }
+
+    #[test]
+    fn ingest_ops() -> Result<(), Error> {
+        let text = r#"
+            push1 foo
+            foo:
+            caller
+        "#;
+
+        let mut output = Vec::new();
+        let mut ingest = Ingest::new(&mut output);
+        ingest.ingest(PathBuf::new(), &text)?;
+        assert_eq!(output, hex!("600133"));
+
+        Ok(())
     }
 
     #[test]

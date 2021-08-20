@@ -22,6 +22,7 @@ pest_derive = "2.1"
 sha3 = "0.9.1"
 structopt = { optional = true, version = "0.3.21" }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.2.0-dev" }
+salsa = "0.16.1"
 snafu = { version = "0.6.10", default-features = false, features = [ "std" ] }
 
 [dev-dependencies]

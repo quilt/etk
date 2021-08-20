@@ -10,7 +10,7 @@ mod parser {
     pub(super) struct AsmParser;
 }
 
-use crate::ast::Node;
+use crate::ast::{self, Node};
 use crate::ops::{
     AbstractOp, Imm, InstructionMacroDefinition, InstructionMacroInvocation, Op, Specifier,
 };
@@ -27,7 +27,7 @@ use snafu::OptionExt;
 
 use std::path::PathBuf;
 
-pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
+pub(crate) fn parse_asm(asm: &str) -> Result<ast::Program, ParseError> {
     let mut program: Vec<Node> = Vec::new();
 
     let pairs = AsmParser::parse(Rule::program, asm)?;
@@ -76,7 +76,7 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
         }
     }
 
-    Ok(program)
+    Ok(ast::Program { body: program })
 }
 
 fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseError> {
@@ -237,7 +237,7 @@ mod tests {
 
     macro_rules! nodes {
         ($($x:expr),+ $(,)?) => (
-            vec![$(Node::from($x)),+]
+            ast::Program { body: vec![$(Node::from($x)),+] }
         );
     }
 

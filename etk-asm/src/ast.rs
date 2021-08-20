@@ -1,7 +1,12 @@
 use crate::ops::{AbstractOp, Op};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct Program {
+    pub(crate) body: Vec<Node>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Node {
     Op(AbstractOp),
     Raw(Vec<u8>),
