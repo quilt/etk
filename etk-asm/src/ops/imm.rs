@@ -35,6 +35,10 @@ pub enum Imm<T> {
 
     /// A macro variable.
     Variable(String),
+    /*
+    /// A mathematical expression.
+    Expression(),
+    */
 }
 
 impl<T> Imm<T> {

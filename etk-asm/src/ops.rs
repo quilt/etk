@@ -15,6 +15,7 @@ mod error {
 }
 
 mod imm;
+mod expression;
 mod types;
 
 pub use self::error::UnknownSpecifierError;
