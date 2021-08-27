@@ -68,7 +68,7 @@ function_parameter = { ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 //////////////
 // operands //
 //////////////
-operand = _{ number | selector | label }
+operand = _{ math_expr | number | selector | label }
 
 number = _{ binary | octal | hex | decimal }
 
@@ -79,6 +79,18 @@ hex = @{ "0x" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT+ }
 
 label = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 label_definition = { label ~ ":" }
+
+////////////////
+// infix math //
+////////////////
+math_expr = { term ~ (operation ~ term)* }
+term = _{ label | int | "(" ~ math_expr ~ ")" }
+int = { ("-")? ~ ASCII_DIGIT+ }
+operation = _{ add | subtract | multiply | divide }
+add      = { "+" }
+subtract = { "-" }
+multiply = { "*" }
+divide   = { "/" }
 
 ///////////////
 // overrides //
