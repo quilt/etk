@@ -450,7 +450,7 @@ where
                             path: partial.path().to_owned(),
                         })?;
 
-                    let raw = hex::decode(file)
+                    let raw = hex::decode(file.trim())
                         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
                         .context(error::InvalidHex {
                             path: partial.path().to_owned(),
