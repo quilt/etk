@@ -855,8 +855,8 @@ mod z3_visit {
                     let lhs = self.arguments.pop().unwrap();
 
                     lhs.bvult(&rhs).ite(
-                        &BV::from_u64(&self.context, 1, 256),
-                        &BV::from_u64(&self.context, 0, 256),
+                        &BV::from_u64(self.context, 1, 256),
+                        &BV::from_u64(self.context, 0, 256),
                     )
                 }
 
@@ -865,8 +865,8 @@ mod z3_visit {
                     let lhs = self.arguments.pop().unwrap();
 
                     lhs.bvugt(&rhs).ite(
-                        &BV::from_u64(&self.context, 1, 256),
-                        &BV::from_u64(&self.context, 0, 256),
+                        &BV::from_u64(self.context, 1, 256),
+                        &BV::from_u64(self.context, 0, 256),
                     )
                 }
 
@@ -875,8 +875,8 @@ mod z3_visit {
                     let lhs = self.arguments.pop().unwrap();
 
                     lhs.bvslt(&rhs).ite(
-                        &BV::from_u64(&self.context, 1, 256),
-                        &BV::from_u64(&self.context, 0, 256),
+                        &BV::from_u64(self.context, 1, 256),
+                        &BV::from_u64(self.context, 0, 256),
                     )
                 }
 
@@ -885,8 +885,8 @@ mod z3_visit {
                     let lhs = self.arguments.pop().unwrap();
 
                     lhs.bvsgt(&rhs).ite(
-                        &BV::from_u64(&self.context, 1, 256),
-                        &BV::from_u64(&self.context, 0, 256),
+                        &BV::from_u64(self.context, 1, 256),
+                        &BV::from_u64(self.context, 0, 256),
                     )
                 }
 
@@ -895,8 +895,8 @@ mod z3_visit {
                     let lhs = self.arguments.pop().unwrap();
 
                     lhs._eq(&rhs).ite(
-                        &BV::from_u64(&self.context, 1, 256),
-                        &BV::from_u64(&self.context, 0, 256),
+                        &BV::from_u64(self.context, 1, 256),
+                        &BV::from_u64(self.context, 0, 256),
                     )
                 }
 
@@ -951,8 +951,8 @@ mod z3_visit {
                     let arg = self.arguments.pop().unwrap();
                     let zero = BV::from_u64(self.context, 0, 256);
                     arg._eq(&zero).ite(
-                        &BV::from_u64(&self.context, 1, 256),
-                        &BV::from_u64(&self.context, 0, 256),
+                        &BV::from_u64(self.context, 1, 256),
+                        &BV::from_u64(self.context, 0, 256),
                     )
                 }
 
@@ -974,9 +974,9 @@ mod z3_visit {
                 Sym::CallDataLoad => {
                     let offset = self.arguments.pop().unwrap();
 
-                    let sort = Sort::bitvector(&self.context, 256);
+                    let sort = Sort::bitvector(self.context, 256);
 
-                    let func = FuncDecl::new(&self.context, "calldataload", &[&sort], &sort);
+                    let func = FuncDecl::new(self.context, "calldataload", &[&sort], &sort);
 
                     let apply = func.apply(&[&Dynamic::from_ast(&offset)]);
                     apply.as_bv().unwrap()
@@ -1010,9 +1010,9 @@ mod z3_visit {
                 Sym::BlockHash => {
                     let num = self.arguments.pop().unwrap();
 
-                    let sort = Sort::bitvector(&self.context, 256);
+                    let sort = Sort::bitvector(self.context, 256);
 
-                    let func = FuncDecl::new(&self.context, "blockhash", &[&sort], &sort);
+                    let func = FuncDecl::new(self.context, "blockhash", &[&sort], &sort);
 
                     let apply = func.apply(&[&Dynamic::from_ast(&num)]);
                     apply.as_bv().unwrap()

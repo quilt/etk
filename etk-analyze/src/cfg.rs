@@ -244,6 +244,8 @@ impl ControlFlowGraph {
         !matches!(result, SatResult::Unsat)
     }
 
+    // https://github.com/rust-lang/rust-clippy/issues/6420
+    #[allow(clippy::needless_collect)]
     pub fn refine_shallow(&mut self) {
         let indexes: Vec<_> = self
             .by_offset
