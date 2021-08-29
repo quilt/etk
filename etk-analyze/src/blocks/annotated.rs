@@ -74,8 +74,8 @@ mod z3_exit {
                     when_false,
                     condition,
                 } => {
-                    let when_true = when_true.to_z3(&context);
-                    let condition = condition.to_z3(&context);
+                    let when_true = when_true.to_z3(context);
+                    let condition = condition.to_z3(context);
 
                     Exit::Branch {
                         when_false: *when_false,
