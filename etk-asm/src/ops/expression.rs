@@ -25,19 +25,34 @@ mod error {
 
 use self::error::Error;
 
+/// An infix mathematical expression.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-enum Expression {
+pub enum Expression {
+    /// A recusrive expression.
     Expression(Box<Self>),
-    Number(u128),
+
+    /// A integer value.
+    Number(i128),
+
+    /// A label.
     Label(String),
+
+    /// An addition operation.
     Plus(Box<Self>, Box<Self>),
+
+    /// A subtraction operation.
     Minus(Box<Self>, Box<Self>),
+
+    /// A multiplication operation.
     Times(Box<Self>, Box<Self>),
+
+    /// A division operation.
     Divide(Box<Self>, Box<Self>),
 }
 
 impl Expression {
-    fn evaluate(&self, labels: &HashMap<String, Option<u32>>) -> Result<u128, Error> {
+    /// Evaluates the expression, substituting resolved label address for labels.
+    fn evaluate(&self, labels: &HashMap<String, Option<u32>>) -> Result<i128, Error> {
         let ret = match self {
             Self::Expression(e) => e.evaluate(labels)?,
             Self::Number(n) => *n,
@@ -45,7 +60,7 @@ impl Expression {
                 .get(label)
                 .context(error::UndeclaredLabel { label })?
                 .context(error::UnresolvedLabel { label })?
-                as u128,
+                as i128,
             Self::Plus(rhs, lhs) => rhs.evaluate(labels)? + lhs.evaluate(labels)?,
             Self::Minus(rhs, lhs) => rhs.evaluate(labels)? - lhs.evaluate(labels)?,
             Self::Times(rhs, lhs) => rhs.evaluate(labels)? * lhs.evaluate(labels)?,

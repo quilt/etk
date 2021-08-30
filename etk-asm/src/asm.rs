@@ -618,6 +618,7 @@ impl Assembler {
                                     .unwrap()
                                 }
                                 Imm::Variable(_) => unreachable!(),
+                                Imm::Expression(_) => unimplemented!(),
                             }
                         }
                     }

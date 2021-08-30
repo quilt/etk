@@ -84,12 +84,12 @@ label_definition = { label ~ ":" }
 // infix math //
 ////////////////
 math_expr = { term ~ (operation ~ term)* }
-term = _{ label | int | "(" ~ math_expr ~ ")" }
+term = _{ label | number | int | "(" ~ math_expr ~ ")" }
 int = { ("-")? ~ ASCII_DIGIT+ }
-operation = _{ add | subtract | multiply | divide }
-add      = { "+" }
-subtract = { "-" }
-multiply = { "*" }
+operation = _{ plus | minus | times | divide }
+plus      = { "+" }
+minus = { "-" }
+times = { "*" }
 divide   = { "/" }
 
 ///////////////

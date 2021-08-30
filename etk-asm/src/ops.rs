@@ -14,11 +14,12 @@ mod error {
     }
 }
 
-mod imm;
 mod expression;
+mod imm;
 mod types;
 
 pub use self::error::UnknownSpecifierError;
+pub use self::expression::Expression;
 pub use self::imm::{Imm, Immediate, TryFromIntError, TryFromSliceError};
 use self::types::ImmediateTypes;
 pub use self::types::{Abstract, Concrete, Spec};
@@ -235,6 +236,15 @@ macro_rules! ret_with_variable {
     };
     ($imm:ident, $op:ident, $arg:ident) => {
         Self::$op(Imm::with_variable($imm))
+    };
+}
+
+macro_rules! ret_with_expression {
+    ($imm:ident, $op:ident) => {
+        panic!()
+    };
+    ($imm:ident, $op:ident, $arg:ident) => {
+        Self::$op(Imm::with_expression($imm))
     };
 }
 
@@ -480,6 +490,22 @@ macro_rules! ops {
         }
 
         impl Op<Abstract> {
+            /// Construct an `Op` with the given variable.
+            ///
+            /// ## Panics
+            ///
+            /// This function panics if the instruction described by the specifier
+            /// does not accept immediate arguments.
+            pub fn with_expression(spec: Op<Spec>, var: Expression) -> Self {
+                let var = var.into();
+
+                match spec {
+                    $(
+                        pat_spec!($op$(, $arg)?) => ret_with_expression!(var, $op$(, $arg)?),
+                    )*
+                }
+            }
+
             /// Construct an `Op` with the given label.
             ///
             /// ## Panics
@@ -1083,6 +1109,16 @@ impl AbstractOp {
         Some(Self::Op(Op::new(spec)?))
     }
 
+    /// Construct an `AbstractOp` with the given expression.
+    ///
+    /// ## Panics
+    ///
+    /// This function panics if the instruction described by the specifier
+    /// does not accept immediate arguments.
+    pub fn with_expression(spec: Op<Spec>, var: Expression) -> Self {
+        Self::Op(Op::with_expression(spec, var))
+    }
+
     /// Construct an `AbstractOp` with the given label.
     ///
     /// ## Panics
@@ -1148,7 +1184,9 @@ impl AbstractOp {
                 let start = bytes.len() - spec.extra_len() as usize;
                 AbstractOp::with_immediate(spec, &bytes[start..]).unwrap()
             }
-            Self::Push(Imm::Constant(_)) | Self::Push(Imm::Variable(_)) => {
+            Self::Push(Imm::Constant(_))
+            | Self::Push(Imm::Variable(_))
+            | Self::Push(Imm::Expression(_)) => {
                 panic!("only pushes with a label can be realized");
             }
             Self::Op(op) => Self::Op(op.realize(address)?),
@@ -1174,6 +1212,7 @@ impl AbstractOp {
                 Op::<Concrete>::with_immediate(spec, trimmed).unwrap()
             }
             Self::Push(Imm::Variable(_)) => panic!("variable immediates must be filled first"),
+            Self::Push(Imm::Expression(_)) => panic!("expressions must be resolved first"),
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),
             Self::MacroDefinition(_) => panic!("macro definitions cannot be concretized"),

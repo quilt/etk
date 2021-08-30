@@ -15,11 +15,16 @@ use crate::ops::{
     AbstractOp, Imm, InstructionMacroDefinition, InstructionMacroInvocation, Op, Specifier,
 };
 
-use pest::Parser;
+use pest::{
+    iterators::Pair,
+    prec_climber::{Assoc, Operator, PrecClimber},
+    Parser,
+};
 
 use self::args::{Label, Signature};
 use self::error::ParseError;
 use self::parser::{AsmParser, Rule};
+use crate::ops::Expression;
 
 use sha3::{Digest, Keccak256};
 
@@ -94,6 +99,7 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseErro
         Imm::Constant(c) => AbstractOp::with_immediate(spec, c.as_ref())
             .ok()
             .context(error::ImmediateTooLarge),
+        Imm::Expression(e) => Ok(AbstractOp::with_expression(spec, e)),
     }
 }
 
@@ -135,10 +141,47 @@ fn parse_operand(
                 .expect("variable didn't start with '$'");
             Imm::<Vec<u8>>::Variable(variable.to_string())
         }
+        Rule::math_expr => Imm::with_expression(parse_expr(operand)?),
         r => unreachable!(format!("{:?}", r)),
     };
 
     Ok(imm)
+}
+
+fn parse_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expression, ParseError> {
+    let climber = PrecClimber::new(vec![
+        Operator::new(Rule::plus, Assoc::Left) | Operator::new(Rule::minus, Assoc::Left),
+        Operator::new(Rule::times, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
+    ]);
+
+    fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Expression {
+        let primary = |pair| consume(pair, climber);
+        let infix = |lhs: Expression, op: Pair<Rule>, rhs: Expression| match op.as_rule() {
+            Rule::plus => Expression::Plus(Box::new(lhs), Box::new(rhs)),
+            Rule::minus => Expression::Minus(Box::new(lhs), Box::new(rhs)),
+            Rule::times => Expression::Times(Box::new(lhs), Box::new(rhs)),
+            Rule::divide => Expression::Divide(Box::new(lhs), Box::new(rhs)),
+            _ => unreachable!(),
+        };
+
+        match pair.as_rule() {
+            Rule::math_expr => climber.climb(pair.into_inner(), primary, infix),
+            Rule::binary => {
+                Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 2).unwrap())
+            }
+            Rule::decimal | Rule::int => {
+                Expression::Number(i128::from_str_radix(pair.as_str(), 10).unwrap())
+            }
+            Rule::octal => {
+                Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 8).unwrap())
+            }
+            Rule::hex => Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 16).unwrap()),
+            Rule::label => Expression::Label(pair.as_str().to_string()),
+            r => panic!("unsupport expression primary: {:?}, {:?}", r, pair.as_str()),
+        }
+    }
+
+    Ok(consume(pair, &climber))
 }
 
 fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
@@ -616,6 +659,49 @@ mod tests {
                     Imm::from(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10])
                 ]
             })
+        ];
+        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+    }
+
+    #[test]
+    fn parse_expression() {
+        let asm = format!(
+            r#"
+            push1 1+1
+            push1 2*foo
+            push1 (1+(2*foo))-(bar/42)
+            push1 0x20+0o1+0b10
+            "#,
+        );
+        let expected = nodes![
+            Op::Push1(Imm::with_expression(Expression::Plus(
+                Box::new(Expression::Number(1)),
+                Box::new(Expression::Number(1))
+            ))),
+            Op::Push1(Imm::with_expression(Expression::Times(
+                Box::new(Expression::Number(2)),
+                Box::new(Expression::Label("foo".into()))
+            ))),
+            Op::Push1(Imm::with_expression(Expression::Minus(
+                Box::new(Expression::Plus(
+                    Box::new(Expression::Number(1)),
+                    Box::new(Expression::Times(
+                        Box::new(Expression::Number(2)),
+                        Box::new(Expression::Label("foo".into()))
+                    ))
+                )),
+                Box::new(Expression::Divide(
+                    Box::new(Expression::Label("bar".into())),
+                    Box::new(Expression::Number(42))
+                ))
+            ))),
+            Op::Push1(Imm::with_expression(Expression::Plus(
+                Box::new(Expression::Plus(
+                    Box::new(Expression::Number(32)),
+                    Box::new(Expression::Number(1))
+                )),
+                Box::new(Expression::Number(2))
+            )))
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }

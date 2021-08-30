@@ -5,6 +5,8 @@ use snafu::{Backtrace, Snafu};
 use std::convert::TryFrom;
 use std::fmt::{self, Debug};
 
+use super::expression::Expression;
+
 /// An error that arises when converting an integer into an immediate.
 #[derive(Snafu, Debug)]
 #[snafu(visibility = "pub(super)")]
@@ -35,10 +37,9 @@ pub enum Imm<T> {
 
     /// A macro variable.
     Variable(String),
-    /*
+
     /// A mathematical expression.
-    Expression(),
-    */
+    Expression(Expression),
 }
 
 impl<T> Imm<T> {
@@ -50,6 +51,11 @@ impl<T> Imm<T> {
     /// Construct an `Imm` with a variable.
     pub fn with_variable<S: Into<String>>(s: S) -> Self {
         Imm::Variable(s.into())
+    }
+
+    /// Construct an `Imm` with an expression.
+    pub fn with_expression(e: Expression) -> Self {
+        Imm::Expression(e)
     }
 }
 
@@ -219,6 +225,7 @@ where
             Imm::Label(s) => write!(f, r#"Imm::Label("{}")"#, s),
             Imm::Constant(c) => write!(f, "Imm::Constant(0x{})", c.encode_hex::<String>()),
             Imm::Variable(s) => write!(f, r#"Imm::Variable("{}")"#, s),
+            Imm::Expression(e) => write!(f, r#"Imm::Expression("{:?}")"#, e),
         }
     }
 }
@@ -232,6 +239,7 @@ where
             Imm::Label(s) => write!(f, ":{}", s),
             Imm::Constant(c) => write!(f, "0x{}", c.encode_hex::<String>()),
             Imm::Variable(s) => write!(f, "{}", s),
+            Imm::Expression(e) => write!(f, "{:?}", e),
         }
     }
 }
