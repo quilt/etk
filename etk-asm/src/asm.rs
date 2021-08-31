@@ -350,6 +350,18 @@ impl Assembler {
                     }
                 }
 
+                if op.immediate_expression().is_some() {
+                    match op.compute(&self.declared_labels) {
+                        Ok(concrete) => op = concrete,
+                        Err(_) => {
+                            assert_eq!(self.pending_len, Some(0));
+                            self.pending_len = op.size();
+                            self.pending.push_back(RawOp::Op(op));
+                            return Ok(());
+                        }
+                    }
+                }
+
                 let concrete = op.concretize().context(error::UnsizedPushTooLarge)?;
                 self.concrete_len += concrete.size();
 
@@ -635,7 +647,7 @@ impl Assembler {
 mod tests {
     use assert_matches::assert_matches;
 
-    use crate::ops::{Imm, InstructionMacroDefinition, InstructionMacroInvocation, Op};
+    use crate::ops::{Expression, Imm, InstructionMacroDefinition, InstructionMacroInvocation, Op};
 
     use hex_literal::hex;
 
@@ -1037,6 +1049,24 @@ mod tests {
         assert_eq!(sz, 7);
         let out = asm.take();
         assert_eq!(out, hex!("5b600060426000"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_expression_push() -> Result<(), Error> {
+        let ops = vec![AbstractOp::Op(Op::Push1(Imm::with_expression(
+            Expression::Plus(
+                Box::new(Expression::Number(1)),
+                Box::new(Expression::Number(1)),
+            ),
+        )))];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 2);
+        let out = asm.take();
+        assert_eq!(out, hex!("6002"));
 
         Ok(())
     }

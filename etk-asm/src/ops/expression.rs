@@ -7,8 +7,7 @@ mod error {
     /// Errors that can occur while assembling instructions.
     #[derive(Snafu, Debug)]
     #[non_exhaustive]
-    #[snafu(visibility = "pub(super)")]
-    #[allow(unreachable_pub)]
+    #[snafu(visibility = "pub(crate)")]
     pub enum Error {
         /// The error that can arise when evaluate an expression without all label offsets being known.
         #[snafu(display("mising label: {}", label))]
@@ -23,7 +22,7 @@ mod error {
     }
 }
 
-use self::error::Error;
+pub(crate) use error::Error;
 
 /// An infix mathematical expression.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -52,26 +51,33 @@ pub enum Expression {
 
 impl Expression {
     /// Evaluates the expression, substituting resolved label address for labels.
-    fn evaluate(&self, labels: &HashMap<String, Option<u32>>) -> Result<i128, Error> {
-        let ret = match self {
-            Self::Expression(e) => e.evaluate(labels)?,
-            Self::Number(n) => *n,
-            Self::Label(label) => labels
-                .get(label)
-                .context(error::UndeclaredLabel { label })?
-                .context(error::UnresolvedLabel { label })?
-                as i128,
-            Self::Plus(rhs, lhs) => rhs.evaluate(labels)? + lhs.evaluate(labels)?,
-            Self::Minus(rhs, lhs) => rhs.evaluate(labels)? - lhs.evaluate(labels)?,
-            Self::Times(rhs, lhs) => rhs.evaluate(labels)? * lhs.evaluate(labels)?,
-            Self::Divide(rhs, lhs) => rhs.evaluate(labels)? / lhs.evaluate(labels)?,
-        };
-        Ok(ret)
+    pub fn evaluate(&self, labels: &HashMap<String, Option<u32>>) -> Result<u128, error::Error> {
+        fn rec(
+            s: &Expression,
+            labels: &HashMap<String, Option<u32>>,
+        ) -> Result<i128, error::Error> {
+            let ret = match s {
+                Expression::Expression(e) => rec(e, labels)?,
+                Expression::Number(n) => *n,
+                Expression::Label(label) => labels
+                    .get(label)
+                    .context(error::UndeclaredLabel { label })?
+                    .context(error::UnresolvedLabel { label })?
+                    as i128,
+                Expression::Plus(rhs, lhs) => rec(rhs, labels)? + rec(lhs, labels)?,
+                Expression::Minus(rhs, lhs) => rec(rhs, labels)? - rec(lhs, labels)?,
+                Expression::Times(rhs, lhs) => rec(rhs, labels)? * rec(lhs, labels)?,
+                Expression::Divide(rhs, lhs) => rec(rhs, labels)? / rec(lhs, labels)?,
+            };
+            Ok(ret)
+        }
+        rec(self, labels).map(|n| n as u128)
     }
 }
 
 #[cfg(test)]
 mod test {
+    use super::error::Error;
     use super::*;
     use assert_matches::assert_matches;
 

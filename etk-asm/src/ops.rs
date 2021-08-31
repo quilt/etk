@@ -27,6 +27,7 @@ pub use self::types::{Abstract, Concrete, Spec};
 use snafu::OptionExt;
 
 use std::cmp::{Eq, PartialEq};
+use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
@@ -144,12 +145,17 @@ macro_rules! pat_label {
     ($cap:ident, $op:ident, $arg:ident) => { Self::$op(Imm::Label(ref $cap)) };
 }
 
+macro_rules! pat_expression {
+    ($cap:ident, $op:ident) => { Self::$op };
+    ($cap:ident, $op:ident, $arg:ident) => { Self::$op(Imm::Expression(ref $cap)) };
+}
+
 macro_rules! pat_variable {
     ($cap:ident, $op:ident) => { Self::$op };
     ($cap:ident, $op:ident, $arg:ident) => { Self::$op(Imm::Variable(ref $cap)) };
 }
 
-macro_rules! ret_label {
+macro_rules! ret_inner {
     ($cap:ident) => {
         None
     };
@@ -164,6 +170,15 @@ macro_rules! ret_realize {
     };
     ($op:ident, $addr:ident, $arg:ident) => {
         Op::$op($addr.try_into()?)
+    };
+}
+
+macro_rules! ret_compute {
+    ($op:ident, $expr:ident, $map:ident) => {
+        panic!()
+    };
+    ($op:ident, $expr:ident, $map:ident, $arg:ident) => {
+        Op::$op(Imm::try_from($expr.evaluate($map)?).unwrap())
     };
 }
 
@@ -558,10 +573,21 @@ macro_rules! ops {
             }
 
             /// The label to be pushed on the stack. Only relevant for push instructions.
+            pub(crate) fn immediate_expression(&self) -> Option<&Expression> {
+                match self {
+                    $(
+                        pat_expression!(a, $op$(, $arg)?) => ret_inner!(a$(, $arg)?),
+                    )*
+
+                    _ => None,
+                }
+            }
+
+            /// The label to be pushed on the stack. Only relevant for push instructions.
             pub(crate) fn immediate_label(&self) -> Option<&str> {
                 match self {
                     $(
-                        pat_label!(a, $op$(, $arg)?) => ret_label!(a$(, $arg)?),
+                        pat_label!(a, $op$(, $arg)?) => ret_inner!(a$(, $arg)?),
                     )*
 
                     _ => None,
@@ -572,7 +598,7 @@ macro_rules! ops {
             pub(crate) fn immediate_variable(&self) -> Option<&str> {
                 match self {
                     $(
-                        pat_variable!(a, $op$(, $arg)?) => ret_label!(a$(, $arg)?),
+                        pat_variable!(a, $op$(, $arg)?) => ret_inner!(a$(, $arg)?),
                     )*
 
                     _ => None,
@@ -586,6 +612,17 @@ macro_rules! ops {
                         pat_label!(_a, $op$(, $arg)?) => ret_realize!($op, address$(, $arg)?),
                     )*
                     _ => panic!("only push ops with labels can be realized"),
+                };
+                Ok(op)
+            }
+
+            /// Compute an expression into a concrete value
+            pub(crate) fn compute(&self, map: &HashMap<String, Option<u32>>) -> Result<Self, expression::Error> {
+                let op = match self {
+                    $(
+                        pat_expression!(a, $op$(, $arg)?) => ret_compute!($op, a, map$(, $arg)?),
+                    )*
+                    _ => panic!("only push ops with expressions can be computed"),
                 };
                 Ok(op)
             }
@@ -1152,6 +1189,17 @@ impl AbstractOp {
         Ok(Self::Op(Op::<Abstract>::with_immediate(spec, imm)?))
     }
 
+    pub(crate) fn immediate_expression(&self) -> Option<&Expression> {
+        match self {
+            Self::Op(op) => op.immediate_expression(),
+            Self::Push(Imm::Expression(e)) => Some(e),
+            Self::Push(_) => None,
+            Self::Label(_) => None,
+            Self::Macro(_) => None,
+            Self::MacroDefinition(_) => None,
+        }
+    }
+
     pub(crate) fn immediate_label(&self) -> Option<&str> {
         match self {
             Self::Op(op) => op.immediate_label(),
@@ -1190,6 +1238,36 @@ impl AbstractOp {
                 panic!("only pushes with a label can be realized");
             }
             Self::Op(op) => Self::Op(op.realize(address)?),
+            Self::Label(_) => panic!("labels cannot be realized"),
+            Self::Macro(_) => panic!("macros cannot be realized"),
+            Self::MacroDefinition(_) => panic!("macro definitions cannot be realized"),
+        };
+
+        Ok(ret)
+    }
+
+    /// Compute a push op with an expression into a concrete op with constant operand
+    /// denoting the address.
+    pub(crate) fn compute(
+        &self,
+        map: &HashMap<String, Option<u32>>,
+    ) -> Result<Self, expression::Error> {
+        let ret = match self {
+            Self::Push(Imm::Expression(e)) => {
+                let val = e.evaluate(map)?;
+                let spec = Specifier::push_for(val as u32)
+                    .context(imm::TryFromIntContext)
+                    .unwrap();
+                let bytes = val.to_be_bytes();
+                let start = bytes.len() - spec.extra_len() as usize;
+                AbstractOp::with_immediate(spec, &bytes[start..]).unwrap()
+            }
+            Self::Push(Imm::Constant(_))
+            | Self::Push(Imm::Label(_))
+            | Self::Push(Imm::Variable(_)) => {
+                panic!("only pushes with a label can be realized");
+            }
+            Self::Op(op) => Self::Op(op.compute(map)?),
             Self::Label(_) => panic!("labels cannot be realized"),
             Self::Macro(_) => panic!("macros cannot be realized"),
             Self::MacroDefinition(_) => panic!("macro definitions cannot be realized"),
