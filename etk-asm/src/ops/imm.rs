@@ -65,6 +65,12 @@ impl From<Vec<u8>> for Imm<Vec<u8>> {
     }
 }
 
+impl From<u128> for Imm<Vec<u8>> {
+    fn from(konst: u128) -> Self {
+        Imm::Constant(konst.to_le_bytes().into())
+    }
+}
+
 macro_rules! impl_from {
     ($ii:literal;) => {
         impl From<[u8; $ii]> for Imm<[u8; $ii]> {

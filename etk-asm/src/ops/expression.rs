@@ -33,6 +33,9 @@ pub enum Expression {
     /// A integer value.
     Number(i128),
 
+    /// A hex value.
+    Hex(String),
+
     /// A label.
     Label(String),
 
@@ -59,6 +62,7 @@ impl Expression {
             let ret = match s {
                 Expression::Expression(e) => rec(e, labels)?,
                 Expression::Number(n) => *n,
+                Expression::Hex(h) => i128::from_str_radix(&h.as_str()[2..], 16).unwrap(),
                 Expression::Label(label) => labels
                     .get(label)
                     .context(error::UndeclaredLabel { label })?

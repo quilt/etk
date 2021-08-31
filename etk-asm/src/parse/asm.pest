@@ -39,7 +39,7 @@ instruction_macro_definition = !{ "%macro" ~ function_declaration ~ NEWLINE* ~ (
 instruction_macro = !{ "%" ~ function_invocation }
 
 instruction_macro_push = ${ "push" ~  word_size ~ WHITESPACE ~ instruction_macro_operand }
-instruction_macro_operand = _{ number | selector | label | instruction_macro_variable }
+instruction_macro_operand = _{ selector | instruction_macro_variable | math_expr }
 instruction_macro_variable = { "$" ~ function_parameter }
 
 builtin = ${ "%" ~ ( import | include | include_hex | push_macro ) }
@@ -68,7 +68,7 @@ function_parameter = { ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 //////////////
 // operands //
 //////////////
-operand = _{ math_expr | number | selector | label }
+operand = _{ selector | math_expr }
 
 number = _{ binary | octal | hex | decimal }
 

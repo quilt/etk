@@ -108,40 +108,33 @@ fn parse_operand(
     size: u32,
 ) -> Result<Imm<Vec<u8>>, ParseError> {
     let imm = match operand.as_rule() {
-        Rule::binary => {
-            let raw = operand.as_str();
-            Imm::from(radix_str_to_vec(&raw[2..], 2, size)?)
-        }
-        Rule::octal => {
-            let raw = operand.as_str();
-            Imm::from(radix_str_to_vec(&raw[2..], 8, size)?)
-        }
-        Rule::decimal => {
-            let raw = operand.as_str();
-            Imm::from(radix_str_to_vec(raw, 10, size)?)
-        }
-        Rule::hex => {
-            let raw = operand.as_str();
-            Imm::from(hex::decode(&raw[2..]).unwrap())
-        }
+        Rule::math_expr => match parse_expr(operand)? {
+            Expression::Label(lbl) => Imm::<Vec<u8>>::Label(lbl),
+            Expression::Number(n) => {
+                let msb = 128 - n.leading_zeros();
+                let mut len = (msb / 8) as usize;
+                if msb % 8 != 0 {
+                    len += 1;
+                }
+                len = std::cmp::max(len, size as usize);
+                Imm::from(n.to_be_bytes()[16 - len..].to_vec())
+            }
+            Expression::Hex(s) => Imm::from(hex::decode(&s[2..]).unwrap()),
+            e => Imm::with_expression(e),
+        },
         Rule::selector => {
             let raw = operand.into_inner().next().unwrap().as_str();
             let mut hasher = Keccak256::new();
             hasher.update(raw.as_bytes());
             Imm::from(hasher.finalize()[0..size as usize].to_vec())
         }
-        Rule::label => {
-            let lbl = operand.as_str().to_string();
-            Imm::<Vec<u8>>::Label(lbl)
-        }
         Rule::instruction_macro_variable => {
             let variable = operand
                 .as_str()
-                .strip_prefix("$")
+                .strip_prefix('$')
                 .expect("variable didn't start with '$'");
             Imm::<Vec<u8>>::Variable(variable.to_string())
         }
-        Rule::math_expr => Imm::with_expression(parse_expr(operand)?),
         r => unreachable!(format!("{:?}", r)),
     };
 
@@ -154,7 +147,7 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expression, ParseErro
         Operator::new(Rule::times, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
     ]);
 
-    fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Expression {
+    fn consume(pair: Pair<Rule>, climber: &PrecClimber<Rule>) -> Expression {
         let primary = |pair| consume(pair, climber);
         let infix = |lhs: Expression, op: Pair<Rule>, rhs: Expression| match op.as_rule() {
             Rule::plus => Expression::Plus(Box::new(lhs), Box::new(rhs)),
@@ -169,13 +162,11 @@ fn parse_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expression, ParseErro
             Rule::binary => {
                 Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 2).unwrap())
             }
-            Rule::decimal | Rule::int => {
-                Expression::Number(i128::from_str_radix(pair.as_str(), 10).unwrap())
-            }
+            Rule::decimal | Rule::int => Expression::Number(str::parse(pair.as_str()).unwrap()),
             Rule::octal => {
                 Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 8).unwrap())
             }
-            Rule::hex => Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 16).unwrap()),
+            Rule::hex => Expression::Hex(pair.as_str().to_string()),
             Rule::label => Expression::Label(pair.as_str().to_string()),
             r => panic!("unsupport expression primary: {:?}, {:?}", r, pair.as_str()),
         }
@@ -250,22 +241,6 @@ fn parse_builtin(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> 
         _ => unreachable!(),
     };
     Ok(node)
-}
-
-fn radix_str_to_vec(s: &str, radix: u32, min: u32) -> Result<Vec<u8>, ParseError> {
-    let n = u128::from_str_radix(s, radix)
-        .ok()
-        .context(error::ImmediateTooLarge)?;
-
-    let msb = 128 - n.leading_zeros();
-    let mut len = (msb / 8) as usize;
-    if msb % 8 != 0 {
-        len += 1;
-    }
-
-    len = std::cmp::max(len, min as usize);
-
-    Ok(n.to_be_bytes()[16 - len..].to_vec())
 }
 
 #[cfg(test)]
@@ -660,6 +635,8 @@ mod tests {
                 ]
             })
         ];
+        println!("{:?}", parse_asm(&asm));
+        println!("{:?}", expected);
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
 
@@ -697,7 +674,7 @@ mod tests {
             ))),
             Op::Push1(Imm::with_expression(Expression::Plus(
                 Box::new(Expression::Plus(
-                    Box::new(Expression::Number(32)),
+                    Box::new(Expression::Hex("0x20".into())),
                     Box::new(Expression::Number(1))
                 )),
                 Box::new(Expression::Number(2))

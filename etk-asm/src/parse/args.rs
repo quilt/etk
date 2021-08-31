@@ -29,8 +29,7 @@ pub(super) struct Label(pub(super) String);
 
 impl FromPair for Label {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError> {
-        ensure!(pair.as_rule() == Rule::label, error::ArgumentType);
-        let txt = pair.as_str();
+        let txt = pair.as_str().trim();
         Ok(Self(txt.into()))
     }
 }
