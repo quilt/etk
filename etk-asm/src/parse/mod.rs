@@ -1,4 +1,7 @@
 mod args;
+mod expression;
+mod macros;
+
 pub(crate) mod error;
 mod parser {
     #![allow(clippy::upper_case_acronyms)]
@@ -11,80 +14,47 @@ mod parser {
 }
 
 use crate::ast::Node;
-use crate::ops::{
-    AbstractOp, Imm, InstructionMacroDefinition, InstructionMacroInvocation, Op, Specifier,
-};
+use crate::ops::{AbstractOp, Imm, Op, Specifier};
 
-use pest::{
-    iterators::Pair,
-    prec_climber::{Assoc, Operator, PrecClimber},
-    Parser,
-};
+use pest::{iterators::Pair, Parser};
 
-use self::args::{Label, Signature};
-use self::error::ParseError;
-use self::parser::{AsmParser, Rule};
+use self::{
+    error::ParseError,
+    parser::{AsmParser, Rule},
+};
 use crate::ops::Expression;
 
 use sha3::{Digest, Keccak256};
 
 use snafu::OptionExt;
 
-use std::path::PathBuf;
-
 pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let mut program: Vec<Node> = Vec::new();
 
     let pairs = AsmParser::parse(Rule::program, asm)?;
     for pair in pairs {
-        match pair.as_rule() {
-            Rule::instruction_macro_definition => {
-                program.push(parse_instruction_macro(pair)?);
-            }
-            Rule::instruction_macro => {
-                let mut pairs = pair.into_inner();
-                let name = pairs.next().unwrap();
-                let mut parameters = Vec::<Imm<Vec<u8>>>::new();
-                for pair in pairs {
-                    let imm = parse_operand(pair, 16)?;
-                    parameters.push(imm);
-                }
-                let invocation = InstructionMacroInvocation {
-                    name: name.as_str().to_string(),
-                    parameters,
-                };
-                program.push(AbstractOp::Macro(invocation).into());
-            }
-            Rule::builtin => {
-                let mut pairs = pair.into_inner();
-                let builtin = pairs.next().unwrap();
-                assert!(pairs.next().is_none());
-                let node = parse_builtin(builtin)?;
-                program.push(node);
-            }
+        let node = match pair.as_rule() {
+            Rule::local_macro => macros::parse(pair)?,
+            Rule::builtin => macros::parse_builtin(pair)?,
             Rule::label_definition => {
-                let mut pair = pair.into_inner();
-                let label = pair.next().unwrap();
-                let txt = label.as_str();
-                program.push(AbstractOp::Label(txt.to_string()).into());
+                AbstractOp::Label(pair.into_inner().next().unwrap().as_str().to_string()).into()
             }
-            Rule::push => {
-                program.push(parse_push(pair)?.into());
-            }
+            Rule::push => parse_push(pair)?.into(),
             Rule::op => {
                 let spec: Specifier = pair.as_str().parse().unwrap();
                 let op = Op::new(spec).unwrap();
                 let aop = AbstractOp::Op(op);
-                program.push(aop.into());
+                aop.into()
             }
             _ => continue,
-        }
+        };
+        program.push(node);
     }
 
     Ok(program)
 }
 
-fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseError> {
+fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let mut pair = pair.into_inner();
     let size = pair.next().unwrap();
     let size: u32 = size.as_str().parse().unwrap();
@@ -92,8 +62,7 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseErro
 
     let spec = Specifier::push(size).unwrap();
 
-    let imm = parse_operand(operand, size)?;
-    match imm {
+    match parse_immediate(operand, size)? {
         Imm::Label(s) => Ok(AbstractOp::with_label(spec, s)),
         Imm::Variable(v) => Ok(AbstractOp::with_variable(spec, v)),
         Imm::Constant(c) => AbstractOp::with_immediate(spec, c.as_ref())
@@ -103,13 +72,14 @@ fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseErro
     }
 }
 
-fn parse_operand(
-    operand: pest::iterators::Pair<Rule>,
-    size: u32,
-) -> Result<Imm<Vec<u8>>, ParseError> {
-    let imm = match operand.as_rule() {
-        Rule::math_expr => match parse_expr(operand)? {
+fn parse_immediate(pair: Pair<Rule>, size: u32) -> Result<Imm<Vec<u8>>, ParseError> {
+    let imm = match pair.as_rule() {
+        Rule::math_expr => match expression::parse(pair)? {
+            // Simplify terminal values into immediates. Since the pest grammar doesn't have
+            // backtracking, it can't tell the difference between a label (et al.) from an
+            // expression with a single terminal value.
             Expression::Label(lbl) => Imm::<Vec<u8>>::Label(lbl),
+            Expression::Hex(s) => Imm::from(hex::decode(&s[2..]).unwrap()),
             Expression::Number(n) => {
                 let msb = 128 - n.leading_zeros();
                 let mut len = (msb / 8) as usize;
@@ -119,139 +89,34 @@ fn parse_operand(
                 len = std::cmp::max(len, size as usize);
                 Imm::from(n.to_be_bytes()[16 - len..].to_vec())
             }
-            Expression::Hex(s) => Imm::from(hex::decode(&s[2..]).unwrap()),
+            // Return non-trival expressions.
+            // TODO: maybe simplify all expressions that don't require label addresses, variable
+            // values, etc?
             e => Imm::with_expression(e),
         },
         Rule::selector => {
-            let raw = operand.into_inner().next().unwrap().as_str();
+            let raw = pair.into_inner().next().unwrap().as_str();
             let mut hasher = Keccak256::new();
             hasher.update(raw.as_bytes());
             Imm::from(hasher.finalize()[0..size as usize].to_vec())
         }
         Rule::instruction_macro_variable => {
-            let variable = operand
-                .as_str()
-                .strip_prefix('$')
-                .expect("variable didn't start with '$'");
+            let variable = pair.as_str().strip_prefix('$').unwrap();
             Imm::<Vec<u8>>::Variable(variable.to_string())
         }
-        r => unreachable!(format!("{:?}", r)),
+        rule => unreachable!("unreachable immediate type: {:?}", rule),
     };
 
     Ok(imm)
 }
 
-fn parse_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expression, ParseError> {
-    let climber = PrecClimber::new(vec![
-        Operator::new(Rule::plus, Assoc::Left) | Operator::new(Rule::minus, Assoc::Left),
-        Operator::new(Rule::times, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
-    ]);
-
-    fn consume(pair: Pair<Rule>, climber: &PrecClimber<Rule>) -> Expression {
-        let primary = |pair| consume(pair, climber);
-        let infix = |lhs: Expression, op: Pair<Rule>, rhs: Expression| match op.as_rule() {
-            Rule::plus => Expression::Plus(Box::new(lhs), Box::new(rhs)),
-            Rule::minus => Expression::Minus(Box::new(lhs), Box::new(rhs)),
-            Rule::times => Expression::Times(Box::new(lhs), Box::new(rhs)),
-            Rule::divide => Expression::Divide(Box::new(lhs), Box::new(rhs)),
-            _ => unreachable!(),
-        };
-
-        match pair.as_rule() {
-            Rule::math_expr => climber.climb(pair.into_inner(), primary, infix),
-            Rule::binary => {
-                Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 2).unwrap())
-            }
-            Rule::decimal | Rule::int => Expression::Number(str::parse(pair.as_str()).unwrap()),
-            Rule::octal => {
-                Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 8).unwrap())
-            }
-            Rule::hex => Expression::Hex(pair.as_str().to_string()),
-            Rule::label => Expression::Label(pair.as_str().to_string()),
-            r => panic!("unsupport expression primary: {:?}, {:?}", r, pair.as_str()),
-        }
-    }
-
-    Ok(consume(pair, &climber))
-}
-
-fn parse_instruction_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
-    let mut pairs = pair.into_inner();
-
-    let mut macro_defn = pairs.next().unwrap().into_inner();
-    let name = macro_defn.next().unwrap();
-    let mut parameters = Vec::<String>::new();
-    for pair in macro_defn {
-        parameters.push(pair.as_str().into());
-    }
-
-    let mut contents = Vec::<AbstractOp>::new();
-
-    for pair in pairs {
-        match pair.as_rule() {
-            Rule::label_definition => {
-                let mut pair = pair.into_inner();
-                let label = pair.next().unwrap();
-                let txt = label.as_str();
-                contents.push(AbstractOp::Label(txt.to_string()));
-            }
-            Rule::instruction_macro_push => {
-                contents.push(parse_push(pair)?);
-            }
-            Rule::op => {
-                let spec: Specifier = pair.as_str().parse().unwrap();
-                let op = Op::new(spec).unwrap();
-                let aop = AbstractOp::Op(op);
-                contents.push(aop);
-            }
-            _ => continue,
-        }
-    }
-
-    let defn = InstructionMacroDefinition {
-        name: name.as_str().to_string(),
-        parameters,
-        contents,
-    };
-    Ok(AbstractOp::MacroDefinition(defn).into())
-}
-
-fn parse_builtin(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
-    let rule = pair.as_rule();
-
-    let node = match rule {
-        Rule::import => {
-            let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
-            Node::Import(args.0)
-        }
-        Rule::include => {
-            let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
-            Node::Include(args.0)
-        }
-        Rule::include_hex => {
-            let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
-            Node::IncludeHex(args.0)
-        }
-        Rule::push_macro => {
-            // TODO: This should accept labels, literals, or variables, not just labels.
-            let args = <(Label,)>::parse_arguments(pair.into_inner())?;
-            let arg = Imm::with_label(args.0 .0);
-            Node::Op(AbstractOp::Push(arg))
-        }
-        _ => unreachable!(),
-    };
-    Ok(node)
-}
-
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
-
-    use crate::ops::Imm;
-
-    use hex_literal::hex;
-
     use super::*;
+    use crate::ops::{Imm, InstructionMacroDefinition, InstructionMacroInvocation};
+    use assert_matches::assert_matches;
+    use hex_literal::hex;
+    use std::path::PathBuf;
 
     macro_rules! nodes {
         ($($x:expr),+ $(,)?) => (

@@ -1,10 +1,7 @@
-use pest::iterators::{Pair, Pairs};
-
-use snafu::{ensure, OptionExt};
-
-use std::path::PathBuf;
-
 use super::{error, ParseError, Rule};
+use pest::iterators::{Pair, Pairs};
+use snafu::{ensure, OptionExt};
+use std::path::PathBuf;
 
 pub(super) trait FromPair: Sized {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError>;
@@ -64,7 +61,7 @@ impl Signature for () {
 
 impl<T> Signature for (T,)
 where
-    T: FromPair,
+    T: FromPair + std::fmt::Debug,
 {
     type Output = Self;
 
@@ -73,6 +70,8 @@ where
         let mut got = 0;
 
         let result = (arg::<T>(&mut pairs, expected, &mut got)?,);
+        println!("{:?}", result);
+        println!("{:?}", pairs);
 
         match pairs.next() {
             Some(_) => error::ExtraArgument { expected }.fail(),

@@ -4,7 +4,7 @@
 program = _{ SOI ~ inner ~ EOI }
 inner = _{ NEWLINE* ~ (stmt ~ (NEWLINE+|";"))* ~ stmt? }
 stmt = _{ expr }
-expr = _{ label_definition | builtin | instruction_macro_definition | instruction_macro | push | op }
+expr = _{ label_definition | builtin | local_macro | push | op }
 
 //////////////////////
 // opcode mnemonics //
@@ -42,6 +42,7 @@ instruction_macro_push = ${ "push" ~  word_size ~ WHITESPACE ~ instruction_macro
 instruction_macro_operand = _{ selector | instruction_macro_variable | math_expr }
 instruction_macro_variable = { "$" ~ function_parameter }
 
+local_macro = { instruction_macro_definition | instruction_macro }
 builtin = ${ "%" ~ ( import | include | include_hex | push_macro ) }
 
 import = !{ "import" ~ arguments }
