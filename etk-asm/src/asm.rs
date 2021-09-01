@@ -566,7 +566,7 @@ impl Assembler {
                         RawOp::Op(AbstractOp::Push(Imm::Expression(expr))) => {
                             // Replace unsized push with our current guess.
                             let labels = expr.labels();
-                            if labels.len() == 0 {
+                            if labels.is_empty() {
                                 match op {
                                     RawOp::Op(aop @ AbstractOp::Push(Imm::Expression(_))) => {
                                         let cop = aop
