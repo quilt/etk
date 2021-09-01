@@ -65,11 +65,11 @@ mod error {
         },
 
         /// A label was used without being defined.
-        #[snafu(display("label `{}` was never defined", label))]
+        #[snafu(display("labels `{:?}` were never defined", labels))]
         #[non_exhaustive]
-        UndeclaredLabel {
+        UndeclaredLabels {
             /// The label that was used without being defined.
-            label: String,
+            labels: Vec<String>,
 
             /// The location of the error.
             backtrace: Backtrace,
@@ -225,18 +225,43 @@ impl Assembler {
     pub fn finish(self) -> Result<(), Error> {
         if let Some(undef) = self.pending.front() {
             return match undef {
+                // Still waiting for a label to concretize a sized push.
                 RawOp::Op(AbstractOp::Op(op)) => {
                     if let Some(label) = op.immediate_label() {
-                        error::UndeclaredLabel { label }.fail()
-                    } else {
-                        match op.compute(&self.declared_labels).unwrap_err() {
-                            crate::ops::ComputeError::UnknownLabel(
-                                crate::ops::expression::UnknownLabel { label, .. },
-                            ) => error::UndeclaredLabel { label }.fail(),
-                            _ => unreachable!(),
+                        error::UndeclaredLabels {
+                            labels: vec![label.into()],
                         }
+                        .fail()
+                    } else if let Some(expr) = op.immediate_expression() {
+                        let labels: Vec<String> = expr
+                            .labels()
+                            .into_iter()
+                            .filter(|lbl| !self.declared_labels.contains_key(*lbl))
+                            .cloned()
+                            .collect();
+                        error::UndeclaredLabels { labels }.fail()
+                    } else {
+                        unreachable!()
                     }
                 }
+                // Still waiting for a label to concretize an unsized push.
+                RawOp::Op(AbstractOp::Push(imm)) => match imm {
+                    Imm::Label(label) => error::UndeclaredLabels {
+                        labels: vec![label.into()],
+                    }
+                    .fail(),
+                    Imm::Expression(expr) => {
+                        let labels: Vec<String> = expr
+                            .labels()
+                            .into_iter()
+                            .filter(|lbl| !self.declared_labels.contains_key(*lbl))
+                            .cloned()
+                            .collect();
+                        error::UndeclaredLabels { labels }.fail()
+                    }
+                    _ => unreachable!(),
+                },
+                // Still waiting for a macro definition to expand a macro invocation.
                 RawOp::Op(AbstractOp::Macro(m)) => error::UndeclaredMacro {
                     macro_name: &m.name,
                 }
@@ -853,7 +878,7 @@ mod tests {
         let mut asm = Assembler::new();
         asm.push_all(vec![AbstractOp::Op(Op::Push1(Imm::with_label("hi")))])?;
         let err = asm.finish().unwrap_err();
-        assert_matches!(err, Error::UndeclaredLabel { label, .. } if label == "hi");
+        assert_matches!(err, Error::UndeclaredLabels { labels, .. } if labels == vec!["hi"]);
         Ok(())
     }
 
@@ -1138,7 +1163,23 @@ mod tests {
             Expression::Label("hi".into()),
         )))])?;
         let err = asm.finish().unwrap_err();
-        assert_matches!(err, Error::UndeclaredLabel { label, .. } if label == "hi");
+        assert_matches!(err, Error::UndeclaredLabels { labels, .. } if labels == vec!["hi"]);
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_push_expression_with_undeclared_labels() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        asm.push_all(vec![
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(
+                Box::new(Expression::Label("foo".into())),
+                Box::new(Expression::Label("bar".into())),
+            ))),
+            AbstractOp::Op(Op::Gas),
+        ])?;
+        let err = asm.finish().unwrap_err();
+        assert_matches!(err, Error::UndeclaredLabels { labels, .. } if labels == vec!["bar", "foo"]);
         Ok(())
     }
 
