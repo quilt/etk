@@ -187,12 +187,8 @@ macro_rules! ret_compute {
     };
     ($op:ident, $expr:ident, $map:ident, $arg:ident) => {
         Op::$op(
-            Imm::try_from(
-                $expr
-                    .evaluate($map)
-                    .map_err(|e| ComputeError::UnknownLabel(e))?,
-            )
-            .map_err(|_| ComputeError::IntTooLarge)?,
+            Imm::try_from($expr.evaluate($map).map_err(ComputeError::UnknownLabel)?)
+                .map_err(|_| ComputeError::IntTooLarge)?,
         )
     };
 }
@@ -1266,7 +1262,7 @@ impl AbstractOp {
     pub(crate) fn compute(&self, map: &HashMap<String, Option<u32>>) -> Result<Self, ComputeError> {
         let ret = match self {
             Self::Push(Imm::Expression(e)) => {
-                let val = e.evaluate(map).map_err(|e| ComputeError::UnknownLabel(e))?;
+                let val = e.evaluate(map).map_err(ComputeError::UnknownLabel)?;
                 let spec = Specifier::push_for(val as u32).ok_or(ComputeError::IntTooLarge)?;
                 let bytes = val.to_be_bytes();
                 let start = bytes.len() - spec.extra_len() as usize;
