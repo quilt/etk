@@ -3,8 +3,7 @@
 ///////////////////////
 program = _{ SOI ~ inner ~ EOI }
 inner = _{ NEWLINE* ~ (stmt ~ (NEWLINE+|";"))* ~ stmt? }
-stmt = _{ expr }
-expr = _{ label_definition | builtin | local_macro | push | op }
+stmt = _{ label_definition | builtin | local_macro | push | op }
 
 //////////////////////
 // opcode mnemonics //
@@ -39,7 +38,7 @@ instruction_macro_definition = !{ "%macro" ~ function_declaration ~ NEWLINE* ~ (
 instruction_macro = !{ "%" ~ function_invocation }
 
 instruction_macro_push = ${ "push" ~  word_size ~ WHITESPACE ~ instruction_macro_operand }
-instruction_macro_operand = _{ selector | instruction_macro_variable | math_expr }
+instruction_macro_operand = _{ selector | instruction_macro_variable | expression }
 instruction_macro_variable = { "$" ~ function_parameter }
 
 local_macro = { instruction_macro_definition | instruction_macro }
@@ -69,7 +68,7 @@ function_parameter = { ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 //////////////
 // operands //
 //////////////
-operand = _{ selector | math_expr }
+operand = _{ selector | expression }
 
 number = _{ binary | octal | hex | decimal }
 
@@ -84,8 +83,8 @@ label_definition = { label ~ ":" }
 ////////////////
 // infix math //
 ////////////////
-math_expr = { term ~ (operation ~ term)* }
-term = _{ label | number | int | "(" ~ math_expr ~ ")" }
+expression = { term ~ (operation ~ term)* }
+term = _{ label | number | int | "(" ~ expression ~ ")" }
 int = { ("-")? ~ ASCII_DIGIT+ }
 operation = _{ plus | minus | times | divide }
 plus      = { "+" }

@@ -4,25 +4,16 @@ use std::collections::HashMap;
 mod error {
     use snafu::{Backtrace, Snafu};
 
-    /// Errors that can occur while assembling instructions.
+    /// An error that arises when a label is used without being declared.
     #[derive(Snafu, Debug)]
-    #[non_exhaustive]
     #[snafu(visibility = "pub(crate)")]
-    pub enum Error {
-        /// The error that can arise when evaluate an expression without all label offsets being known.
-        #[snafu(display("mising label: {}", label))]
-        #[non_exhaustive]
-        UndeclaredLabel { label: String, backtrace: Backtrace },
-
-        /// The error that can arise when the label is known, but hasn't resolved a concrete
-        /// address.
-        #[snafu(display("unresolved label: {}", label))]
-        #[non_exhaustive]
-        UnresolvedLabel { label: String, backtrace: Backtrace },
+    pub struct UnknownLabel {
+        pub label: String,
+        backtrace: Backtrace,
     }
 }
 
-pub(crate) use error::Error;
+pub(crate) use self::error::UnknownLabel;
 
 /// An infix mathematical expression.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -54,19 +45,22 @@ pub enum Expression {
 
 impl Expression {
     /// Evaluates the expression, substituting resolved label address for labels.
-    pub fn evaluate(&self, labels: &HashMap<String, Option<u32>>) -> Result<u128, error::Error> {
+    pub fn evaluate(
+        &self,
+        labels: &HashMap<String, Option<u32>>,
+    ) -> Result<u128, error::UnknownLabel> {
         fn rec(
             s: &Expression,
             labels: &HashMap<String, Option<u32>>,
-        ) -> Result<i128, error::Error> {
+        ) -> Result<i128, error::UnknownLabel> {
             let ret = match s {
                 Expression::Expression(e) => rec(e, labels)?,
                 Expression::Number(n) => *n,
                 Expression::Hex(h) => i128::from_str_radix(&h.as_str()[2..], 16).unwrap(),
                 Expression::Label(label) => labels
                     .get(label)
-                    .context(error::UndeclaredLabel { label })?
-                    .context(error::UnresolvedLabel { label })?
+                    .context(error::UnknownLabelContext { label })?
+                    .context(error::UnknownLabelContext { label })?
                     as i128,
                 Expression::Plus(rhs, lhs) => rec(rhs, labels)? + rec(lhs, labels)?,
                 Expression::Minus(rhs, lhs) => rec(rhs, labels)? - rec(lhs, labels)?,
@@ -81,7 +75,6 @@ impl Expression {
 
 #[cfg(test)]
 mod test {
-    use super::error::Error;
     use super::*;
     use assert_matches::assert_matches;
 
@@ -130,18 +123,15 @@ mod test {
     }
 
     #[test]
-    fn expr_undeclared_label() {
+    fn expr_unknown_label() {
         let expr = Expression::Plus(
             Box::new(Expression::Label("foo".into())),
             Box::new(Expression::Number(1)),
         );
 
         let err = expr.evaluate(&HashMap::new()).unwrap_err();
-        assert_matches!(err, Error::UndeclaredLabel { label, .. } if label == "foo");
-    }
+        assert_matches!(err, error::UnknownLabel { label, .. } if label == "foo");
 
-    #[test]
-    fn expr_unresolved_label() {
         let expr = Expression::Plus(
             Box::new(Expression::Label("foo".into())),
             Box::new(Expression::Number(1)),
@@ -151,6 +141,6 @@ mod test {
         labels.insert("foo".into(), None);
 
         let err = expr.evaluate(&labels).unwrap_err();
-        assert_matches!(err, Error::UnresolvedLabel { label, .. } if label == "foo");
+        assert_matches!(err, error::UnknownLabel { label, .. } if label == "foo");
     }
 }

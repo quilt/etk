@@ -219,8 +219,16 @@ impl Assembler {
         if let Some(undef) = self.pending.front() {
             return match undef {
                 RawOp::Op(AbstractOp::Op(op)) => {
-                    let label = op.immediate_label().unwrap();
-                    error::UndeclaredLabel { label }.fail()
+                    if let Some(label) = op.immediate_label() {
+                        error::UndeclaredLabel { label }.fail()
+                    } else {
+                        match op.compute(&self.declared_labels).unwrap_err() {
+                            crate::ops::ComputeError::UnknownLabel(
+                                crate::ops::expression::UnknownLabel { label, .. },
+                            ) => error::UndeclaredLabel { label }.fail(),
+                            _ => unreachable!(),
+                        }
+                    }
                 }
                 RawOp::Op(AbstractOp::Macro(m)) => error::UndeclaredMacro {
                     macro_name: &m.name,
@@ -1068,6 +1076,17 @@ mod tests {
         let out = asm.take();
         assert_eq!(out, hex!("6002"));
 
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_expression_undeclared_label() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        asm.push_all(vec![AbstractOp::Op(Op::Push1(Imm::with_expression(
+            Expression::Label("hi".into()),
+        )))])?;
+        let err = asm.finish().unwrap_err();
+        assert_matches!(err, Error::UndeclaredLabel { label, .. } if label == "hi");
         Ok(())
     }
 }

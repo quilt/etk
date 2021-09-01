@@ -1,6 +1,7 @@
 //! Definitions of all instructions supported by the assembler.
 
 mod error {
+    use super::expression;
     use snafu::{Backtrace, Snafu};
 
     /// The error that can arise while parsing a specifier from a string.
@@ -12,12 +13,19 @@ mod error {
         text: String,
         backtrace: Backtrace,
     }
+
+    #[derive(Debug)]
+    pub(crate) enum ComputeError {
+        UnknownLabel(expression::UnknownLabel),
+        IntTooLarge,
+    }
 }
 
-mod expression;
+pub(crate) mod expression;
 mod imm;
 mod types;
 
+pub(crate) use self::error::ComputeError;
 pub use self::error::UnknownSpecifierError;
 pub use self::expression::Expression;
 pub use self::imm::{Imm, Immediate, TryFromIntError, TryFromSliceError};
@@ -178,7 +186,14 @@ macro_rules! ret_compute {
         panic!()
     };
     ($op:ident, $expr:ident, $map:ident, $arg:ident) => {
-        Op::$op(Imm::try_from($expr.evaluate($map)?).unwrap())
+        Op::$op(
+            Imm::try_from(
+                $expr
+                    .evaluate($map)
+                    .map_err(|e| ComputeError::UnknownLabel(e))?,
+            )
+            .map_err(|_| ComputeError::IntTooLarge)?,
+        )
     };
 }
 
@@ -617,7 +632,7 @@ macro_rules! ops {
             }
 
             /// Compute an expression into a concrete value
-            pub(crate) fn compute(&self, map: &HashMap<String, Option<u32>>) -> Result<Self, expression::Error> {
+            pub(crate) fn compute(&self, map: &HashMap<String, Option<u32>>) -> Result<Self, ComputeError> {
                 let op = match self {
                     $(
                         pat_expression!(a, $op$(, $arg)?) => ret_compute!($op, a, map$(, $arg)?),
@@ -1248,16 +1263,11 @@ impl AbstractOp {
 
     /// Compute a push op with an expression into a concrete op with constant operand
     /// denoting the address.
-    pub(crate) fn compute(
-        &self,
-        map: &HashMap<String, Option<u32>>,
-    ) -> Result<Self, expression::Error> {
+    pub(crate) fn compute(&self, map: &HashMap<String, Option<u32>>) -> Result<Self, ComputeError> {
         let ret = match self {
             Self::Push(Imm::Expression(e)) => {
-                let val = e.evaluate(map)?;
-                let spec = Specifier::push_for(val as u32)
-                    .context(imm::TryFromIntContext)
-                    .unwrap();
+                let val = e.evaluate(map).map_err(|e| ComputeError::UnknownLabel(e))?;
+                let spec = Specifier::push_for(val as u32).ok_or(ComputeError::IntTooLarge)?;
                 let bytes = val.to_be_bytes();
                 let start = bytes.len() - spec.extra_len() as usize;
                 AbstractOp::with_immediate(spec, &bytes[start..]).unwrap()

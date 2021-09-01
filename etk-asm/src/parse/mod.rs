@@ -74,7 +74,7 @@ fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
 
 fn parse_immediate(pair: Pair<Rule>, size: u32) -> Result<Imm<Vec<u8>>, ParseError> {
     let imm = match pair.as_rule() {
-        Rule::math_expr => match expression::parse(pair)? {
+        Rule::expression => match expression::parse(pair)? {
             // Simplify terminal values into immediates. Since the pest grammar doesn't have
             // backtracking, it can't tell the difference between a label (et al.) from an
             // expression with a single terminal value.
@@ -104,7 +104,7 @@ fn parse_immediate(pair: Pair<Rule>, size: u32) -> Result<Imm<Vec<u8>>, ParseErr
             let variable = pair.as_str().strip_prefix('$').unwrap();
             Imm::<Vec<u8>>::Variable(variable.to_string())
         }
-        rule => unreachable!("unreachable immediate type: {:?}", rule),
+        _ => unreachable!(),
     };
 
     Ok(imm)

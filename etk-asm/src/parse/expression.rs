@@ -23,7 +23,7 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
         };
 
         match pair.as_rule() {
-            Rule::math_expr => climber.climb(pair.into_inner(), primary, infix),
+            Rule::expression => climber.climb(pair.into_inner(), primary, infix),
             Rule::binary => {
                 Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 2).unwrap())
             }
@@ -33,7 +33,7 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
             }
             Rule::hex => Expression::Hex(pair.as_str().to_string()),
             Rule::label => Expression::Label(pair.as_str().to_string()),
-            r => panic!("unsupport expression primary: {:?}, {:?}", r, pair.as_str()),
+            _ => unreachable!(),
         }
     }
 
