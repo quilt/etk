@@ -51,7 +51,7 @@ push_macro = !{ "push" ~ arguments }
 
 arguments = _{ "(" ~ arguments_list? ~ ")" }
 arguments_list = _{ ( argument ~ "," )* ~ argument? }
-argument = _{ string | operand }
+argument = _{ string | expression }
 
 string = @{ "\"" ~ string_char* ~ "\"" }
 string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }

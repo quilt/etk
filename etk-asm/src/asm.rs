@@ -98,7 +98,7 @@ mod error {
     }
 }
 
-use crate::ops::{AbstractOp, Imm, InstructionMacroDefinition, Metadata, Specifier};
+use crate::ops::{AbstractOp, Expression, Imm, InstructionMacroDefinition, Metadata, Specifier};
 
 pub use self::error::Error;
 
@@ -130,6 +130,13 @@ impl RawOp {
     fn immediate_label(&self) -> Option<&str> {
         match self {
             Self::Op(op) => op.immediate_label(),
+            Self::Raw(_) => None,
+        }
+    }
+
+    fn immediate_expression(&self) -> Option<&Expression> {
+        match self {
+            Self::Op(op) => op.immediate_expression(),
             Self::Raw(_) => None,
         }
     }
@@ -312,6 +319,17 @@ impl Assembler {
             }
         }
 
+        if let Some(expr) = rop.immediate_expression() {
+            let labels = expr.labels();
+            for label in labels {
+                if !self.declared_labels.contains_key(label) {
+                    println!("undeclared label: {:?}", label);
+                    self.undeclared_labels.insert(label.to_owned());
+                }
+            }
+            println!("undeclared labels: {:?}", self.undeclared_labels);
+        }
+
         self.push_unchecked(rop)?;
         Ok(self.ready.len())
     }
@@ -451,7 +469,7 @@ impl Assembler {
 
         // Repeatedly check if the front of the pending list is ready.
         while let Some(next) = self.pending.front() {
-            let op = match next {
+            let op = match next.to_owned() {
                 RawOp::Op(AbstractOp::Push(Imm::Label(_))) => {
                     if self.undeclared_labels.is_empty() {
                         unreachable!()
@@ -468,6 +486,17 @@ impl Assembler {
                     continue;
                 }
             };
+
+            if op.immediate_expression().is_some() {
+                match op.compute(&self.declared_labels) {
+                    Ok(op) => {
+                        let front = self.pending.front_mut().unwrap();
+                        *front = RawOp::Op(op);
+                    }
+                    // Still waiting on more labels.
+                    Err(_) => break,
+                }
+            }
 
             let mut address = None;
             let mut label = None;
@@ -532,6 +561,30 @@ impl Assembler {
                             let aop = AbstractOp::with_label(spec, lbl);
                             RawOp::Op(aop)
                         }
+                        // TODO: 1.56.0 supports bindings_after_at
+                        // https://github.com/rust-lang/rust/issues/65490
+                        RawOp::Op(AbstractOp::Push(Imm::Expression(expr))) => {
+                            // Replace unsized push with our current guess.
+                            let labels = expr.labels();
+                            if labels.len() == 0 {
+                                match op {
+                                    RawOp::Op(aop @ AbstractOp::Push(Imm::Expression(_))) => {
+                                        let cop = aop
+                                            .clone()
+                                            .compute(&HashMap::new())
+                                            .unwrap() // TODO: remove this
+                                            .concretize()
+                                            .context(error::UnsizedPushTooLarge)?;
+                                        RawOp::Op(cop.into())
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            } else {
+                                let spec = undefined_labels[labels[0]];
+                                let aop = AbstractOp::with_label(spec, labels[0]);
+                                RawOp::Op(aop)
+                            }
+                        }
                         RawOp::Op(aop @ AbstractOp::Push(Imm::Constant(_))) => {
                             let cop = aop
                                 .clone()
@@ -539,7 +592,6 @@ impl Assembler {
                                 .context(error::UnsizedPushTooLarge)?;
                             RawOp::Op(cop.into())
                         }
-
                         op => op.clone(),
                     };
 
@@ -1087,6 +1139,40 @@ mod tests {
         )))])?;
         let err = asm.finish().unwrap_err();
         assert_matches!(err, Error::UndeclaredLabel { label, .. } if label == "hi");
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_variable_push1_expression() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Label("auto".into()),
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(
+                Box::new(Expression::Number(1)),
+                Box::new(Expression::Label("auto".into())),
+            ))),
+        ])?;
+        assert_eq!(3, sz);
+        assert_eq!(asm.take(), hex!("5b6002"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_expression_with_labels() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(
+                Box::new(Expression::Label("foo".into())),
+                Box::new(Expression::Label("bar".into())),
+            ))),
+            AbstractOp::Op(Op::Gas),
+            AbstractOp::Label("foo".into()),
+            AbstractOp::Label("bar".into()),
+        ])?;
+        assert_eq!(4, sz);
+        assert_eq!(asm.take(), hex!("5b60045a"));
         Ok(())
     }
 }

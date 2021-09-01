@@ -71,6 +71,23 @@ impl Expression {
         }
         rec(self, labels).map(|n| n as u128)
     }
+
+    /// Returns a list of all labels used in the expression.
+    pub fn labels(&self) -> Vec<&String> {
+        fn dfs(x: &Expression) -> Vec<&String> {
+            match x {
+                Expression::Expression(e) => dfs(e),
+                Expression::Number(_) | Expression::Hex(_) => vec![],
+                Expression::Label(label) => vec![label],
+                Expression::Plus(rhs, lhs)
+                | Expression::Minus(rhs, lhs)
+                | Expression::Times(rhs, lhs)
+                | Expression::Divide(rhs, lhs) => dfs(lhs).into_iter().chain(dfs(rhs)).collect(),
+            }
+        }
+
+        dfs(self)
+    }
 }
 
 #[cfg(test)]

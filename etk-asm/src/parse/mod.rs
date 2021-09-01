@@ -547,4 +547,24 @@ mod tests {
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
+
+    #[test]
+    fn parse_push_macro_with_expression() {
+        let asm = format!(
+            r#"
+            push1 1
+            %push( 1 + 1 )
+            push1 2
+            "#,
+        );
+        let expected = nodes![
+            Op::Push1(Imm::from(1)),
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(
+                Box::new(Expression::Number(1)),
+                Box::new(Expression::Number(1))
+            ))),
+            Op::Push1(Imm::from(2)),
+        ];
+        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+    }
 }

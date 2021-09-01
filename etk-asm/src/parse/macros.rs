@@ -1,4 +1,4 @@
-use super::args::{Label, Signature};
+use super::args::Signature;
 use super::error::ParseError;
 use super::parser::Rule;
 use super::{parse_immediate, parse_push};
@@ -30,9 +30,8 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
         }
         Rule::push_macro => {
             // TODO: This should accept labels, literals, or variables, not just labels.
-            let args = <(Label,)>::parse_arguments(pair.into_inner())?;
-            let arg = Imm::with_label(args.0 .0);
-            Node::Op(AbstractOp::Push(arg))
+            let imm = parse_immediate(pair.into_inner().next().unwrap(), 32)?;
+            Node::Op(AbstractOp::Push(imm))
         }
         _ => unreachable!(),
     };
