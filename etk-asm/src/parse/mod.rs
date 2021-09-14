@@ -13,20 +13,13 @@ mod parser {
     pub(super) struct AsmParser;
 }
 
-use crate::ast::Node;
-use crate::ops::{AbstractOp, Imm, Op, Specifier};
-
-use pest::{iterators::Pair, Parser};
-
 use self::{
     error::ParseError,
     parser::{AsmParser, Rule},
 };
-use crate::ops::Expression;
-
-use sha3::{Digest, Keccak256};
-
-use snafu::OptionExt;
+use crate::ast::Node;
+use crate::ops::{AbstractOp, Op, Specifier};
+use pest::{iterators::Pair, Parser};
 
 pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let mut program: Vec<Node> = Vec::new();
@@ -61,59 +54,18 @@ fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let operand = pair.next().unwrap();
 
     let spec = Specifier::push(size).unwrap();
+    let expr = expression::parse(operand)?;
 
-    match parse_immediate(operand, size)? {
-        Imm::Label(s) => Ok(AbstractOp::with_label(spec, s)),
-        Imm::Variable(v) => Ok(AbstractOp::with_variable(spec, v)),
-        Imm::Constant(c) => AbstractOp::with_immediate(spec, c.as_ref())
-            .ok()
-            .context(error::ImmediateTooLarge),
-        Imm::Expression(e) => Ok(AbstractOp::with_expression(spec, e)),
-    }
-}
-
-fn parse_immediate(pair: Pair<Rule>, size: u32) -> Result<Imm<Vec<u8>>, ParseError> {
-    let imm = match pair.as_rule() {
-        Rule::expression => match expression::parse(pair)? {
-            // Simplify terminal values into immediates. Since the pest grammar doesn't have
-            // backtracking, it can't tell the difference between a label (et al.) from an
-            // expression with a single terminal value.
-            Expression::Label(lbl) => Imm::<Vec<u8>>::Label(lbl),
-            Expression::Hex(s) => Imm::from(hex::decode(&s[2..]).unwrap()),
-            Expression::Number(n) => {
-                let msb = 128 - n.leading_zeros();
-                let mut len = (msb / 8) as usize;
-                if msb % 8 != 0 {
-                    len += 1;
-                }
-                len = std::cmp::max(len, size as usize);
-                Imm::from(n.to_be_bytes()[16 - len..].to_vec())
-            }
-            // Return non-trival expressions.
-            // TODO: maybe simplify all expressions that don't require label addresses, variable
-            // values, etc?
-            e => Imm::with_expression(e),
-        },
-        Rule::selector => {
-            let raw = pair.into_inner().next().unwrap().as_str();
-            let mut hasher = Keccak256::new();
-            hasher.update(raw.as_bytes());
-            Imm::from(hasher.finalize()[0..size as usize].to_vec())
-        }
-        Rule::instruction_macro_variable => {
-            let variable = pair.as_str().strip_prefix('$').unwrap();
-            Imm::<Vec<u8>>::Variable(variable.to_string())
-        }
-        _ => unreachable!(),
-    };
-
-    Ok(imm)
+    Ok(AbstractOp::with_expression(spec, expr))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ops::{Imm, InstructionMacroDefinition, InstructionMacroInvocation};
+    use crate::ops::{
+        ExpressionMacroDefinition, ExpressionMacroInvocation, Imm, InstructionMacroDefinition,
+        InstructionMacroInvocation,
+    };
     use assert_matches::assert_matches;
     use hex_literal::hex;
     use std::path::PathBuf;
@@ -482,16 +434,19 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            AbstractOp::MacroDefinition(InstructionMacroDefinition {
-                name: "my_macro".into(),
-                parameters: vec!["foo".into(), "bar".into()],
-                contents: vec![
-                    Op::GasPrice.into(),
-                    Op::Pop.into(),
-                    AbstractOp::Op(Op::Push1(Imm::with_variable("foo"))),
-                    AbstractOp::Op(Op::Push1(Imm::with_variable("bar"))),
-                ]
-            }),
+            AbstractOp::MacroDefinition(
+                InstructionMacroDefinition {
+                    name: "my_macro".into(),
+                    parameters: vec!["foo".into(), "bar".into()],
+                    contents: vec![
+                        Op::GasPrice.into(),
+                        Op::Pop.into(),
+                        AbstractOp::Op(Op::Push1(Imm::with_variable("foo"))),
+                        AbstractOp::Op(Op::Push1(Imm::with_variable("bar"))),
+                    ]
+                }
+                .into()
+            ),
             AbstractOp::Macro(InstructionMacroInvocation {
                 name: "my_macro".into(),
                 parameters: vec![
@@ -564,6 +519,33 @@ mod tests {
                 Box::new(Expression::Number(1))
             ))),
             Op::Push1(Imm::from(2)),
+        ];
+        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+    }
+
+    #[test]
+    fn parse_expression_macro() {
+        let asm = format!(
+            r#"
+            %def foobar()
+                1+2
+            %end
+            push1 foobar()
+            "#,
+        );
+        let expected = nodes![
+            ExpressionMacroDefinition {
+                name: "foobar".into(),
+                parameters: vec![],
+                content: Imm::with_expression(Expression::Plus(
+                    Box::new(Expression::Number(1)),
+                    Box::new(Expression::Number(2))
+                )),
+            },
+            Op::Push1(Imm::with_macro(ExpressionMacroInvocation {
+                name: "foobar".into(),
+                parameters: vec![]
+            })),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }

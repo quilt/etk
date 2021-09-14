@@ -1,10 +1,13 @@
 use super::error::ParseError;
+use super::macros;
 use super::parser::Rule;
-use crate::ops::Expression;
+use crate::ops::{Expression, Terminal};
+use num_bigint::{BigInt, Sign};
 use pest::{
     iterators::Pair,
     prec_climber::{Assoc, Operator, PrecClimber},
 };
+use sha3::{Digest, Keccak256};
 
 pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
     let climber = PrecClimber::new(vec![
@@ -24,15 +27,40 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
 
         match pair.as_rule() {
             Rule::expression => climber.climb(pair.into_inner(), primary, infix),
-            Rule::binary => {
-                Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 2).unwrap())
+            Rule::binary => BigInt::from_radix_be(
+                Sign::Plus,
+                hex::decode(&pair.as_str()[2..]).unwrap().as_ref(),
+                2,
+            )
+            .unwrap()
+            .into(),
+            Rule::decimal | Rule::int => BigInt::from_radix_be(
+                Sign::Plus,
+                hex::decode(&pair.as_str()[2..]).unwrap().as_ref(),
+                10,
+            )
+            .unwrap()
+            .into(),
+            Rule::octal => BigInt::from_radix_be(
+                Sign::Plus,
+                hex::decode(&pair.as_str()[2..]).unwrap().as_ref(),
+                8,
+            )
+            .unwrap()
+            .into(),
+            Rule::hex => Terminal::Bytes(hex::decode(pair.as_str().to_string()).unwrap()).into(),
+            Rule::label => Terminal::Label(pair.as_str().to_string()).into(),
+            Rule::selector => {
+                let raw = pair.into_inner().next().unwrap().as_str();
+                let mut hasher = Keccak256::new();
+                hasher.update(raw.as_bytes());
+                Terminal::Bytes(hasher.finalize()[0..4].to_vec()).into()
             }
-            Rule::decimal | Rule::int => Expression::Number(str::parse(pair.as_str()).unwrap()),
-            Rule::octal => {
-                Expression::Number(i128::from_str_radix(&pair.as_str()[2..], 8).unwrap())
+            Rule::expression_macro => macros::parse_expression_macro(pair).unwrap(),
+            Rule::instruction_macro_variable => {
+                let variable = pair.as_str().strip_prefix('$').unwrap();
+                Terminal::Variable(variable.to_string()).into()
             }
-            Rule::hex => Expression::Hex(pair.as_str().to_string()),
-            Rule::label => Expression::Label(pair.as_str().to_string()),
             _ => unreachable!(),
         }
     }

@@ -1,21 +1,46 @@
-use hex::ToHex;
+use num_bigint::BigInt;
+use snafu::OptionExt;
+
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::fmt::{self, Debug};
+use std::marker::PhantomData;
+
+use super::macros::{ExpressionMacroInvocation, MacroDefinition};
+use super::{Labels, Macros, Variables};
 
 use snafu::{Backtrace, Snafu};
 
-use std::convert::TryFrom;
-use std::fmt::{self, Debug};
+/// An error that arises when a label is used without being declared.
+#[derive(Snafu, Debug)]
+#[snafu(visibility = "pub")]
+pub enum Error {
+    #[snafu(display("unknown label `{}`", label))]
+    #[non_exhaustive]
+    UnknownLabel { label: String, backtrace: Backtrace },
 
-use super::expression::Expression;
+    #[snafu(display("unknown macro `{}`", macro_name))]
+    #[non_exhaustive]
+    UnknownMacro {
+        macro_name: String,
+        backtrace: Backtrace,
+    },
+
+    #[snafu(display("undefined macro variable `{}`", name))]
+    #[non_exhaustive]
+    UndefinedVariable { name: String, backtrace: Backtrace },
+}
 
 /// An error that arises when converting an integer into an immediate.
 #[derive(Snafu, Debug)]
-#[snafu(visibility = "pub(super)")]
+#[snafu(visibility = "pub")]
 pub struct TryFromIntError {
     backtrace: Backtrace,
 }
 
 /// An error that arises when converting a slice into an immediate.
 #[derive(Snafu, Debug)]
+#[snafu(visibility = "pub")]
 pub struct TryFromSliceError {
     backtrace: Backtrace,
 }
@@ -27,47 +52,55 @@ impl From<std::convert::Infallible> for TryFromIntError {
 }
 
 /// An immediate value for push instructions.
-#[derive(Clone, Eq, PartialEq)]
-pub enum Imm<T> {
-    /// A label argument.
-    Label(String),
-
-    /// A constant argument.
-    Constant(T),
-
-    /// A macro variable.
-    Variable(String),
-
-    /// A mathematical expression.
-    Expression(Expression),
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Imm<T> {
+    /// An infix tree representing a mathematical expression.
+    pub tree: Expression,
+    _p: PhantomData<T>,
 }
 
 impl<T> Imm<T> {
     /// Construct an `Imm` with a label.
     pub fn with_label<S: Into<String>>(s: S) -> Self {
-        Imm::Label(s.into())
+        Terminal::Label(s.into()).into()
     }
 
     /// Construct an `Imm` with a variable.
     pub fn with_variable<S: Into<String>>(s: S) -> Self {
-        Imm::Variable(s.into())
+        Terminal::Variable(s.into()).into()
     }
 
     /// Construct an `Imm` with an expression.
     pub fn with_expression(e: Expression) -> Self {
-        Imm::Expression(e)
+        Expression::Expression(Box::new(e)).into()
+    }
+
+    /// Construct an `Imm` with an expression macro.
+    pub fn with_macro(m: ExpressionMacroInvocation) -> Self {
+        Expression::Macro(m).into()
+    }
+
+    /// Returns all labels referenced in an immediate's expression.
+    pub fn labels(&self, macros: &Macros) -> Result<Vec<String>, Error> {
+        self.tree.labels(macros)
     }
 }
 
-impl From<Vec<u8>> for Imm<Vec<u8>> {
-    fn from(konst: Vec<u8>) -> Self {
-        Imm::Constant(konst)
+// impl From<Vec<u8>> for Imm<Vec<u8>> {
+//     fn from(konst: Vec<u8>) -> Self {
+//         Imm::Constant(konst)
+//     }
+// }
+
+impl<T> fmt::Display for Imm<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.tree)
     }
 }
 
 impl From<u128> for Imm<Vec<u8>> {
     fn from(konst: u128) -> Self {
-        Imm::Constant(konst.to_le_bytes().into())
+        Terminal::Bytes(konst.to_le_bytes().into()).into()
     }
 }
 
@@ -75,7 +108,7 @@ macro_rules! impl_from {
     ($ii:literal;) => {
         impl From<[u8; $ii]> for Imm<[u8; $ii]> {
             fn from(konst: [u8; $ii]) -> Self {
-                Imm::Constant(konst)
+                Terminal::Bytes(konst.to_vec()).into()
             }
         }
     };
@@ -87,7 +120,7 @@ macro_rules! impl_from {
                 let bytes = x.to_be_bytes();
                 let start = $ii - bytes.len();
                 (&mut output[start..$ii]).copy_from_slice(&bytes);
-                Imm::Constant(output)
+                Terminal::Bytes(output.to_vec()).into()
             }
         }
 
@@ -114,7 +147,7 @@ macro_rules! impl_try_from {
                 let bytes = x.to_be_bytes();
                 let start = std::mem::size_of::<$ty>() - $ii;
                 output.copy_from_slice(&bytes[start..]);
-                Ok(Imm::Constant(output))
+                Ok(Terminal::Bytes(output.to_vec()).into())
             }
         }
 
@@ -134,7 +167,7 @@ macro_rules! impl_try_from_slice {
 
                 let mut output = [0u8; $ii];
                 output.copy_from_slice(x);
-                Ok(Imm::Constant(output))
+                Ok(Terminal::Bytes(output.to_vec()).into())
             }
         }
     };
@@ -222,31 +255,246 @@ impl_try_from!(13; u128);
 impl_try_from!(14; u128);
 impl_try_from!(15; u128);
 
-impl<T> Debug for Imm<T>
-where
-    T: ToHex,
-{
+/// An mathematical expression.
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Expression {
+    /// A mathematical expression.
+    Expression(Box<Self>),
+
+    /// An expression macro invocation.
+    Macro(ExpressionMacroInvocation),
+
+    /// A terminal value.
+    Terminal(Terminal),
+
+    /// An addition operation.
+    Plus(Box<Self>, Box<Self>),
+
+    /// A subtraction operation.
+    Minus(Box<Self>, Box<Self>),
+
+    /// A multiplication operation.
+    Times(Box<Self>, Box<Self>),
+
+    /// A division operation.
+    Divide(Box<Self>, Box<Self>),
+}
+
+impl Debug for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Imm::Label(s) => write!(f, r#"Imm::Label("{}")"#, s),
-            Imm::Constant(c) => write!(f, "Imm::Constant(0x{})", c.encode_hex::<String>()),
-            Imm::Variable(s) => write!(f, r#"Imm::Variable("{}")"#, s),
-            Imm::Expression(e) => write!(f, r#"Imm::Expression("{:?}")"#, e),
+            Expression::Expression(s) => write!(f, r#"Expression::Label("{:?}")"#, s),
+            Expression::Macro(m) => unimplemented!(),
+            Expression::Terminal(t) => write!(f, r#"Expression::Terminal({:?})"#, t),
+            Expression::Plus(lhs, rhs) => write!(f, r#"Expression::Plus({:?}+{:?})"#, lhs, rhs),
+            Expression::Minus(lhs, rhs) => write!(f, r#"Expression::Minus({:?}-{:?})"#, lhs, rhs),
+            Expression::Times(lhs, rhs) => write!(f, r#"Expression::Times({:?}*{:?})"#, lhs, rhs),
+            Expression::Divide(lhs, rhs) => write!(f, r#"Expression::Divide({:?}/{:?})"#, lhs, rhs),
         }
     }
 }
 
-impl<T> fmt::Display for Imm<T>
-where
-    T: ToHex,
-{
+impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Imm::Label(s) => write!(f, ":{}", s),
-            Imm::Constant(c) => write!(f, "0x{}", c.encode_hex::<String>()),
-            Imm::Variable(s) => write!(f, "{}", s),
-            Imm::Expression(e) => write!(f, "{:?}", e),
+            Expression::Expression(s) => write!(f, r#"({})"#, s),
+            Expression::Macro(m) => unimplemented!(),
+            Expression::Terminal(t) => write!(f, r#"{}"#, t),
+            Expression::Plus(lhs, rhs) => write!(f, r#"{}+{}"#, lhs, rhs),
+            Expression::Minus(lhs, rhs) => write!(f, r#"{}-{}"#, lhs, rhs),
+            Expression::Times(lhs, rhs) => write!(f, r#"{}*{}"#, lhs, rhs),
+            Expression::Divide(lhs, rhs) => write!(f, r#"{}/{}"#, lhs, rhs),
         }
+    }
+}
+
+/// A terminal value in an expression.
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Terminal {
+    /// A integer value.
+    Number(BigInt),
+
+    /// A label.
+    Label(String),
+
+    /// A macro variable.
+    Variable(String),
+
+    /// A bytes value.
+    Bytes(Vec<u8>),
+}
+
+impl Terminal {
+    /// Evaluates a terminal into an integer value.
+    pub fn evaluate(
+        &self,
+        labels: &Labels,
+        variables: &Variables,
+        macros: &Macros,
+    ) -> Result<BigInt, Error> {
+        let ret = match self {
+            Terminal::Number(n) => n.clone(),
+            Terminal::Label(label) => labels
+                .get(label)
+                .context(UnknownLabel { label })?
+                .context(UnknownLabel { label })?
+                .into(),
+            Terminal::Variable(name) => variables
+                .get(name)
+                .context(UndefinedVariable { name })?
+                .evaluate(labels, variables, macros)?,
+            Terminal::Bytes(_) => unimplemented!(),
+        };
+
+        Ok(ret)
+    }
+}
+
+impl Expression {
+    /// Evaluates the expression, substituting resolved label address for labels.
+    pub fn evaluate(
+        &self,
+        labels: &HashMap<String, Option<u32>>,
+        variables: &HashMap<String, Expression>,
+        macros: &HashMap<String, MacroDefinition>,
+    ) -> Result<BigInt, Error> {
+        fn recursive_eval(
+            e: &Expression,
+            l: &HashMap<String, Option<u32>>,
+            v: &HashMap<String, Expression>,
+            m: &HashMap<String, MacroDefinition>,
+        ) -> Result<BigInt, Error> {
+            let ret = match e {
+                Expression::Expression(expr) => recursive_eval(expr, l, v, m)?,
+                Expression::Macro(mac) => m
+                    .get(&mac.name)
+                    .context(UnknownMacro {
+                        macro_name: mac.name.clone(),
+                    })?
+                    .unwrap_expression()
+                    .content
+                    .tree
+                    .evaluate(l, v, m)?,
+                Expression::Terminal(term) => term.evaluate(l, v, m)?,
+                Expression::Plus(lhs, rhs) => {
+                    recursive_eval(lhs, l, v, m)? + recursive_eval(rhs, l, v, m)?
+                }
+                Expression::Minus(lhs, rhs) => {
+                    recursive_eval(lhs, l, v, m)? + recursive_eval(rhs, l, v, m)?
+                }
+                Expression::Times(lhs, rhs) => {
+                    recursive_eval(lhs, l, v, m)? + recursive_eval(rhs, l, v, m)?
+                }
+                Expression::Divide(lhs, rhs) => {
+                    recursive_eval(lhs, l, v, m)? + recursive_eval(rhs, l, v, m)?
+                }
+            };
+            Ok(ret)
+        }
+        // TODO error if top level receives negative value.
+        recursive_eval(self, labels, variables, macros)
+    }
+
+    /// Returns a list of all labels used in the expression.
+    pub fn labels(&self, macros: &Macros) -> Result<Vec<String>, Error> {
+        fn dfs(x: &Expression, m: &Macros) -> Result<Vec<String>, Error> {
+            match x {
+                Expression::Expression(e) => dfs(e, m),
+                Expression::Macro(mac) => m
+                    .get(&mac.name)
+                    .context(UnknownMacro {
+                        macro_name: mac.name.clone(),
+                    })?
+                    .unwrap_expression()
+                    .content
+                    .tree
+                    .labels(m),
+                Expression::Terminal(Terminal::Label(label)) => Ok(vec![label.clone()]),
+                Expression::Terminal(_) => Ok(vec![]),
+                Expression::Plus(lhs, rhs)
+                | Expression::Minus(lhs, rhs)
+                | Expression::Times(lhs, rhs)
+                | Expression::Divide(lhs, rhs) => dfs(lhs, m).and_then(|x: Vec<String>| {
+                    let ret = x.into_iter().chain(dfs(rhs, m)?).collect();
+                    Ok(ret)
+                }),
+            }
+        }
+
+        dfs(self, macros)
+    }
+}
+
+impl Debug for Terminal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Terminal::Label(l) => write!(f, r#"Terminal::Label({})"#, l),
+            Terminal::Number(n) => write!(f, r#"Terminal::Number({})"#, n),
+            Terminal::Bytes(b) => write!(f, r#"Terminal::Bytes(0x{})"#, hex::encode(b)),
+            Terminal::Variable(v) => write!(f, r#"Terminal::Variable({})"#, v),
+        }
+    }
+}
+
+impl fmt::Display for Terminal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Terminal::Label(l) => write!(f, r#"Label({})"#, l),
+            Terminal::Number(n) => write!(f, r#"{}"#, n),
+            Terminal::Bytes(b) => write!(f, r#"0x{}"#, hex::encode(b)),
+            Terminal::Variable(v) => write!(f, r#"Variable({})"#, v),
+        }
+    }
+}
+
+impl<T> From<Expression> for Imm<T> {
+    fn from(tree: Expression) -> Self {
+        Self {
+            tree,
+            _p: PhantomData,
+        }
+    }
+}
+
+impl<T> From<Terminal> for Imm<T> {
+    fn from(terminal: Terminal) -> Self {
+        Expression::Terminal(terminal).into()
+    }
+}
+
+impl From<Terminal> for Expression {
+    fn from(terminal: Terminal) -> Self {
+        Expression::Terminal(terminal)
+    }
+}
+
+impl From<Terminal> for Box<Expression> {
+    fn from(terminal: Terminal) -> Self {
+        Box::new(Expression::Terminal(terminal))
+    }
+}
+
+impl From<u64> for Box<Expression> {
+    fn from(n: u64) -> Self {
+        Box::new(Expression::Terminal(Terminal::Number(n.into())))
+    }
+}
+
+impl From<u64> for Terminal {
+    fn from(n: u64) -> Self {
+        Terminal::Number(n.into())
+    }
+}
+
+impl From<BigInt> for Box<Expression> {
+    fn from(n: BigInt) -> Self {
+        Box::new(n.into())
+    }
+}
+
+impl From<BigInt> for Expression {
+    fn from(n: BigInt) -> Self {
+        Expression::Terminal(Terminal::Number(n))
     }
 }
 
@@ -269,9 +517,91 @@ mod tests {
 
     use super::*;
 
+    // #[test]
+    // fn imm4_from_array() {
+    //     let imm = Imm::from(hex!("95ea7b30"));
+    //     assert_matches!(imm, Terminal::Bytes(vec![0x95, 0xea, 0x7b, 0x30]).into());
+    // }
+
     #[test]
-    fn imm4_from_array() {
-        let imm = Imm::from(hex!("95ea7b30"));
-        assert_matches!(imm, Imm::Constant([0x95, 0xea, 0x7b, 0x30]));
+    fn expr_simple() {
+        // 24 + 42 = 66
+        let expr = Expression::Plus(
+            Terminal::Number(24.into()).into(),
+            Terminal::Number(42.into()).into(),
+        );
+
+        let out = expr
+            .evaluate(&HashMap::new(), &HashMap::new(), &HashMap::new())
+            .unwrap();
+        assert_eq!(out, BigInt::from(66));
+    }
+
+    #[test]
+    fn expr_nested() {
+        //((1+2)*3-(4/2) = 7
+        let expr = Expression::Minus(
+            Expression::Times(
+                Expression::Plus(
+                    Terminal::Number(1.into()).into(),
+                    Terminal::Number(2.into()).into(),
+                )
+                .into(),
+                Terminal::Number(3.into()).into(),
+            )
+            .into(),
+            Expression::Divide(
+                Terminal::Number(4.into()).into(),
+                Terminal::Number(2.into()).into(),
+            )
+            .into(),
+        );
+        let out = expr
+            .evaluate(&HashMap::new(), &HashMap::new(), &HashMap::new())
+            .unwrap();
+        assert_eq!(out, BigInt::from(7));
+    }
+
+    #[test]
+    fn expr_with_label() {
+        // foo + 1 = 42
+        let expr = Expression::Plus(
+            Terminal::Label(String::from("foo")).into(),
+            Terminal::Number(1.into()).into(),
+        );
+
+        let mut labels = HashMap::new();
+        labels.insert("foo".into(), Some(41));
+
+        let out = expr
+            .evaluate(&labels, &HashMap::new(), &HashMap::new())
+            .unwrap();
+        assert_eq!(out, BigInt::from(42));
+    }
+
+    #[test]
+    fn expr_unknown_label() {
+        let expr = Expression::Plus(
+            Terminal::Label(String::from("foo")).into(),
+            Terminal::Number(1.into()).into(),
+        );
+
+        let err = expr
+            .evaluate(&HashMap::new(), &HashMap::new(), &HashMap::new())
+            .unwrap_err();
+        assert_matches!(err, Error::UnknownLabel { label, .. } if label == "foo");
+
+        let expr = Expression::Plus(
+            Terminal::Label(String::from("foo")).into(),
+            Terminal::Number(1.into()).into(),
+        );
+
+        let mut labels = HashMap::new();
+        labels.insert("foo".into(), None);
+
+        let err = expr
+            .evaluate(&labels, &HashMap::new(), &HashMap::new())
+            .unwrap_err();
+        assert_matches!(err, Error::UnknownLabel { label, .. } if label == "foo");
     }
 }

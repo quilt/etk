@@ -4,7 +4,7 @@
 //! [`mod@crate::ingest`] module for a higher-level interface.
 
 mod error {
-    use crate::ops::TryFromIntError;
+    use crate::ops::imm::TryFromIntError;
     use crate::ParseError;
 
     use snafu::{Backtrace, Snafu};
@@ -49,7 +49,7 @@ mod error {
         },
 
         /// The value provided to a sized push was too large.
-        #[snafu(display("value was too large for any push"))]
+        #[snafu(display("value was too large for chosen push"))]
         #[non_exhaustive]
         SizedPushTooLarge {
             /// The location of the error.
@@ -78,7 +78,7 @@ mod error {
         /// A macro was used without being defined.
         #[snafu(display("macro `{}` was never defined", macro_name))]
         #[non_exhaustive]
-        UndeclaredMacro {
+        UndeclaredInstructionMacro {
             /// The macro that was used without being defined.
             macro_name: String,
 
@@ -98,7 +98,8 @@ mod error {
     }
 }
 
-use crate::ops::{AbstractOp, Expression, Imm, InstructionMacroDefinition, Metadata, Specifier};
+use crate::ops::imm::{self, Terminal};
+use crate::ops::{AbstractOp, Expression, Imm, MacroDefinition, Specifier};
 
 pub use self::error::Error;
 
@@ -127,16 +128,12 @@ impl RawOp {
         }
     }
 
-    fn immediate_label(&self) -> Option<&str> {
+    fn labels(
+        &self,
+        macros: &HashMap<String, MacroDefinition>,
+    ) -> Option<Result<Vec<String>, imm::Error>> {
         match self {
-            Self::Op(op) => op.immediate_label(),
-            Self::Raw(_) => None,
-        }
-    }
-
-    fn immediate_expression(&self) -> Option<&Expression> {
-        match self {
-            Self::Op(op) => op.immediate_expression(),
+            Self::Op(op) => op.labels(macros),
             Self::Raw(_) => None,
         }
     }
@@ -193,7 +190,7 @@ pub struct Assembler {
     declared_labels: HashMap<String, Option<u32>>,
 
     /// Macros, in `pending`, associated with an `AbstractOp::Macro`.
-    declared_macros: HashMap<String, InstructionMacroDefinition>,
+    declared_macros: HashMap<String, MacroDefinition>,
 
     /// Labels, in `pending`, that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
@@ -223,6 +220,8 @@ impl Assembler {
     /// Indicate that the input sequence is complete. Returns any errors that
     /// may remain.
     pub fn finish(self) -> Result<(), Error> {
+        unimplemented!();
+        /*
         if let Some(undef) = self.pending.front() {
             return match undef {
                 // Still waiting for a label to concretize a sized push.
@@ -262,8 +261,8 @@ impl Assembler {
                     _ => unreachable!(),
                 },
                 // Still waiting for a macro definition to expand a macro invocation.
-                RawOp::Op(AbstractOp::Macro(m)) => error::UndeclaredMacro {
-                    macro_name: &m.name,
+                RawOp::Op(AbstractOp::Macro(m)) => error::UndeclaredInstructionMacro {
+                    macro_name: m.name.clone(),
                 }
                 .fail(),
                 _ => unreachable!(),
@@ -275,6 +274,7 @@ impl Assembler {
         }
 
         Ok(())
+        */
     }
 
     /// Collect any assembled instructions that are ready to be output.
@@ -297,15 +297,9 @@ impl Assembler {
         Ok(self.ready.len())
     }
 
-    /// Feed a single instruction into the `Assembler`.
-    ///
-    /// Returns the number of bytes that can be collected with [`Assembler::take`]
-    pub fn push<O>(&mut self, rop: O) -> Result<usize, Error>
-    where
-        O: Into<RawOp>,
-    {
-        let rop = rop.into();
-
+    /// Insert explicilty declared macros and labels, via `AbstractOp`, and implictly declared
+    /// macros and labels via usage in `Op`.
+    pub fn declare_content(&mut self, rop: &RawOp) -> Result<(), Error> {
         match rop {
             RawOp::Op(AbstractOp::Label(ref label)) => {
                 match self.declared_labels.entry(label.to_owned()) {
@@ -319,10 +313,10 @@ impl Assembler {
                 }
             }
             RawOp::Op(AbstractOp::MacroDefinition(ref defn)) => {
-                match self.declared_macros.entry(defn.name.to_owned()) {
+                match self.declared_macros.entry(defn.name().to_owned()) {
                     hash_map::Entry::Occupied(_) => {
                         return error::DuplicateMacro {
-                            macro_name: &defn.name,
+                            macro_name: defn.name(),
                         }
                         .fail()
                     }
@@ -331,31 +325,44 @@ impl Assembler {
                     }
                 }
             }
-            RawOp::Op(AbstractOp::Macro(ref m)) => {
-                self.expand_macro(&m.name, &m.parameters)?;
-                return Ok(self.ready.len());
-            }
             _ => (),
-        }
+        };
 
-        if let Some(label) = rop.immediate_label() {
-            if !self.declared_labels.contains_key(label) {
-                self.undeclared_labels.insert(label.to_owned());
-            }
-        }
-
-        if let Some(expr) = rop.immediate_expression() {
-            let labels = expr.labels();
+        // 1. get all labels used by `rop`
+        // 2. check if they've been defined
+        // 3. if not, note them as "undeclared"
+        if let Some(Ok(labels)) = rop.labels(&self.declared_macros) {
             for label in labels {
-                if !self.declared_labels.contains_key(label) {
-                    println!("undeclared label: {:?}", label);
+                if !self.declared_labels.contains_key(&label) {
                     self.undeclared_labels.insert(label.to_owned());
                 }
             }
-            println!("undeclared labels: {:?}", self.undeclared_labels);
+        }
+
+        Ok(())
+    }
+
+    /// Feed a single instruction into the `Assembler`.
+    ///
+    /// Returns the number of bytes that can be collected with [`Assembler::take`]
+    pub fn push<O>(&mut self, rop: O) -> Result<usize, Error>
+    where
+        O: Into<RawOp>,
+    {
+        let rop = rop.into();
+
+        self.declare_content(&rop)?;
+
+        // Expand instruction macros immediately. We do this here because it's the same process
+        // regardless if we `push_read` or `push_pending` -- in fact, `expand_macro` pushes each op
+        // individually which calls the correct unchecked push.
+        if let RawOp::Op(AbstractOp::Macro(ref m)) = rop {
+            self.expand_macro(&m.name, &m.parameters)?;
+            return Ok(self.ready.len());
         }
 
         self.push_unchecked(rop)?;
+
         Ok(self.ready.len())
     }
 
@@ -379,41 +386,25 @@ impl Assembler {
             }
             RawOp::Op(AbstractOp::MacroDefinition(_)) => Ok(()),
             RawOp::Op(AbstractOp::Macro(ref m)) => {
-                if !self.declared_macros.contains_key(&m.name) {
-                    assert_eq!(self.pending_len, Some(0));
-                    self.pending_len = None;
-                    self.pending.push_back(rop);
+                match self.declared_macros.get(&m.name) {
+                    // Do nothing if the instruction macro has been defined.
+                    Some(MacroDefinition::Instruction(_)) => (),
+                    _ => {
+                        assert_eq!(self.pending_len, Some(0));
+                        self.pending_len = None;
+                        self.pending.push_back(rop);
+                    }
                 }
                 Ok(())
             }
-            RawOp::Op(mut op) => {
-                if let Some(label) = op.immediate_label() {
-                    match self.declared_labels.get(label) {
-                        Some(Some(addr)) => {
-                            op = op.realize(*addr).context(error::LabelTooLarge { label })?;
-                        }
-                        _ => {
-                            assert_eq!(self.pending_len, Some(0));
-                            self.pending_len = op.size();
-                            self.pending.push_back(RawOp::Op(op));
-                            return Ok(());
-                        }
-                    }
-                }
-
-                if op.immediate_expression().is_some() {
-                    match op.compute(&self.declared_labels) {
-                        Ok(concrete) => op = concrete,
-                        Err(_) => {
-                            assert_eq!(self.pending_len, Some(0));
-                            self.pending_len = op.size();
-                            self.pending.push_back(RawOp::Op(op));
-                            return Ok(());
-                        }
-                    }
-                }
-
-                let concrete = op.concretize().context(error::UnsizedPushTooLarge)?;
+            RawOp::Op(op) => {
+                let concrete = op
+                    .concretize(
+                        &self.declared_labels,
+                        &HashMap::new(),
+                        &self.declared_macros,
+                    )
+                    .unwrap();
                 self.concrete_len += concrete.size();
 
                 concrete.assemble(&mut self.ready);
@@ -445,7 +436,13 @@ impl Assembler {
                 None => size = 0,
             },
             RawOp::Op(aop) => {
-                let cop = aop.concretize().context(error::UnsizedPushTooLarge {})?;
+                let cop = aop
+                    .concretize(
+                        &self.declared_labels,
+                        &HashMap::new(),
+                        &self.declared_macros,
+                    )
+                    .unwrap();
                 size = cop.size();
                 cop.assemble(&mut self.ready);
             }
@@ -495,7 +492,10 @@ impl Assembler {
         // Repeatedly check if the front of the pending list is ready.
         while let Some(next) = self.pending.front() {
             let op = match next.to_owned() {
-                RawOp::Op(AbstractOp::Push(Imm::Label(_))) => {
+                RawOp::Op(AbstractOp::Push(Imm {
+                    tree: Expression::Terminal(Terminal::Label(_)),
+                    ..
+                })) => {
                     if self.undeclared_labels.is_empty() {
                         unreachable!()
                     } else {
@@ -503,7 +503,10 @@ impl Assembler {
                         break;
                     }
                 }
-                RawOp::Op(AbstractOp::Push(Imm::Constant(_))) => unreachable!(),
+                RawOp::Op(AbstractOp::Push(Imm {
+                    tree: Expression::Terminal(Terminal::Bytes(_)),
+                    ..
+                })) => unreachable!(),
                 RawOp::Op(AbstractOp::Label(_)) => unreachable!(),
                 RawOp::Op(op) => op,
                 RawOp::Raw(_) => {
@@ -512,42 +515,17 @@ impl Assembler {
                 }
             };
 
-            if op.immediate_expression().is_some() {
-                match op.compute(&self.declared_labels) {
-                    Ok(op) => {
-                        let front = self.pending.front_mut().unwrap();
-                        *front = RawOp::Op(op);
-                    }
-                    // Still waiting on more labels.
-                    Err(_) => break,
+            match op.concretize(
+                &self.declared_labels,
+                &HashMap::new(),
+                &self.declared_macros,
+            ) {
+                Ok(cop) => {
+                    unimplemented!()
+                    // let front = self.pending.front_mut().unwrap();
+                    // *front = RawOp::Op(cop.into());
                 }
-            }
-
-            let mut address = None;
-            let mut label = None;
-
-            if let Some(lbl) = op.immediate_label() {
-                // If the op has a label, try to resolve it.
-                match self.declared_labels.get(lbl) {
-                    Some(Some(addr)) => {
-                        // The label resolved! Move the op to ready.
-                        address = Some(*addr);
-                        label = Some(lbl);
-                    }
-                    _ => {
-                        // Otherwise, the address isn't known yet, so break!
-                        break;
-                    }
-                }
-            }
-
-            if let Some(s) = address {
-                // Don't modify `self.pending` if realize returns an error.
-                let realized = op.realize(s).with_context(|| error::LabelTooLarge {
-                    label: label.unwrap(),
-                })?;
-                let front = self.pending.front_mut().unwrap();
-                *front = RawOp::Op(realized);
+                Err(_) => unimplemented!(),
             }
 
             self.pop_pending()?;
@@ -580,41 +558,65 @@ impl Assembler {
                 .iter()
                 .map(|op| {
                     let new = match op {
-                        RawOp::Op(AbstractOp::Push(Imm::Label(lbl))) => {
+                        RawOp::Op(AbstractOp::Push(Imm {
+                            tree: Expression::Terminal(Terminal::Label(lbl)),
+                            ..
+                        })) => {
                             // Replace unsized push with our current guess.
                             let spec = undefined_labels[lbl];
-                            let aop = AbstractOp::with_label(spec, lbl);
+                            let aop = AbstractOp::with_expression(
+                                spec,
+                                Terminal::Label(lbl.clone()).into(),
+                            );
                             RawOp::Op(aop)
                         }
                         // TODO: 1.56.0 supports bindings_after_at
                         // https://github.com/rust-lang/rust/issues/65490
-                        RawOp::Op(AbstractOp::Push(Imm::Expression(expr))) => {
+                        RawOp::Op(AbstractOp::Push(Imm { tree, .. })) => {
                             // Replace unsized push with our current guess.
-                            let labels = expr.labels();
+                            let labels = tree.labels(&subasm.declared_macros).unwrap();
                             if labels.is_empty() {
                                 match op {
-                                    RawOp::Op(aop @ AbstractOp::Push(Imm::Expression(_))) => {
+                                    RawOp::Op(aop @ AbstractOp::Push(_)) => {
                                         let cop = aop
                                             .clone()
-                                            .compute(&HashMap::new())
-                                            .unwrap() // TODO: remove this
-                                            .concretize()
-                                            .context(error::UnsizedPushTooLarge)?;
+                                            .concretize(
+                                                &subasm.declared_labels,
+                                                &HashMap::new(),
+                                                &subasm.declared_macros,
+                                            )
+                                            // TODO don't unwrap
+                                            .unwrap();
                                         RawOp::Op(cop.into())
                                     }
                                     _ => unreachable!(),
                                 }
                             } else {
-                                let spec = undefined_labels[labels[0]];
-                                let aop = AbstractOp::with_label(spec, labels[0]);
+                                let spec = undefined_labels[&labels[0]];
+                                let aop = AbstractOp::with_expression(
+                                    spec,
+                                    Terminal::Label(labels[0].to_string()).into(),
+                                );
                                 RawOp::Op(aop)
                             }
                         }
-                        RawOp::Op(aop @ AbstractOp::Push(Imm::Constant(_))) => {
+                        RawOp::Op(
+                            aop
+                            @
+                            AbstractOp::Push(Imm {
+                                tree: Expression::Terminal(Terminal::Bytes(_)),
+                                ..
+                            }),
+                        ) => {
                             let cop = aop
                                 .clone()
-                                .concretize()
-                                .context(error::UnsizedPushTooLarge)?;
+                                .concretize(
+                                    &subasm.declared_labels,
+                                    &HashMap::new(),
+                                    &subasm.declared_macros,
+                                )
+                                //TODO fix this
+                                .unwrap();
                             RawOp::Op(cop.into())
                         }
                         op => op.clone(),
@@ -658,7 +660,7 @@ impl Assembler {
     ) -> Result<Option<usize>, Error> {
         // Remap labels to macro scope.
         match self.declared_macros.get(name).cloned() {
-            Some(mut m) => {
+            Some(MacroDefinition::Instruction(mut m)) => {
                 if m.parameters.len() != parameters.len() {
                     panic!("invalid number of parameters for macro {}", name);
                 }
@@ -684,6 +686,7 @@ impl Assembler {
                     }
                 }
 
+                /*
                 // Second pass, update local label invocations.
                 for op in m.contents.iter_mut() {
                     if let Some(label) = op.immediate_label() {
@@ -716,14 +719,16 @@ impl Assembler {
                                 }
                                 Imm::Variable(_) => unreachable!(),
                                 Imm::Expression(_) => unimplemented!(),
+                                Imm::Macro(_) => unimplemented!(),
                             }
                         }
                     }
                 }
+                */
 
                 Ok(Some(self.push_all(m.contents)?))
             }
-            None => error::UndeclaredMacro { macro_name: name }.fail(),
+            _ => error::UndeclaredInstructionMacro { macro_name: name }.fail(),
         }
     }
 }
@@ -732,7 +737,10 @@ impl Assembler {
 mod tests {
     use assert_matches::assert_matches;
 
-    use crate::ops::{Expression, Imm, InstructionMacroDefinition, InstructionMacroInvocation, Op};
+    use crate::ops::{
+        Expression, ExpressionMacroDefinition, ExpressionMacroInvocation, Imm,
+        InstructionMacroDefinition, InstructionMacroInvocation, Op,
+    };
 
     use hex_literal::hex;
 
@@ -743,7 +751,7 @@ mod tests {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![
             AbstractOp::Op(Op::Push1(Imm::with_label("label1"))),
-            AbstractOp::Push(Imm::Constant(vec![0x00, 0xaa, 0xbb])),
+            AbstractOp::Push(Expression::Terminal(Terminal::Bytes(vec![0x00, 0xaa, 0xbb])).into()),
             AbstractOp::Label("label1".into()),
         ])?;
         assert_eq!(5, sz);
@@ -802,9 +810,9 @@ mod tests {
     #[test]
     fn assemble_variable_push_const() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let sz = asm.push_all(vec![AbstractOp::Push(Imm::Constant(
-            hex!("00aaaaaaaaaaaaaaaaaaaaaaaa").into(),
-        ))])?;
+        let sz = asm.push_all(vec![AbstractOp::Push(
+            Expression::Terminal(Terminal::Bytes(hex!("00aaaaaaaaaaaaaaaaaaaaaaaa").into())).into(),
+        )])?;
         assert_eq!(13, sz);
         assert_eq!(asm.take(), hex!("6baaaaaaaaaaaaaaaaaaaaaaaa"));
         Ok(())
@@ -998,7 +1006,7 @@ mod tests {
     #[test]
     fn assemble_instruction_macro() -> Result<(), Error> {
         let ops = vec![
-            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+            InstructionMacroDefinition {
                 name: "my_macro".into(),
                 parameters: vec![],
                 contents: vec![
@@ -1007,7 +1015,8 @@ mod tests {
                     AbstractOp::Op(Op::Push1(Imm::with_label("a"))),
                     AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
                 ],
-            }),
+            }
+            .into(),
             AbstractOp::Label("b".into()),
             AbstractOp::Op(Op::JumpDest),
             AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
@@ -1033,24 +1042,26 @@ mod tests {
         )];
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
-        assert_matches!(err, Error::UndeclaredMacro { macro_name, .. } if macro_name == "my_macro");
+        assert_matches!(err, Error::UndeclaredInstructionMacro { macro_name, .. } if macro_name == "my_macro");
 
         Ok(())
     }
 
     #[test]
     fn assemble_duplicate_instruction_macro() -> Result<(), Error> {
-        let ops = vec![
-            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+        let ops: Vec<AbstractOp> = vec![
+            InstructionMacroDefinition {
                 name: "my_macro".into(),
                 parameters: vec![],
                 contents: vec![AbstractOp::Op(Op::Caller)],
-            }),
-            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+            }
+            .into(),
+            InstructionMacroDefinition {
                 name: "my_macro".into(),
                 parameters: vec![],
                 contents: vec![AbstractOp::Op(Op::Caller)],
-            }),
+            }
+            .into(),
         ];
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
@@ -1062,11 +1073,12 @@ mod tests {
     #[test]
     fn assemble_duplicate_labels_in_instruction_macro() -> Result<(), Error> {
         let ops = vec![
-            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+            InstructionMacroDefinition {
                 name: "my_macro".into(),
                 parameters: vec![],
                 contents: vec![AbstractOp::Label("a".into()), AbstractOp::Label("a".into())],
-            }),
+            }
+            .into(),
             AbstractOp::Macro(InstructionMacroInvocation::with_zero_parameters(
                 "my_macro".into(),
             )),
@@ -1084,14 +1096,15 @@ mod tests {
         let ops = vec![
             AbstractOp::Label("a".into()),
             AbstractOp::Op(Op::Caller),
-            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+            InstructionMacroDefinition {
                 name: "my_macro()".into(),
                 parameters: vec![],
                 contents: vec![
                     AbstractOp::Label("a".into()),
                     AbstractOp::Op(Op::Push1(Imm::with_label("a"))),
                 ],
-            }),
+            }
+            .into(),
             AbstractOp::Macro(InstructionMacroInvocation::with_zero_parameters(
                 "my_macro()".into(),
             )),
@@ -1109,17 +1122,19 @@ mod tests {
         Ok(())
     }
 
+    /*
     #[test]
     fn assemble_instruction_macro_with_parameters() -> Result<(), Error> {
         let ops = vec![
-            AbstractOp::MacroDefinition(InstructionMacroDefinition {
+            InstructionMacroDefinition {
                 name: "my_macro".into(),
                 parameters: vec!["foo".into(), "bar".into()],
                 contents: vec![
                     AbstractOp::Op(Op::Push1(Imm::with_variable("foo"))),
                     AbstractOp::Op(Op::Push1(Imm::with_variable("bar"))),
                 ],
-            }),
+            }
+            .into(),
             AbstractOp::Label("b".into()),
             AbstractOp::Op(Op::JumpDest),
             AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
@@ -1137,14 +1152,12 @@ mod tests {
 
         Ok(())
     }
+    */
 
     #[test]
     fn assemble_expression_push() -> Result<(), Error> {
         let ops = vec![AbstractOp::Op(Op::Push1(Imm::with_expression(
-            Expression::Plus(
-                Box::new(Expression::Number(1)),
-                Box::new(Expression::Number(1)),
-            ),
+            Expression::Plus(1.into(), 1.into()),
         )))];
 
         let mut asm = Assembler::new();
@@ -1160,7 +1173,7 @@ mod tests {
     fn assemble_expression_undeclared_label() -> Result<(), Error> {
         let mut asm = Assembler::new();
         asm.push_all(vec![AbstractOp::Op(Op::Push1(Imm::with_expression(
-            Expression::Label("hi".into()),
+            Terminal::Label(String::from("hi")).into(),
         )))])?;
         let err = asm.finish().unwrap_err();
         assert_matches!(err, Error::UndeclaredLabels { labels, .. } if labels == vec!["hi"]);
@@ -1173,8 +1186,8 @@ mod tests {
         asm.push_all(vec![
             AbstractOp::Op(Op::JumpDest),
             AbstractOp::Push(Imm::with_expression(Expression::Plus(
-                Box::new(Expression::Label("foo".into())),
-                Box::new(Expression::Label("bar".into())),
+                Terminal::Label("foo".into()).into(),
+                Terminal::Label("bar".into()).into(),
             ))),
             AbstractOp::Op(Op::Gas),
         ])?;
@@ -1190,8 +1203,8 @@ mod tests {
             AbstractOp::Op(Op::JumpDest),
             AbstractOp::Label("auto".into()),
             AbstractOp::Push(Imm::with_expression(Expression::Plus(
-                Box::new(Expression::Number(1)),
-                Box::new(Expression::Label("auto".into())),
+                1.into(),
+                Terminal::Label(String::from("auto")).into(),
             ))),
         ])?;
         assert_eq!(3, sz);
@@ -1205,8 +1218,8 @@ mod tests {
         let sz = asm.push_all(vec![
             AbstractOp::Op(Op::JumpDest),
             AbstractOp::Push(Imm::with_expression(Expression::Plus(
-                Box::new(Expression::Label("foo".into())),
-                Box::new(Expression::Label("bar".into())),
+                Terminal::Label(String::from("foo")).into(),
+                Terminal::Label(String::from("bar")).into(),
             ))),
             AbstractOp::Op(Op::Gas),
             AbstractOp::Label("foo".into()),
@@ -1214,6 +1227,33 @@ mod tests {
         ])?;
         assert_eq!(4, sz);
         assert_eq!(asm.take(), hex!("5b60045a"));
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_expression_macro_push() -> Result<(), Error> {
+        let ops = vec![
+            ExpressionMacroDefinition {
+                name: "foo".into(),
+                parameters: vec![],
+                content: Imm::with_expression(Expression::Plus(
+                    Terminal::Number(1).into(),
+                    Terminal::Number(1).into(),
+                )),
+            }
+            .into(),
+            AbstractOp::Op(Op::Push1(Imm::with_macro(ExpressionMacroInvocation {
+                name: "foo".into(),
+                parameters: vec![],
+            }))),
+        ];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 2);
+        let out = asm.take();
+        assert_eq!(out, hex!("6002"));
+
         Ok(())
     }
 }

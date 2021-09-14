@@ -1,13 +1,26 @@
 use super::args::Signature;
 use super::error::ParseError;
 use super::parser::Rule;
-use super::{parse_immediate, parse_push};
+use super::{expression, parse_push};
 use crate::ast::Node;
 use crate::ops::{
-    AbstractOp, Imm, InstructionMacroDefinition, InstructionMacroInvocation, Op, Specifier,
+    AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation, Imm,
+    InstructionMacroDefinition, InstructionMacroInvocation, Op, Specifier,
 };
 use pest::iterators::Pair;
 use std::path::PathBuf;
+
+pub(crate) fn parse(pair: Pair<Rule>) -> Result<Node, ParseError> {
+    let mut pairs = pair.into_inner();
+    let pair = pairs.next().unwrap();
+
+    match pair.as_rule() {
+        Rule::instruction_macro_definition => parse_instruction_macro_defn(pair),
+        Rule::instruction_macro => parse_instruction_macro(pair),
+        Rule::expression_macro_definition => parse_expression_macro_defn(pair),
+        rule => unreachable!("unreachable macro type: {:?}", rule),
+    }
+}
 
 pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
     let mut pairs = pair.into_inner();
@@ -30,23 +43,12 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
         }
         Rule::push_macro => {
             // TODO: This should accept labels, literals, or variables, not just labels.
-            let imm = parse_immediate(pair.into_inner().next().unwrap(), 32)?;
-            Node::Op(AbstractOp::Push(imm))
+            let expr = expression::parse(pair.into_inner().next().unwrap())?;
+            Node::Op(AbstractOp::Push(expr.into()))
         }
         _ => unreachable!(),
     };
     Ok(node)
-}
-
-pub(crate) fn parse(pair: Pair<Rule>) -> Result<Node, ParseError> {
-    let mut pairs = pair.into_inner();
-    let pair = pairs.next().unwrap();
-
-    match pair.as_rule() {
-        Rule::instruction_macro_definition => parse_instruction_macro_defn(pair),
-        Rule::instruction_macro => parse_instruction_macro(pair),
-        rule => unreachable!("unreachable macro type: {:?}", rule),
-    }
 }
 
 fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
@@ -87,7 +89,7 @@ fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
         parameters,
         contents,
     };
-    Ok(AbstractOp::MacroDefinition(defn).into())
+    Ok(defn.into())
 }
 
 fn parse_instruction_macro(pair: Pair<Rule>) -> Result<Node, ParseError> {
@@ -95,12 +97,48 @@ fn parse_instruction_macro(pair: Pair<Rule>) -> Result<Node, ParseError> {
     let name = pairs.next().unwrap();
     let mut parameters = Vec::<Imm<Vec<u8>>>::new();
     for pair in pairs {
-        let imm = parse_immediate(pair, 16)?;
-        parameters.push(imm);
+        let expr = expression::parse(pair)?;
+        parameters.push(expr.into());
     }
     let invocation = InstructionMacroInvocation {
         name: name.as_str().to_string(),
         parameters,
     };
     Ok(AbstractOp::Macro(invocation).into())
+}
+
+fn parse_expression_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
+    let mut pairs = pair.into_inner();
+
+    let mut macro_defn = pairs.next().unwrap().into_inner();
+    let name = macro_defn.next().unwrap();
+
+    let mut parameters = Vec::<String>::new();
+    for pair in macro_defn {
+        parameters.push(pair.as_str().into());
+    }
+
+    let defn = ExpressionMacroDefinition {
+        name: name.as_str().to_string(),
+        parameters,
+        content: expression::parse(pairs.next().unwrap())?.into(),
+    };
+    Ok(defn.into())
+}
+
+pub(crate) fn parse_expression_macro(pair: Pair<Rule>) -> Result<Expression, ParseError> {
+    let mut pairs = pair.into_inner();
+    println!("{:?}", pairs);
+    let name = pairs.next().unwrap();
+    println!("{:?}", name.as_str());
+    let mut parameters = Vec::<Imm<Vec<u8>>>::new();
+    for pair in pairs {
+        let expr = expression::parse(pair)?;
+        parameters.push(expr.into());
+    }
+    let invocation = ExpressionMacroInvocation {
+        name: name.as_str().to_string(),
+        parameters,
+    };
+    Ok(Expression::Macro(invocation))
 }
