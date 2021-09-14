@@ -15,7 +15,7 @@
 #![deny(unreachable_pub)]
 #![deny(missing_debug_implementations)]
 
-include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/codegen.rs.in"));
 
 /// Attempt to retrieve the human-readable signature given a selector.
 ///
