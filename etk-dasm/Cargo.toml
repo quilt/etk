@@ -1,35 +1,30 @@
 [package]
-name = "etk-analyze"
+name = "etk-dasm"
 version = "0.2.0-dev"
-edition = "2018"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
 license = "MIT OR Apache-2.0"
-description = "EVM Toolkit analysis tools"
+edition = "2018"
+description = "EVM Toolkit disassembler"
 homepage = "https://quilt.github.io/etk"
 repository = "https://github.com/quilt/etk"
 readme = "README.md"
-keywords = ["etk", "ethereum"]
+keywords = ["etk", "ethereum", "disassembler"]
 categories = ["cryptography::cryptocurrencies", "command-line-utilities", "development-tools"]
 
 [features]
-cli = ["etk-cli", "etk-asm", "structopt", "snafu"]
+cli = ["structopt", "etk-cli", "snafu", "etk-4byte"]
 
 [dependencies]
-snafu = { optional = true, version = "0.6.10" }
+hex = "0.4.3"
+etk-asm = { path = "../etk-asm", version = "0.2.0-dev" }
 structopt = { optional = true, version = "0.3.21" }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.2.0-dev" }
-etk-asm = { optional = true, path = "../etk-asm", version = "0.2.0-dev" }
-etk-dasm = { path = "../etk-dasm", version = "0.2.0-dev" }
-z3 = "0.10.0"
-
-[dependencies.petgraph]
-version = "0.5.1"
-default-features = false
+etk-4byte = { optional = true, path = "../etk-4byte", version = "0.2.0-dev" }
+snafu = { optional = true, version = "0.6.10" }
 
 [dev-dependencies]
 hex-literal = "0.3.1"
-assert_matches = "1.5.0"
 
 [[bin]]
-name = "ecfg"
+name = "disease"
 required-features = ["cli"]

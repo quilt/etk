@@ -1,21 +1,28 @@
+//! A list of EVM instructions with a single point of entry and a single exit.
 use etk_asm::disasm::Offset;
 use etk_asm::ops::{ConcreteOp, Metadata};
 
 use std::convert::TryInto;
 
+/// A list of EVM instructions with a single point of entry and a single exit.
 #[derive(Debug, Eq, PartialEq)]
 pub struct BasicBlock {
+    /// Position of the first instruction of this block in the entire program.
     pub offset: usize,
+
+    /// List of instructions contained in the block.
     pub ops: Vec<ConcreteOp>,
 }
 
 impl BasicBlock {
+    /// Sum of the length of every instruction in this block.
     pub fn size(&self) -> usize {
         let sum: u32 = self.ops.iter().map(ConcreteOp::size).sum();
         sum.try_into().unwrap()
     }
 }
 
+/// Separate a sequence of [`ConcreteOp`] into [`BasicBlock`].
 #[derive(Debug, Default)]
 pub struct Separator {
     complete_blocks: Vec<BasicBlock>,
@@ -23,10 +30,14 @@ pub struct Separator {
 }
 
 impl Separator {
+    /// Create a default instance.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Read instructions from `iter` until it is empty.
+    ///
+    /// Returns `true` if any [`BasicBlock`] are ready.
     pub fn push_all<I>(&mut self, iter: I) -> bool
     where
         I: IntoIterator<Item = Offset<ConcreteOp>>,
@@ -38,6 +49,8 @@ impl Separator {
         available
     }
 
+    /// Push a single instruction, returns `true` if a [`BasicBlock`] has been
+    /// completed.
     pub fn push(&mut self, off: Offset<ConcreteOp>) -> bool {
         if off.item.is_jump_target() {
             // If we receive a jumpdest, start a new block beginning with it.
@@ -77,10 +90,13 @@ impl Separator {
         }
     }
 
+    /// Remove all completed [`BasicBlock`].
     pub fn take(&mut self) -> Vec<BasicBlock> {
         std::mem::take(&mut self.complete_blocks)
     }
 
+    /// Retrieve the last [`BasicBlock`] after all instructions have been
+    /// consumed.
     #[must_use]
     pub fn finish(&mut self) -> Option<BasicBlock> {
         if self.complete_blocks.is_empty() {

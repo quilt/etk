@@ -3,13 +3,14 @@ mod opts;
 
 use crate::opts::Opts;
 
-use etk_cli::errors::WithSources;
-
-use etk_analyze::blocks::basic::Separator;
-use etk_analyze::blocks::AnnotatedBlock;
 use etk_analyze::cfg::ControlFlowGraph;
 
 use etk_asm::disasm::Disassembler;
+
+use etk_cli::errors::WithSources;
+
+use etk_dasm::blocks::basic::Separator;
+use etk_dasm::blocks::AnnotatedBlock;
 
 use snafu::{Backtrace, Snafu};
 

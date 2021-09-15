@@ -7,7 +7,6 @@
 // TODO: #![deny(unreachable_pub)]
 #![deny(missing_debug_implementations)]
 
-pub mod blocks;
-#[cfg(feature = "cfg")]
+mod blocks;
 pub mod cfg;
 mod sym;

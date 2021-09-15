@@ -6,11 +6,11 @@ mod selectors;
 use crate::opts::Opts;
 use crate::selectors::DisplayOp;
 
-use etk_analyze::blocks::basic::Separator;
-
 use etk_asm::disasm::{Disassembler, Offset};
 
 use etk_cli::errors::WithSources;
+
+use etk_dasm::blocks::basic::Separator;
 
 use snafu::{Backtrace, Snafu};
 
