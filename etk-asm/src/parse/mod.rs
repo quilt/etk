@@ -19,6 +19,7 @@ use self::{
 };
 use crate::ast::Node;
 use crate::ops::{AbstractOp, Op, Specifier};
+use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
 
 pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
@@ -56,6 +57,13 @@ fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let spec = Specifier::push(size).unwrap();
     let expr = expression::parse(operand)?;
 
+    if let Some(val) = expr.constant() {
+        let max = BigInt::pow(&BigInt::from(2), 8 * size);
+        if val >= max {
+            return error::ImmediateTooLarge.fail();
+        }
+    }
+
     Ok(AbstractOp::with_expression(spec, expr))
 }
 
@@ -63,8 +71,8 @@ fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
 mod tests {
     use super::*;
     use crate::ops::{
-        ExpressionMacroDefinition, ExpressionMacroInvocation, Imm, InstructionMacroDefinition,
-        InstructionMacroInvocation,
+        Expression, ExpressionMacroDefinition, ExpressionMacroInvocation, Imm,
+        InstructionMacroDefinition, InstructionMacroInvocation, Terminal,
     };
     use assert_matches::assert_matches;
     use hex_literal::hex;
@@ -135,6 +143,7 @@ mod tests {
             Op::Push1(Imm::from([7])),
             Op::Push2(Imm::from([1, 0])),
         ];
+        println!("{:?}\n\n{:?}", parse_asm(asm), expected);
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -155,7 +164,7 @@ mod tests {
             push4 4294967295
         "#;
         let expected = nodes![
-            Op::Push1(Imm::from([0])),
+            Op::Push1(0.into()),
             Op::Push1(Imm::from([1])),
             Op::Push2(Imm::from([0, 42])),
             Op::Push2(Imm::from(hex!("0100"))),
@@ -278,9 +287,10 @@ mod tests {
             Op::Push4(Imm::from(hex!("a9059cbb"))),
             Op::Push4(Imm::from(hex!("095ea7b3"))),
             Op::Push32(Imm::from(hex!(
-                "a9059cbb2ab09eb219583f4a59a5d0623ade346d962bcd4e46b11da047c9049b"
+                "00000000000000000000000000000000000000000000000000000000a9059cbb"
             ))),
         ];
+        println!("{:?}\n\n{:?}", parse_asm(asm), expected);
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -471,36 +481,33 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            Op::Push1(Imm::with_expression(Expression::Plus(
-                Box::new(Expression::Number(1)),
-                Box::new(Expression::Number(1))
-            ))),
+            Op::Push1(Imm::with_expression(Expression::Plus(1.into(), 1.into(),))),
             Op::Push1(Imm::with_expression(Expression::Times(
-                Box::new(Expression::Number(2)),
-                Box::new(Expression::Label("foo".into()))
+                2.into(),
+                Terminal::Label("foo".into()).into()
             ))),
             Op::Push1(Imm::with_expression(Expression::Minus(
                 Box::new(Expression::Plus(
-                    Box::new(Expression::Number(1)),
+                    1.into(),
                     Box::new(Expression::Times(
-                        Box::new(Expression::Number(2)),
-                        Box::new(Expression::Label("foo".into()))
+                        2.into(),
+                        Terminal::Label("foo".into()).into()
                     ))
                 )),
                 Box::new(Expression::Divide(
-                    Box::new(Expression::Label("bar".into())),
-                    Box::new(Expression::Number(42))
+                    Terminal::Label("bar".into()).into(),
+                    42.into()
                 ))
             ))),
             Op::Push1(Imm::with_expression(Expression::Plus(
                 Box::new(Expression::Plus(
-                    Box::new(Expression::Hex("0x20".into())),
-                    Box::new(Expression::Number(1))
+                    Terminal::Number(0x20.into()).into(),
+                    1.into()
                 )),
-                Box::new(Expression::Number(2))
+                2.into()
             )))
         ];
-        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+        assert_eq!(parse_asm(&asm).unwrap(), expected)
     }
 
     #[test]
@@ -514,10 +521,7 @@ mod tests {
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
-            AbstractOp::Push(Imm::with_expression(Expression::Plus(
-                Box::new(Expression::Number(1)),
-                Box::new(Expression::Number(1))
-            ))),
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(1.into(), 1.into()))),
             Op::Push1(Imm::from(2)),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
@@ -537,16 +541,13 @@ mod tests {
             ExpressionMacroDefinition {
                 name: "foobar".into(),
                 parameters: vec![],
-                content: Imm::with_expression(Expression::Plus(
-                    Box::new(Expression::Number(1)),
-                    Box::new(Expression::Number(2))
-                )),
+                content: Imm::with_expression(Expression::Plus(1.into(), 2.into())),
             },
             Op::Push1(Imm::with_macro(ExpressionMacroInvocation {
                 name: "foobar".into(),
                 parameters: vec![]
             })),
         ];
-        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+        assert_eq!(parse_asm(&asm).unwrap(), expected);
     }
 }

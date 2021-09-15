@@ -25,40 +25,19 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
             _ => unreachable!(),
         };
 
+        let txt = pair.as_str();
+
         match pair.as_rule() {
             Rule::expression => climber.climb(pair.into_inner(), primary, infix),
-            Rule::binary => BigInt::from_radix_be(
-                Sign::Plus,
-                hex::decode(&pair.as_str()[2..]).unwrap().as_ref(),
-                2,
-            )
-            .unwrap()
-            .into(),
-            Rule::decimal | Rule::int => BigInt::from_radix_be(
-                Sign::Plus,
-                hex::decode(&pair.as_str()[2..]).unwrap().as_ref(),
-                10,
-            )
-            .unwrap()
-            .into(),
-            Rule::octal => BigInt::from_radix_be(
-                Sign::Plus,
-                hex::decode(&pair.as_str()[2..]).unwrap().as_ref(),
-                8,
-            )
-            .unwrap()
-            .into(),
-            Rule::hex => Terminal::Bytes(hex::decode(pair.as_str().to_string()).unwrap()).into(),
-            Rule::label => Terminal::Label(pair.as_str().to_string()).into(),
-            Rule::selector => {
-                let raw = pair.into_inner().next().unwrap().as_str();
-                let mut hasher = Keccak256::new();
-                hasher.update(raw.as_bytes());
-                Terminal::Bytes(hasher.finalize()[0..4].to_vec()).into()
-            }
+            Rule::binary => parse_radix_str(&txt[2..], 2),
+            Rule::octal => parse_radix_str(&txt[2..], 8),
+            Rule::hex => parse_radix_str(&txt[2..], 16),
+            Rule::decimal | Rule::int => parse_radix_str(txt, 10),
+            Rule::label => Terminal::Label(txt.to_string()).into(),
+            Rule::selector => parse_selector(pair),
             Rule::expression_macro => macros::parse_expression_macro(pair).unwrap(),
             Rule::instruction_macro_variable => {
-                let variable = pair.as_str().strip_prefix('$').unwrap();
+                let variable = txt.strip_prefix('$').unwrap();
                 Terminal::Variable(variable.to_string()).into()
             }
             _ => unreachable!(),
@@ -66,4 +45,23 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
     }
 
     Ok(consume(pair, &climber))
+}
+
+fn parse_radix_str(s: &str, radix: u32) -> Expression {
+    let buf: Vec<u8> = s
+        .to_string()
+        .chars()
+        .map(|c| c.to_digit(radix).unwrap() as u8)
+        .collect();
+    BigInt::from_radix_be(Sign::Plus, &buf, radix)
+        .unwrap()
+        .into()
+}
+
+fn parse_selector(pair: Pair<Rule>) -> Expression {
+    let raw = pair.into_inner().next().unwrap().as_str();
+    let mut hasher = Keccak256::new();
+    hasher.update(raw.as_bytes());
+    // TODO: return full hash
+    BigInt::from_bytes_be(Sign::Plus, &hasher.finalize()[0..4]).into()
 }

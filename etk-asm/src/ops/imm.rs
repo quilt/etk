@@ -1,4 +1,4 @@
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use snafu::OptionExt;
 
 use std::collections::HashMap;
@@ -72,7 +72,7 @@ impl<T> Imm<T> {
 
     /// Construct an `Imm` with an expression.
     pub fn with_expression(e: Expression) -> Self {
-        Expression::Expression(Box::new(e)).into()
+        e.into()
     }
 
     /// Construct an `Imm` with an expression macro.
@@ -86,11 +86,11 @@ impl<T> Imm<T> {
     }
 }
 
-// impl From<Vec<u8>> for Imm<Vec<u8>> {
-//     fn from(konst: Vec<u8>) -> Self {
-//         Imm::Constant(konst)
-//     }
-// }
+impl From<Vec<u8>> for Imm<Vec<u8>> {
+    fn from(konst: Vec<u8>) -> Self {
+        Imm::from(Terminal::Number(BigInt::from_bytes_be(Sign::Plus, &konst)))
+    }
+}
 
 impl<T> fmt::Display for Imm<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -100,7 +100,7 @@ impl<T> fmt::Display for Imm<T> {
 
 impl From<u128> for Imm<Vec<u8>> {
     fn from(konst: u128) -> Self {
-        Terminal::Bytes(konst.to_le_bytes().into()).into()
+        Imm::from(Terminal::Number(konst.into()))
     }
 }
 
@@ -108,7 +108,10 @@ macro_rules! impl_from {
     ($ii:literal;) => {
         impl From<[u8; $ii]> for Imm<[u8; $ii]> {
             fn from(konst: [u8; $ii]) -> Self {
-                Terminal::Bytes(konst.to_vec()).into()
+                Imm::from(Terminal::Number(BigInt::from_bytes_be(
+                    Sign::Plus,
+                    &konst,
+                )))
             }
         }
     };
@@ -116,11 +119,7 @@ macro_rules! impl_from {
     ($ii:literal; $ty:ty $(, $rest:ty)* $(,)*) => {
         impl From<$ty> for Imm<[u8; $ii]> {
             fn from(x: $ty) -> Self {
-                let mut output = [0u8; $ii];
-                let bytes = x.to_be_bytes();
-                let start = $ii - bytes.len();
-                (&mut output[start..$ii]).copy_from_slice(&bytes);
-                Terminal::Bytes(output.to_vec()).into()
+                Imm::from(Terminal::Number(x.into()))
             }
         }
 
@@ -143,11 +142,7 @@ macro_rules! impl_try_from {
                     return TryFromIntContext.fail();
                 }
 
-                let mut output = [0u8; $ii];
-                let bytes = x.to_be_bytes();
-                let start = std::mem::size_of::<$ty>() - $ii;
-                output.copy_from_slice(&bytes[start..]);
-                Ok(Terminal::Bytes(output.to_vec()).into())
+                Ok(Imm::from(Terminal::Number(x.into())))
             }
         }
 
@@ -165,9 +160,10 @@ macro_rules! impl_try_from_slice {
                     return TryFromSliceContext.fail();
                 }
 
-                let mut output = [0u8; $ii];
-                output.copy_from_slice(x);
-                Ok(Terminal::Bytes(output.to_vec()).into())
+                Ok(Imm::from(Terminal::Number(BigInt::from_bytes_be(
+                    Sign::Plus,
+                    x,
+                ))))
             }
         }
     };
@@ -283,13 +279,15 @@ pub enum Expression {
 impl Debug for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expression::Expression(s) => write!(f, r#"Expression::Label("{:?}")"#, s),
-            Expression::Macro(m) => unimplemented!(),
+            Expression::Expression(s) => write!(f, r#"({:?})"#, s),
+            Expression::Macro(m) => write!(f, r#"Expression::Macro("{}")"#, m.name),
             Expression::Terminal(t) => write!(f, r#"Expression::Terminal({:?})"#, t),
-            Expression::Plus(lhs, rhs) => write!(f, r#"Expression::Plus({:?}+{:?})"#, lhs, rhs),
-            Expression::Minus(lhs, rhs) => write!(f, r#"Expression::Minus({:?}-{:?})"#, lhs, rhs),
-            Expression::Times(lhs, rhs) => write!(f, r#"Expression::Times({:?}*{:?})"#, lhs, rhs),
-            Expression::Divide(lhs, rhs) => write!(f, r#"Expression::Divide({:?}/{:?})"#, lhs, rhs),
+            Expression::Plus(lhs, rhs) => write!(f, r#"Expression::Plus({:?}, {:?})"#, lhs, rhs),
+            Expression::Minus(lhs, rhs) => write!(f, r#"Expression::Minus({:?}, {:?})"#, lhs, rhs),
+            Expression::Times(lhs, rhs) => write!(f, r#"Expression::Times({:?}, {:?})"#, lhs, rhs),
+            Expression::Divide(lhs, rhs) => {
+                write!(f, r#"Expression::Divide({:?}, {:?})"#, lhs, rhs)
+            }
         }
     }
 }
@@ -351,6 +349,11 @@ impl Terminal {
 }
 
 impl Expression {
+    /// Returns the constant value of the expression.
+    pub fn constant(&self) -> Option<BigInt> {
+        self.evaluate(&HashMap::new(), &HashMap::new(), &HashMap::new())
+            .ok()
+    }
     /// Evaluates the expression, substituting resolved label address for labels.
     pub fn evaluate(
         &self,
@@ -380,13 +383,13 @@ impl Expression {
                     recursive_eval(lhs, l, v, m)? + recursive_eval(rhs, l, v, m)?
                 }
                 Expression::Minus(lhs, rhs) => {
-                    recursive_eval(lhs, l, v, m)? + recursive_eval(rhs, l, v, m)?
+                    recursive_eval(lhs, l, v, m)? - recursive_eval(rhs, l, v, m)?
                 }
                 Expression::Times(lhs, rhs) => {
-                    recursive_eval(lhs, l, v, m)? + recursive_eval(rhs, l, v, m)?
+                    recursive_eval(lhs, l, v, m)? * recursive_eval(rhs, l, v, m)?
                 }
                 Expression::Divide(lhs, rhs) => {
-                    recursive_eval(lhs, l, v, m)? + recursive_eval(rhs, l, v, m)?
+                    recursive_eval(lhs, l, v, m)? / recursive_eval(rhs, l, v, m)?
                 }
             };
             Ok(ret)

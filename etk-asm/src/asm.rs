@@ -103,7 +103,7 @@ use crate::ops::{AbstractOp, Expression, Imm, MacroDefinition, Specifier};
 
 pub use self::error::Error;
 
-use snafu::{OptionExt, ResultExt};
+use snafu::OptionExt;
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
@@ -1236,10 +1236,7 @@ mod tests {
             ExpressionMacroDefinition {
                 name: "foo".into(),
                 parameters: vec![],
-                content: Imm::with_expression(Expression::Plus(
-                    Terminal::Number(1).into(),
-                    Terminal::Number(1).into(),
-                )),
+                content: Imm::with_expression(Expression::Plus(1.into(), 1.into())),
             }
             .into(),
             AbstractOp::Op(Op::Push1(Imm::with_macro(ExpressionMacroInvocation {

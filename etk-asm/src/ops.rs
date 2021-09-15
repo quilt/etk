@@ -592,6 +592,7 @@ macro_rules! ops {
             /// This function panics if the instruction described by the specifier
             /// does not accept immediate arguments.
             pub fn with_expression(spec: Op<Spec>, var: Expression) -> Self {
+                println!("{:?}", var);
                 match spec {
                     $(
                         pat_spec!($op$(, $arg)?) => ret_with_expression!(var, $op$(, $arg)?),
@@ -605,7 +606,6 @@ macro_rules! ops {
                     $(
                         pat_labels!(tree, $op$(, $arg)?) => ret_labels!(tree, macros$(, $arg)?),
                     )*
-                    _ => None,
                 }
             }
 
@@ -615,7 +615,6 @@ macro_rules! ops {
                         pat_tree!(tree, $op$(, $arg)?) => ret_concretize!($op, tree, labels, variables, macros$(, $arg)?),
                     )*
                     // TODO: this doesn't account for variables
-                    _ => panic!("abstract immediates must be resolved be concretizing"),
                 }
             }
         }
@@ -1321,26 +1320,23 @@ impl Metadata for AbstractOp {
 
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
-
-    use std::convert::TryInto;
-
     use super::*;
+    use std::convert::TryInto;
 
     #[test]
     fn u8_into_imm1() {
         let x: u8 = 0xdc;
         let imm: Imm<[u8; 1]> = x.into();
-        let out: Imm<[u8; 1]> = Terminal::Bytes(vec![0xdc]).into();
-        assert_matches!(imm, out);
+        let res: Imm<[u8; 1]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]
     fn u16_try_into_imm1() {
         let x: u16 = 0xFF;
         let imm: Imm<[u8; 1]> = x.try_into().unwrap();
-        let out: Imm<[u8; 1]> = Terminal::Bytes(vec![0xFF]).into();
-        assert_matches!(imm, out);
+        let res: Imm<[u8; 1]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]
@@ -1359,29 +1355,24 @@ mod tests {
     fn u8_into_imm2() {
         let x: u8 = 0xdc;
         let imm: Imm<[u8; 2]> = x.into();
-        let out: Imm<[u8; 2]> = Terminal::Bytes(vec![0x00, 0xdc]).into();
-        assert_matches!(imm, out);
+        let res: Imm<[u8; 2]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]
     fn u16_into_imm2() {
         let x: u16 = 0xfedc;
         let imm: Imm<[u8; 2]> = x.into();
-        let out: Imm<[u8; 2]> = Terminal::Bytes(vec![0xfe, 0xdc]).into();
-        assert_matches!(imm, out);
+        let res: Imm<[u8; 2]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]
     fn u128_into_imm32() {
         let x: u128 = 0x1023456789abcdef0123456789abcdef;
         let imm: Imm<[u8; 32]> = x.into();
-        let out: Imm<[u8; 32]> = Terminal::Bytes(vec![
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x10, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67,
-            0x89, 0xab, 0xcd, 0xef,
-        ])
-        .into();
-        assert_matches!(imm, out);
+        let res: Imm<[u8; 32]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]
