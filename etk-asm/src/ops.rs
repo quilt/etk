@@ -276,7 +276,34 @@ macro_rules! ret_with_expression {
     };
 }
 
+macro_rules! ret_with_expression {
+    ($expr:ident, $op:ident) => {
+        panic!()
+    };
+    ($expr:ident, $op:ident, $arg:ident) => {
+        Self::$op(Imm::from($expr))
+    };
+}
+
 macro_rules! ret_from_slice {
+    ($imm:ident, $op:ident) => {
+        Self::$op
+    };
+    ($imm:ident, $op:ident, $arg:ident) => {
+        Self::$op(TryFrom::try_from(&$imm[1..]).unwrap())
+    };
+}
+
+macro_rules! ret_tree {
+    ($tree:ident, $op:ident) => {
+        None
+    };
+    ($tree:ident, $op:ident, $arg:ident) => {
+        Some($tree)
+    };
+}
+
+macro_rules! ret_expression {
     ($imm:ident, $op:ident) => {
         Self::$op
     };
@@ -548,6 +575,17 @@ macro_rules! ops {
                     $(
                         pat_spec!($op$(, $arg)?) => ret_with_expression!(var, $op$(, $arg)?),
                     )*
+                }
+            }
+
+            /// The expression to be pushed on the stack. Only relevant for push instructions.
+            pub(crate) fn expression(&self) -> Option<&Expression> {
+                match self {
+                    $(
+                        pat_tree!(tree, $op$(, $arg)?) => ret_tree!(tree, $op$(, $arg)?),
+                    )*
+
+                    _ => None,
                 }
             }
 
@@ -1106,6 +1144,15 @@ impl AbstractOp {
         match self {
             Self::Op(op) => op.labels(macros),
             Self::Push(imm) => Some(imm.tree.labels(macros)),
+            _ => None,
+        }
+    }
+
+    /// The expression to be pushed on the stack. Only relevant for push instructions.
+    pub(crate) fn expression(&self) -> Option<&Expression> {
+        match self {
+            Self::Op(op) => op.expression(),
+            Self::Push(Imm { tree, .. }) => Some(tree),
             _ => None,
         }
     }

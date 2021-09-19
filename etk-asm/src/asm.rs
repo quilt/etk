@@ -5,6 +5,7 @@
 
 mod error {
     use crate::ops::imm::TryFromIntError;
+    use crate::ops::Expression;
     use crate::ParseError;
 
     use snafu::{Backtrace, Snafu};
@@ -36,16 +37,12 @@ mod error {
             backtrace: Backtrace,
         },
 
-        /// A push instruction was too small for the address of a label.
-        #[snafu(display("value of label `{}` was too large for the given opcode", label))]
+        /// A push instruction was too small for the result of the expression.
+        #[snafu(display("value of expression `{}` was too large for the given opcode", expr))]
         #[non_exhaustive]
-        LabelTooLarge {
-            /// The name of the oversized label.
-            label: String,
-
-            /// The next source of this error.
-            #[snafu(backtrace)]
-            source: TryFromIntError,
+        ExpressionTooLarge {
+            /// The oversized expression.
+            expr: Expression,
         },
 
         /// The value provided to a sized push was too large.
@@ -105,8 +102,10 @@ pub use self::error::Error;
 
 use snafu::OptionExt;
 
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 
 /// An item to be assembled, which can be either an [`AbstractOp`] or a raw byte
@@ -135,6 +134,13 @@ impl RawOp {
     ) -> Option<Result<Vec<String>, expression::Error>> {
         match self {
             Self::Op(op) => op.labels(macros),
+            Self::Raw(_) => None,
+        }
+    }
+
+    fn expression(&self) -> Option<&Expression> {
+        match self {
+            Self::Op(op) => op.expression(),
             Self::Raw(_) => None,
         }
     }
@@ -490,7 +496,7 @@ impl Assembler {
                 }
             };
 
-            match op.concretize(
+            match op.clone().concretize(
                 &self.declared_labels,
                 &HashMap::new(),
                 &self.declared_macros,
@@ -500,7 +506,10 @@ impl Assembler {
                     *front = RawOp::Op(cop.into());
                 }
                 Err(ops::Error::SpecifierCoercion { .. }) => {
-                    return error::SizedPushTooLarge.fail()
+                    return error::ExpressionTooLarge {
+                        expr: op.expression().unwrap().clone(),
+                    }
+                    .fail()
                 }
                 Err(e) => {
                     println!("error: {:?}", e);
@@ -517,12 +526,22 @@ impl Assembler {
     fn choose_sizes(&mut self) -> Result<(), Error> {
         let minimum = Specifier::push_for(self.concrete_len).unwrap();
 
-        // TODO: map expression => spec size
-        let mut undefined_labels: HashMap<String, Specifier> = self
-            .declared_labels
+        let mut sizes: HashMap<u64, Specifier> = self
+            .pending
             .iter()
-            .filter(|(_, v)| v.is_none())
-            .map(|(k, _)| (k.clone(), minimum))
+            .filter(|op| {
+                if let RawOp::Op(AbstractOp::Push(_)) = op {
+                    true
+                } else {
+                    false
+                }
+            })
+            .map(|op| {
+                let expr = op.expression().unwrap();
+                let mut s = DefaultHasher::new();
+                expr.hash(&mut s);
+                (s.finish(), Specifier::push_for(1).unwrap())
+            })
             .collect();
 
         let mut subasm;
@@ -540,16 +559,11 @@ impl Assembler {
                 .map(|op| {
                     let new = match op {
                         RawOp::Op(AbstractOp::Push(Imm { tree, .. })) => {
-                            // Replace unsized push with our current guess.
-                            let labels = tree.labels(&subasm.declared_macros).unwrap();
-                            println!("labels: {:?}", labels);
-                            if labels.is_empty() {
-                                op.clone()
-                            } else {
-                                let spec = undefined_labels[&labels[0]];
-                                let aop = AbstractOp::with_expression(spec, tree.clone());
-                                RawOp::Op(aop)
-                            }
+                            let mut s = DefaultHasher::new();
+                            tree.hash(&mut s);
+                            let spec = sizes[&s.finish()];
+                            let aop = AbstractOp::with_expression(spec, tree.clone());
+                            RawOp::Op(aop)
                         }
                         op => op.clone(),
                     };
@@ -563,10 +577,12 @@ impl Assembler {
                     assert!(subasm.pending.is_empty());
                     break;
                 }
-                Err(Error::LabelTooLarge { label, .. }) => {
+                Err(Error::ExpressionTooLarge { expr, .. }) => {
                     // If a label is too large for an op, increase the width of
                     // that label.
-                    let item = undefined_labels.get_mut(&label).unwrap();
+                    let mut s = DefaultHasher::new();
+                    expr.hash(&mut s);
+                    let item = sizes.get_mut(&s.finish()).unwrap();
 
                     let new_size = item.upsize().context(error::UnsizedPushTooLarge)?;
                     *item = new_size;
@@ -906,7 +922,7 @@ mod tests {
         ops.push(AbstractOp::Op(Op::Push1(Imm::with_label("a"))));
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
-        assert_matches!(err, Error::LabelTooLarge { label, .. } if label == "a");
+        assert_matches!(err, Error::ExpressionTooLarge { expr: Expression::Terminal(Terminal::Label(label)), .. } if label == "a");
     }
 
     #[test]
