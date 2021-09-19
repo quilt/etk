@@ -385,6 +385,12 @@ impl Assembler {
                         self.concrete_len += cop.size();
                         cop.assemble(&mut self.ready);
                     }
+                    Err(ops::Error::SpecifierCoercion { .. }) => {
+                        return error::ExpressionTooLarge {
+                            expr: op.expression().unwrap().clone(),
+                        }
+                        .fail()
+                    }
                     Err(_) => {
                         assert_eq!(self.pending_len, Some(0));
                         self.pending_len = None;
@@ -443,7 +449,6 @@ impl Assembler {
     }
 
     fn push_pending(&mut self, rop: RawOp) -> Result<(), Error> {
-        println!("push pending {:?}", rop);
         // Update total size of pending ops.
         if let Some(ref mut pending_len) = self.pending_len {
             match rop.size() {
@@ -459,7 +464,6 @@ impl Assembler {
                 let address = self.concrete_len + pending_len;
                 let item = self.declared_labels.get_mut(&*lbl).unwrap();
                 *item = Some(address);
-                println!("setting addr");
             }
             (None, rop @ RawOp::Op(AbstractOp::Label(_))) => {
                 self.pending.push_back(rop);
@@ -511,8 +515,7 @@ impl Assembler {
                     }
                     .fail()
                 }
-                Err(e) => {
-                    println!("error: {:?}", e);
+                Err(_) => {
                     break;
                 }
             }
@@ -524,8 +527,6 @@ impl Assembler {
     }
 
     fn choose_sizes(&mut self) -> Result<(), Error> {
-        let minimum = Specifier::push_for(self.concrete_len).unwrap();
-
         let mut sizes: HashMap<u64, Specifier> = self
             .pending
             .iter()
@@ -1174,7 +1175,7 @@ mod tests {
             AbstractOp::Label("bar".into()),
         ])?;
         assert_eq!(4, sz);
-        assert_eq!(asm.take(), hex!("5b60045a"));
+        assert_eq!(asm.take(), hex!("5b60085a"));
         Ok(())
     }
 
