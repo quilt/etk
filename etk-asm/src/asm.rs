@@ -98,8 +98,8 @@ mod error {
     }
 }
 
-use crate::ops::imm::{self, Terminal};
-use crate::ops::{AbstractOp, Expression, Imm, MacroDefinition, Specifier};
+use crate::ops::expression::{self, Terminal};
+use crate::ops::{self, AbstractOp, Expression, Imm, MacroDefinition, Specifier};
 
 pub use self::error::Error;
 
@@ -107,6 +107,7 @@ use snafu::OptionExt;
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
+use std::iter::FromIterator;
 
 /// An item to be assembled, which can be either an [`AbstractOp`] or a raw byte
 /// sequence.
@@ -131,7 +132,7 @@ impl RawOp {
     fn labels(
         &self,
         macros: &HashMap<String, MacroDefinition>,
-    ) -> Option<Result<Vec<String>, imm::Error>> {
+    ) -> Option<Result<Vec<String>, expression::Error>> {
         match self {
             Self::Op(op) => op.labels(macros),
             Self::Raw(_) => None,
@@ -220,52 +221,24 @@ impl Assembler {
     /// Indicate that the input sequence is complete. Returns any errors that
     /// may remain.
     pub fn finish(self) -> Result<(), Error> {
-        unimplemented!();
-        /*
         if let Some(undef) = self.pending.front() {
             return match undef {
-                // Still waiting for a label to concretize a sized push.
-                RawOp::Op(AbstractOp::Op(op)) => {
-                    if let Some(label) = op.immediate_label() {
-                        error::UndeclaredLabels {
-                            labels: vec![label.into()],
-                        }
-                        .fail()
-                    } else if let Some(expr) = op.immediate_expression() {
-                        let labels: Vec<String> = expr
-                            .labels()
-                            .into_iter()
-                            .filter(|lbl| !self.declared_labels.contains_key(*lbl))
+                RawOp::Op(op) => match op.labels(&self.declared_macros) {
+                    Some(Ok(labels)) => {
+                        let declared_labels = HashSet::from_iter(self.declared_labels.into_keys());
+                        let labels = HashSet::<String>::from_iter(labels);
+                        let missing = labels
+                            .difference(&declared_labels)
                             .cloned()
-                            .collect();
-                        error::UndeclaredLabels { labels }.fail()
-                    } else {
-                        unreachable!()
+                            .collect::<Vec<String>>();
+                        error::UndeclaredLabels { labels: missing }.fail()
                     }
-                }
-                // Still waiting for a label to concretize an unsized push.
-                RawOp::Op(AbstractOp::Push(imm)) => match imm {
-                    Imm::Label(label) => error::UndeclaredLabels {
-                        labels: vec![label.into()],
+                    Some(Err(expression::Error::UnknownMacro { macro_name, .. })) => {
+                        error::UndeclaredInstructionMacro { macro_name }.fail()
                     }
-                    .fail(),
-                    Imm::Expression(expr) => {
-                        let labels: Vec<String> = expr
-                            .labels()
-                            .into_iter()
-                            .filter(|lbl| !self.declared_labels.contains_key(*lbl))
-                            .cloned()
-                            .collect();
-                        error::UndeclaredLabels { labels }.fail()
-                    }
-                    _ => unreachable!(),
+                    _ => unimplemented!(),
                 },
-                // Still waiting for a macro definition to expand a macro invocation.
-                RawOp::Op(AbstractOp::Macro(m)) => error::UndeclaredInstructionMacro {
-                    macro_name: m.name.clone(),
-                }
-                .fail(),
-                _ => unreachable!(),
+                _ => unimplemented!(),
             };
         }
 
@@ -274,7 +247,6 @@ impl Assembler {
         }
 
         Ok(())
-        */
     }
 
     /// Collect any assembled instructions that are ready to be output.
@@ -397,17 +369,22 @@ impl Assembler {
                 }
                 Ok(())
             }
-            RawOp::Op(op) => {
-                let concrete = op
-                    .concretize(
-                        &self.declared_labels,
-                        &HashMap::new(),
-                        &self.declared_macros,
-                    )
-                    .unwrap();
-                self.concrete_len += concrete.size();
-
-                concrete.assemble(&mut self.ready);
+            RawOp::Op(ref op) => {
+                match op.clone().concretize(
+                    &self.declared_labels,
+                    &HashMap::new(),
+                    &self.declared_macros,
+                ) {
+                    Ok(cop) => {
+                        self.concrete_len += cop.size();
+                        cop.assemble(&mut self.ready);
+                    }
+                    Err(_) => {
+                        assert_eq!(self.pending_len, Some(0));
+                        self.pending_len = None;
+                        self.pending.push_back(rop);
+                    }
+                }
 
                 Ok(())
             }
@@ -460,6 +437,7 @@ impl Assembler {
     }
 
     fn push_pending(&mut self, rop: RawOp) -> Result<(), Error> {
+        println!("push pending {:?}", rop);
         // Update total size of pending ops.
         if let Some(ref mut pending_len) = self.pending_len {
             match rop.size() {
@@ -475,6 +453,7 @@ impl Assembler {
                 let address = self.concrete_len + pending_len;
                 let item = self.declared_labels.get_mut(&*lbl).unwrap();
                 *item = Some(address);
+                println!("setting addr");
             }
             (None, rop @ RawOp::Op(AbstractOp::Label(_))) => {
                 self.pending.push_back(rop);
@@ -503,10 +482,6 @@ impl Assembler {
                         break;
                     }
                 }
-                RawOp::Op(AbstractOp::Push(Imm {
-                    tree: Expression::Terminal(Terminal::Bytes(_)),
-                    ..
-                })) => unreachable!(),
                 RawOp::Op(AbstractOp::Label(_)) => unreachable!(),
                 RawOp::Op(op) => op,
                 RawOp::Raw(_) => {
@@ -521,11 +496,16 @@ impl Assembler {
                 &self.declared_macros,
             ) {
                 Ok(cop) => {
-                    unimplemented!()
-                    // let front = self.pending.front_mut().unwrap();
-                    // *front = RawOp::Op(cop.into());
+                    let front = self.pending.front_mut().unwrap();
+                    *front = RawOp::Op(cop.into());
                 }
-                Err(_) => unimplemented!(),
+                Err(ops::Error::SpecifierCoercion { .. }) => {
+                    return error::SizedPushTooLarge.fail()
+                }
+                Err(e) => {
+                    println!("error: {:?}", e);
+                    break;
+                }
             }
 
             self.pop_pending()?;
@@ -537,6 +517,7 @@ impl Assembler {
     fn choose_sizes(&mut self) -> Result<(), Error> {
         let minimum = Specifier::push_for(self.concrete_len).unwrap();
 
+        // TODO: map expression => spec size
         let mut undefined_labels: HashMap<String, Specifier> = self
             .declared_labels
             .iter()
@@ -558,66 +539,17 @@ impl Assembler {
                 .iter()
                 .map(|op| {
                     let new = match op {
-                        RawOp::Op(AbstractOp::Push(Imm {
-                            tree: Expression::Terminal(Terminal::Label(lbl)),
-                            ..
-                        })) => {
-                            // Replace unsized push with our current guess.
-                            let spec = undefined_labels[lbl];
-                            let aop = AbstractOp::with_expression(
-                                spec,
-                                Terminal::Label(lbl.clone()).into(),
-                            );
-                            RawOp::Op(aop)
-                        }
-                        // TODO: 1.56.0 supports bindings_after_at
-                        // https://github.com/rust-lang/rust/issues/65490
                         RawOp::Op(AbstractOp::Push(Imm { tree, .. })) => {
                             // Replace unsized push with our current guess.
                             let labels = tree.labels(&subasm.declared_macros).unwrap();
+                            println!("labels: {:?}", labels);
                             if labels.is_empty() {
-                                match op {
-                                    RawOp::Op(aop @ AbstractOp::Push(_)) => {
-                                        let cop = aop
-                                            .clone()
-                                            .concretize(
-                                                &subasm.declared_labels,
-                                                &HashMap::new(),
-                                                &subasm.declared_macros,
-                                            )
-                                            // TODO don't unwrap
-                                            .unwrap();
-                                        RawOp::Op(cop.into())
-                                    }
-                                    _ => unreachable!(),
-                                }
+                                op.clone()
                             } else {
                                 let spec = undefined_labels[&labels[0]];
-                                let aop = AbstractOp::with_expression(
-                                    spec,
-                                    Terminal::Label(labels[0].to_string()).into(),
-                                );
+                                let aop = AbstractOp::with_expression(spec, tree.clone());
                                 RawOp::Op(aop)
                             }
-                        }
-                        RawOp::Op(
-                            aop
-                            @
-                            AbstractOp::Push(Imm {
-                                tree: Expression::Terminal(Terminal::Bytes(_)),
-                                ..
-                            }),
-                        ) => {
-                            let cop = aop
-                                .clone()
-                                .concretize(
-                                    &subasm.declared_labels,
-                                    &HashMap::new(),
-                                    &subasm.declared_macros,
-                                )
-                                //TODO fix this
-                                .unwrap();
-                            RawOp::Op(cop.into())
                         }
                         op => op.clone(),
                     };
@@ -751,7 +683,7 @@ mod tests {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![
             AbstractOp::Op(Op::Push1(Imm::with_label("label1"))),
-            AbstractOp::Push(Expression::Terminal(Terminal::Bytes(vec![0x00, 0xaa, 0xbb])).into()),
+            AbstractOp::Push(Terminal::Number(0xaabb.into()).into()),
             AbstractOp::Label("label1".into()),
         ])?;
         assert_eq!(5, sz);
@@ -811,7 +743,7 @@ mod tests {
     fn assemble_variable_push_const() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![AbstractOp::Push(
-            Expression::Terminal(Terminal::Bytes(hex!("00aaaaaaaaaaaaaaaaaaaaaaaa").into())).into(),
+            Terminal::Number((0x00aaaaaaaaaaaaaaaaaaaaaaaa as u128).into()).into(),
         )])?;
         assert_eq!(13, sz);
         assert_eq!(asm.take(), hex!("6baaaaaaaaaaaaaaaaaaaaaaaa"));

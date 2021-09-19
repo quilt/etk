@@ -1,7 +1,19 @@
 //! Definitions of all instructions supported by the assembler.
 
 mod error {
+    use super::expression;
     use snafu::{Backtrace, Snafu};
+
+    #[derive(Snafu, Debug)]
+    #[snafu(visibility = "pub(crate)")]
+    pub(crate) enum Error {
+        Evaluation {
+            source: expression::Error,
+        },
+        SpecifierCoercion {
+            source: std::array::TryFromSliceError,
+        },
+    }
 
     /// The error that can arise while parsing a specifier from a string.
     #[derive(Debug, Snafu)]
@@ -12,20 +24,19 @@ mod error {
         text: String,
         backtrace: Backtrace,
     }
-
-    #[derive(Debug)]
-    pub(crate) enum ComputeError {
-        UnknownLabel(String),
-        IntTooLarge,
-    }
 }
 
+pub(crate) mod expression;
 pub(crate) mod imm;
 mod macros;
 mod types;
 
+pub(crate) use self::error::Error;
+
 pub use self::error::UnknownSpecifierError;
-pub use self::imm::{Expression, Imm, Immediate, Terminal, TryFromSliceError};
+pub use self::expression::{Expression, Terminal};
+pub use self::imm::{Imm, Immediate, TryFromSliceError};
+
 pub use self::macros::{
     ExpressionMacroDefinition, ExpressionMacroInvocation, InstructionMacroDefinition,
     InstructionMacroInvocation, MacroDefinition,
@@ -38,6 +49,9 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
+
+use num_bigint::{BigInt, Sign};
+use snafu::ResultExt;
 
 /// The access mode (read, write, both) of an instruction.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -142,6 +156,15 @@ macro_rules! write_imm {
     };
 }
 
+macro_rules! write_concrete {
+    ($f:ident, $sp:expr, $imm:expr) => {
+        write!($f, "{}", $sp)
+    };
+    ($f:ident, $sp:expr, $imm:expr, $arg:ident) => {
+        write!($f, "{} {:?}", $sp, $imm)
+    };
+}
+
 // macro_rules! pat_const {
 //     ($cap:ident, $op:ident) => {
 //         Self::$op
@@ -181,56 +204,12 @@ macro_rules! ret_labels {
     };
 }
 
-// macro_rules! ret_inner {
-//     ($cap:ident) => {
-//         None
-//     };
-//     ($inner:ident, $arg:ident) => {
-//         Some($inner)
-//     };
-// }
-
-// macro_rules! ret_compute {
-//     ($op:ident, $imm:ident, $macros:ident, $map:ident) => {
-//         panic!()
-//     };
-//     ($op:ident, $imm:ident, $macros:ident, $map:ident, $arg:ident) => {
-//         match $imm {
-//             Imm::Expression(expr) => Op::$op(
-//                 Imm::try_from(expr.evaluate($map).map_err(ComputeError::UnknownLabel)?)
-//                     .map_err(|_| ComputeError::IntTooLarge)?,
-//             ),
-//             Imm::Macro(m) => Op::$op(
-//                 match $macros
-//                     .get(&m.name)
-//                     .unwrap()
-//                     .unwrap_expression()
-//                     .content
-//                     .clone()
-//                 {
-//                     Imm::Expression(expr) => {
-//                         Imm::try_from(expr.evaluate($map).map_err(ComputeError::UnknownLabel)?)
-//                             .map_err(|_| ComputeError::IntTooLarge)?
-//                     }
-//                     Imm::Constant(konst) => {
-//                         Imm::try_from(konst.as_slice()).map_err(|_| ComputeError::IntTooLarge)?
-//                     }
-//                     Imm::Label(lbl) => Imm::Label(lbl),
-//                     Imm::Variable(v) => Imm::Variable(v),
-//                     Imm::Macro(m) => Imm::Macro(m),
-//                 },
-//             ),
-//             _ => panic!(),
-//         }
-//     };
-// }
-
 macro_rules! ret_from_concrete {
     ($op:ident, $raw:ident) => {
         Self::$op
     };
     ($op:ident, $raw:expr, $arg:ident) => {
-        Self::$op(Terminal::Bytes($raw.to_vec()).into())
+        Self::$op(Terminal::Number(BigInt::from_bytes_be(Sign::Plus, &$raw[..])).into())
     };
 }
 
@@ -241,11 +220,13 @@ macro_rules! ret_concretize {
     ($op:ident, $tree:ident, $labels:ident, $variables:ident, $macros:ident, $arg:ident) => {
         Ok(Op::$op(
             $tree
-                .evaluate($labels, $variables, $macros)?
+                .evaluate($labels, $variables, $macros)
+                .context(error::Evaluation)?
                 .to_bytes_be()
                 .1
+                .as_slice()
                 .try_into()
-                .unwrap(),
+                .context(error::SpecifierCoercion)?,
         ))
     };
 }
@@ -285,35 +266,6 @@ macro_rules! ret_with_immediate {
         Self::$op($imm.try_into()?)
     };
 }
-
-/*
-macro_rules! ret_with_label {
-    ($lbl:ident, $op:ident) => {
-        panic!()
-    };
-    ($lbl:ident, $op:ident, $arg:ident) => {
-        Self::$op(Terminal::Label($lbl.into()).into())
-    };
-}
-*/
-
-// macro_rules! ret_with_variable {
-//     ($imm:ident, $op:ident) => {
-//         panic!()
-//     };
-//     ($imm:ident, $op:ident, $arg:ident) => {
-//         Self::$op(Imm::with_variable($imm))
-//     };
-// }
-
-// macro_rules! ret_with_expression_macro {
-//     ($imm:ident, $op:ident) => {
-//         panic!()
-//     };
-//     ($imm:ident, $op:ident, $arg:ident) => {
-//         Self::$op(Imm::with_macro($imm))
-//     };
-// }
 
 macro_rules! ret_with_expression {
     ($expr:ident, $op:ident) => {
@@ -592,7 +544,6 @@ macro_rules! ops {
             /// This function panics if the instruction described by the specifier
             /// does not accept immediate arguments.
             pub fn with_expression(spec: Op<Spec>, var: Expression) -> Self {
-                println!("{:?}", var);
                 match spec {
                     $(
                         pat_spec!($op$(, $arg)?) => ret_with_expression!(var, $op$(, $arg)?),
@@ -601,7 +552,7 @@ macro_rules! ops {
             }
 
             /// The labels in an expression. Only relevant for push instructions.
-            pub(crate) fn labels(&self, macros: &Macros) -> Option<Result<Vec<String>, imm::Error>> {
+            pub(crate) fn labels(&self, macros: &Macros) -> Option<Result<Vec<String>, expression::Error>> {
                 match self {
                     $(
                         pat_labels!(tree, $op$(, $arg)?) => ret_labels!(tree, macros$(, $arg)?),
@@ -609,12 +560,11 @@ macro_rules! ops {
                 }
             }
 
-            pub(crate) fn concretize(self, labels: &Labels, variables: &Variables, macros: &Macros) -> Result<Op<Concrete>, imm::Error> {
+            pub(crate) fn concretize(self, labels: &Labels, variables: &Variables, macros: &Macros) -> Result<Op<Concrete>, error::Error> {
                 match self {
                     $(
                         pat_tree!(tree, $op$(, $arg)?) => ret_concretize!($op, tree, labels, variables, macros$(, $arg)?),
                     )*
-                    // TODO: this doesn't account for variables
                 }
             }
         }
@@ -716,7 +666,7 @@ macro_rules! ops {
                 match self {
                     $(
                         pat_imm!(imm, $op$(, $arg)?) => {
-                            write_imm!(f, sp, Terminal::Bytes(imm.to_vec())$(, $arg)?)
+                            write_concrete!(f, sp, imm$(, $arg)?)
                         }
                     )*
                 }
@@ -1121,73 +1071,41 @@ impl AbstractOp {
         Ok(Self::Op(Op::<Abstract>::with_immediate(spec, imm)?))
     }
 
-    /*
-    /// Realizes a push op with a label into a concrete op with constant operand
-    /// denoting the address.
-    pub(crate) fn realize(&self, address: u32) -> Result<Self, TryFromIntError> {
-        let ret = match self {
-            Self::Push(Imm::Label(_)) => {
-                let spec = Specifier::push_for(address).context(imm::TryFromIntContext)?;
-                let bytes = address.to_be_bytes();
-                let start = bytes.len() - spec.extra_len() as usize;
-                AbstractOp::with_immediate(spec, &bytes[start..]).unwrap()
-            }
-            Self::Push(Imm::Constant(_))
-            | Self::Push(Imm::Variable(_))
-            | Self::Push(Imm::Expression(_))
-            | Self::Push(Imm::Macro(_)) => {
-                panic!("only pushes with a label can be realized");
-            }
-            Self::Op(op) => Self::Op(op.realize(address)?),
-            Self::Label(_) => panic!("labels cannot be realized"),
-            Self::Macro(_) => panic!("macros cannot be realized"),
-            Self::MacroDefinition(_) => panic!("macro definitions cannot be realized"),
-        };
-
-        Ok(ret)
-    }
-    */
-
-    // TODO: do everything here
     pub(crate) fn concretize(
         self,
         labels: &Labels,
         variables: &Variables,
         macros: &Macros,
-    ) -> Result<Op<Concrete>, imm::Error> {
+    ) -> Result<Op<Concrete>, error::Error> {
         let res = match self {
             Self::Op(op) => op.concretize(labels, variables, macros),
             // Self::Push(Imm { tree, ..}) => tree.evaluate(labels, variables, macros),
-            Self::Push(_) => panic!("variable push cannot be concretized"),
-            Self::Label(_) => panic!("labels cannot be concretized"),
-            Self::Macro(_) => panic!("macros cannot be concretized"),
-            Self::MacroDefinition(_) => panic!("macro definitions cannot be concretized"),
-            /*
-            Self::Push(Imm::Constant(konst)) => {
-                let mut trimmed = konst.as_slice();
-                while !trimmed.is_empty() && trimmed[0] == 0 {
-                    trimmed = &trimmed[1..];
-                }
-                let spec = Specifier::push(trimmed.len() as u32)?;
-
-                Op::<Concrete>::with_immediate(spec, trimmed).unwrap()
+            Self::Push(imm) => {
+                let res = imm
+                    .tree
+                    .evaluate(labels, variables, macros)
+                    .context(error::Evaluation)?;
+                let size = (res.bits() as u32 + 8 - 1) / 8;
+                let spec = Specifier::push(size).unwrap();
+                let bytes = res.to_bytes_be().1;
+                let start = bytes.len() - spec.extra_len() as usize;
+                AbstractOp::with_immediate(spec, &bytes[start..])
+                    .unwrap()
+                    .concretize(labels, variables, macros)
             }
-            Self::Push(Imm::Variable(_)) => panic!("variable immediates must be filled first"),
-            Self::Push(Imm::Expression(_)) => panic!("expressions must be computed first"),
-            Self::Push(Imm::Macro(_)) => panic!("macros must be expanded first"),
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),
             Self::MacroDefinition(_) => panic!("macro definitions cannot be concretized"),
-            */
         };
 
         res
     }
 
     /// The labels in an expression. Only relevant for push instructions.
-    pub fn labels(&self, macros: &Macros) -> Option<Result<Vec<String>, imm::Error>> {
+    pub fn labels(&self, macros: &Macros) -> Option<Result<Vec<String>, expression::Error>> {
         match self {
             Self::Op(op) => op.labels(macros),
+            Self::Push(imm) => Some(imm.tree.labels(macros)),
             _ => None,
         }
     }
