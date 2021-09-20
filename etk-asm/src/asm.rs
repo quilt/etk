@@ -4,7 +4,6 @@
 //! [`mod@crate::ingest`] module for a higher-level interface.
 
 mod error {
-    use crate::ops::imm::TryFromIntError;
     use crate::ops::Expression;
     use crate::ParseError;
 
@@ -128,19 +127,19 @@ impl RawOp {
         }
     }
 
-    fn labels(
+    fn get_labels(
         &self,
         macros: &HashMap<String, MacroDefinition>,
     ) -> Option<Result<Vec<String>, expression::Error>> {
         match self {
-            Self::Op(op) => op.labels(macros),
+            Self::Op(op) => op.get_labels(macros),
             Self::Raw(_) => None,
         }
     }
 
-    fn expression(&self) -> Option<&Expression> {
+    fn get_expression(&self) -> Option<&Expression> {
         match self {
-            Self::Op(op) => op.expression(),
+            Self::Op(op) => op.get_expression(),
             Self::Raw(_) => None,
         }
     }
@@ -229,7 +228,7 @@ impl Assembler {
     pub fn finish(self) -> Result<(), Error> {
         if let Some(undef) = self.pending.front() {
             return match undef {
-                RawOp::Op(op) => match op.labels(&self.declared_macros) {
+                RawOp::Op(op) => match op.get_labels(&self.declared_macros) {
                     Some(Ok(labels)) => {
                         let declared_labels = HashSet::from_iter(self.declared_labels.into_keys());
                         let labels = HashSet::<String>::from_iter(labels);
@@ -309,7 +308,7 @@ impl Assembler {
         // 1. get all labels used by `rop`
         // 2. check if they've been defined
         // 3. if not, note them as "undeclared"
-        if let Some(Ok(labels)) = rop.labels(&self.declared_macros) {
+        if let Some(Ok(labels)) = rop.get_labels(&self.declared_macros) {
             for label in labels {
                 if !self.declared_labels.contains_key(&label) {
                     self.undeclared_labels.insert(label.to_owned());
@@ -353,6 +352,7 @@ impl Assembler {
     }
 
     fn push_ready(&mut self, rop: RawOp) -> Result<(), Error> {
+        println!("push_ready: {:?}, size: {:?}", rop, rop.size());
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
                 let old = self
@@ -387,13 +387,13 @@ impl Assembler {
                     }
                     Err(ops::Error::SpecifierCoercion { .. }) => {
                         return error::ExpressionTooLarge {
-                            expr: op.expression().unwrap().clone(),
+                            expr: op.get_expression().unwrap().clone(),
                         }
                         .fail()
                     }
                     Err(_) => {
                         assert_eq!(self.pending_len, Some(0));
-                        self.pending_len = None;
+                        self.pending_len = rop.size();
                         self.pending.push_back(rop);
                     }
                 }
@@ -457,6 +457,9 @@ impl Assembler {
             }
         }
 
+        println!("push_pending: {:?}, size: {:?}", rop, rop.size());
+        println!("pending_len: {:?}", self.pending_len);
+
         // Handle labels.
         match (self.pending_len, rop) {
             (Some(pending_len), RawOp::Op(AbstractOp::Label(lbl))) => {
@@ -509,11 +512,20 @@ impl Assembler {
                     let front = self.pending.front_mut().unwrap();
                     *front = RawOp::Op(cop.into());
                 }
-                Err(ops::Error::SpecifierCoercion { .. }) => {
+                Err(ops::Error::SpecifierCoercion) => {
+                    println!("failed op: {:?}", op);
+                    println!(
+                        "eval: {:?}",
+                        op.get_expression().unwrap().evaluate(
+                            &self.declared_labels,
+                            &HashMap::new(),
+                            &self.declared_macros,
+                        )
+                    );
                     return error::ExpressionTooLarge {
-                        expr: op.expression().unwrap().clone(),
+                        expr: op.get_expression().unwrap().clone(),
                     }
-                    .fail()
+                    .fail();
                 }
                 Err(_) => {
                     break;
@@ -538,7 +550,7 @@ impl Assembler {
                 }
             })
             .map(|op| {
-                let expr = op.expression().unwrap();
+                let expr = op.get_expression().unwrap();
                 let mut s = DefaultHasher::new();
                 expr.hash(&mut s);
                 (s.finish(), Specifier::push_for(1).unwrap())
@@ -579,8 +591,7 @@ impl Assembler {
                     break;
                 }
                 Err(Error::ExpressionTooLarge { expr, .. }) => {
-                    // If a label is too large for an op, increase the width of
-                    // that label.
+                    // If an expression is too large for an op, increase the width of that op.
                     let mut s = DefaultHasher::new();
                     expr.hash(&mut s);
                     let item = sizes.get_mut(&s.finish()).unwrap();
@@ -605,7 +616,7 @@ impl Assembler {
     fn expand_macro(
         &mut self,
         name: &str,
-        parameters: &[Imm<Vec<u8>>],
+        parameters: &[Expression],
     ) -> Result<Option<usize>, Error> {
         // Remap labels to macro scope.
         match self.declared_macros.get(name).cloned() {
@@ -613,6 +624,12 @@ impl Assembler {
                 if m.parameters.len() != parameters.len() {
                     panic!("invalid number of parameters for macro {}", name);
                 }
+
+                let parameters: HashMap<String, Expression> = m
+                    .parameters
+                    .into_iter()
+                    .zip(parameters.iter().cloned())
+                    .collect();
 
                 let mut labels = HashMap::<String, String>::new();
 
@@ -635,45 +652,29 @@ impl Assembler {
                     }
                 }
 
-                /*
                 // Second pass, update local label invocations.
                 for op in m.contents.iter_mut() {
-                    if let Some(label) = op.immediate_label() {
-                        if let Some(label) = labels.get(label) {
-                            *op = AbstractOp::with_label(op.specifier().unwrap(), label);
-                        }
-                    } else if let Some(variable) = op.immediate_variable() {
-                        if let Some(idx) = m.parameters.iter().position(|x| x == variable) {
-                            match &parameters[idx] {
-                                Imm::Label(lbl) => {
-                                    *op = AbstractOp::with_label(op.specifier().unwrap(), lbl)
-                                }
-                                Imm::Constant(c) => {
-                                    let mut trimmed = &c[..];
-                                    while !trimmed.is_empty() && trimmed[0] == 0 {
-                                        trimmed = &trimmed[1..];
-                                    }
-                                    if trimmed.len() < op.pushes() {
-                                        return error::SizedPushTooLarge {}.fail();
-                                    }
-                                    let mut normalized =
-                                        vec![0; op.size().unwrap() as usize - 1 - trimmed.len()];
-                                    normalized.extend_from_slice(trimmed);
-
-                                    *op = AbstractOp::with_immediate(
-                                        op.specifier().unwrap(),
-                                        &normalized,
-                                    )
-                                    .unwrap()
-                                }
-                                Imm::Variable(_) => unreachable!(),
-                                Imm::Expression(_) => unimplemented!(),
-                                Imm::Macro(_) => unimplemented!(),
+                    if let Some(expr) = op.get_expression_mut() {
+                        for lbl in expr.get_labels(&self.declared_macros).unwrap() {
+                            if labels.contains_key(&lbl) {
+                                let a =
+                                    expr.replace_label(&lbl, &labels[&lbl], &self.declared_macros);
                             }
                         }
                     }
+
+                    // Attempt to fill in parameters
+                    if let Some(_) = op.get_expression() {
+                        match op.clone().concretize(
+                            &self.declared_labels,
+                            &parameters,
+                            &self.declared_macros,
+                        ) {
+                            Ok(cop) => *op = cop.into(),
+                            Err(_) => (),
+                        }
+                    }
                 }
-                */
 
                 Ok(Some(self.push_all(m.contents)?))
             }
@@ -684,16 +685,14 @@ impl Assembler {
 
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
-
+    use super::*;
     use crate::ops::{
         Expression, ExpressionMacroDefinition, ExpressionMacroInvocation, Imm,
-        InstructionMacroDefinition, InstructionMacroInvocation, Op,
+        InstructionMacroDefinition, InstructionMacroInvocation, Op, Terminal,
     };
-
+    use assert_matches::assert_matches;
     use hex_literal::hex;
-
-    use super::*;
+    use num_bigint::{BigInt, Sign};
 
     #[test]
     fn assemble_variable_push_const_while_pending() -> Result<(), Error> {
@@ -1071,7 +1070,6 @@ mod tests {
         Ok(())
     }
 
-    /*
     #[test]
     fn assemble_instruction_macro_with_parameters() -> Result<(), Error> {
         let ops = vec![
@@ -1089,7 +1087,10 @@ mod tests {
             AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
             AbstractOp::Macro(InstructionMacroInvocation {
                 name: "my_macro".into(),
-                parameters: vec![Imm::<Vec<u8>>::from(vec![0x42]), Imm::with_label("b")],
+                parameters: vec![
+                    BigInt::from_bytes_be(Sign::Plus, &vec![0x42]).into(),
+                    Terminal::Label("b".to_string()).into(),
+                ],
             }),
         ];
 
@@ -1101,7 +1102,6 @@ mod tests {
 
         Ok(())
     }
-    */
 
     #[test]
     fn assemble_expression_push() -> Result<(), Error> {
@@ -1141,7 +1141,7 @@ mod tests {
             AbstractOp::Op(Op::Gas),
         ])?;
         let err = asm.finish().unwrap_err();
-        assert_matches!(err, Error::UndeclaredLabels { labels, .. } if labels == vec!["bar", "foo"]);
+        assert_matches!(err, Error::UndeclaredLabels { labels, .. } if labels == vec!["foo", "bar"]);
         Ok(())
     }
 

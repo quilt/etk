@@ -4,7 +4,7 @@ use super::parser::Rule;
 use super::{expression, parse_push};
 use crate::ast::Node;
 use crate::ops::{
-    AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation, Imm,
+    AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation,
     InstructionMacroDefinition, InstructionMacroInvocation, Op, Specifier,
 };
 use pest::iterators::Pair;
@@ -95,10 +95,10 @@ fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
 fn parse_instruction_macro(pair: Pair<Rule>) -> Result<Node, ParseError> {
     let mut pairs = pair.into_inner();
     let name = pairs.next().unwrap();
-    let mut parameters = Vec::<Imm<Vec<u8>>>::new();
+    let mut parameters = Vec::<Expression>::new();
     for pair in pairs {
         let expr = expression::parse(pair)?;
-        parameters.push(expr.into());
+        parameters.push(expr);
     }
     let invocation = InstructionMacroInvocation {
         name: name.as_str().to_string(),
@@ -131,10 +131,10 @@ pub(crate) fn parse_expression_macro(pair: Pair<Rule>) -> Result<Expression, Par
     println!("{:?}", pairs);
     let name = pairs.next().unwrap();
     println!("{:?}", name.as_str());
-    let mut parameters = Vec::<Imm<Vec<u8>>>::new();
+    let mut parameters = Vec::<Expression>::new();
     for pair in pairs {
         let expr = expression::parse(pair)?;
-        parameters.push(expr.into());
+        parameters.push(expr);
     }
     let invocation = ExpressionMacroInvocation {
         name: name.as_str().to_string(),

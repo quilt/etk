@@ -76,6 +76,7 @@ mod tests {
     };
     use assert_matches::assert_matches;
     use hex_literal::hex;
+    use num_bigint::Sign;
     use std::path::PathBuf;
 
     macro_rules! nodes {
@@ -460,8 +461,12 @@ mod tests {
             AbstractOp::Macro(InstructionMacroInvocation {
                 name: "my_macro".into(),
                 parameters: vec![
-                    Imm::from(vec![0x42]),
-                    Imm::from(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10])
+                    BigInt::from_bytes_be(Sign::Plus, &vec![0x42]).into(),
+                    BigInt::from_bytes_be(
+                        Sign::Plus,
+                        &vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10]
+                    )
+                    .into()
                 ]
             })
         ];

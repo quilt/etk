@@ -170,7 +170,7 @@ impl Expression {
     }
 
     /// Returns a list of all labels used in the expression.
-    pub fn labels(&self, macros: &Macros) -> Result<Vec<String>, Error> {
+    pub fn get_labels(&self, macros: &Macros) -> Result<Vec<String>, Error> {
         fn dfs(x: &Expression, m: &Macros) -> Result<Vec<String>, Error> {
             match x {
                 Expression::Expression(e) => dfs(e, m),
@@ -182,7 +182,7 @@ impl Expression {
                     .unwrap_expression()
                     .content
                     .tree
-                    .labels(m),
+                    .get_labels(m),
                 Expression::Terminal(Terminal::Label(label)) => Ok(vec![label.clone()]),
                 Expression::Terminal(_) => Ok(vec![]),
                 Expression::Plus(lhs, rhs)
@@ -196,6 +196,33 @@ impl Expression {
         }
 
         dfs(self, macros)
+    }
+
+    /// Returns a list of all labels used in the expression.
+    pub fn replace_label(&mut self, old: &str, new: &str, macros: &Macros) -> Result<(), Error> {
+        fn dfs(x: &mut Expression, old: &str, new: &str, m: &Macros) -> Result<(), Error> {
+            match x {
+                Expression::Expression(e) => dfs(e, new, old, m),
+                Expression::Macro(_) => Ok(()),
+                Expression::Terminal(Terminal::Label(ref mut label)) => {
+                    if *label == old {
+                        *label = new.to_string();
+                    }
+                    Ok(())
+                }
+                Expression::Terminal(_) => Ok(()),
+                Expression::Plus(lhs, rhs)
+                | Expression::Minus(lhs, rhs)
+                | Expression::Times(lhs, rhs)
+                | Expression::Divide(lhs, rhs) => {
+                    dfs(lhs, new, old, m)?;
+                    dfs(rhs, new, old, m)?;
+                    Ok(())
+                }
+            }
+        }
+
+        dfs(self, old, new, macros)
     }
 }
 

@@ -63,8 +63,8 @@ impl<T> Imm<T> {
     }
 
     /// Returns all labels referenced in an immediate's expression.
-    pub fn labels(&self, macros: &Macros) -> Result<Vec<String>, expression::Error> {
-        self.tree.labels(macros)
+    pub fn get_labels(&self, macros: &Macros) -> Result<Vec<String>, expression::Error> {
+        self.tree.get_labels(macros)
     }
 }
 
@@ -138,6 +138,7 @@ macro_rules! impl_try_from_slice {
             type Error = TryFromSliceError;
 
             fn try_from(x: &[u8]) -> Result<Self, Self::Error> {
+                println!("trying from slice: {} > {}", x.len(), $ii);
                 if x.len() > $ii {
                     return TryFromSliceContext.fail();
                 }

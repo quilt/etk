@@ -1,4 +1,4 @@
-use super::{AbstractOp, Imm};
+use super::{AbstractOp, Expression, Imm};
 use std::convert::From;
 use std::fmt;
 
@@ -78,7 +78,7 @@ pub struct InstructionMacroInvocation {
     /// The name of the macro being invoked.
     pub name: String,
     /// The parameters that are being passed into the invocation.
-    pub parameters: Vec<Imm<Vec<u8>>>,
+    pub parameters: Vec<Expression>,
 }
 
 impl InstructionMacroInvocation {
@@ -99,7 +99,7 @@ impl fmt::Display for InstructionMacroInvocation {
             self.name,
             self.parameters
                 .iter()
-                .map(Imm::to_string)
+                .map(Expression::to_string)
                 .collect::<Vec<String>>()
                 .join(", ")
         )
@@ -123,7 +123,7 @@ pub struct ExpressionMacroInvocation {
     /// The name of the macro being invoked.
     pub name: String,
     /// The parameters that are being passed into the invocation.
-    pub parameters: Vec<Imm<Vec<u8>>>,
+    pub parameters: Vec<Expression>,
 }
 
 impl fmt::Display for ExpressionMacroInvocation {
@@ -134,7 +134,7 @@ impl fmt::Display for ExpressionMacroInvocation {
             self.name,
             self.parameters
                 .iter()
-                .map(Imm::to_string)
+                .map(Expression::to_string)
                 .collect::<Vec<String>>()
                 .join(", ")
         )

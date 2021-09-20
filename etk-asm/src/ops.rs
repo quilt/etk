@@ -7,12 +7,8 @@ mod error {
     #[derive(Snafu, Debug)]
     #[snafu(visibility = "pub(crate)")]
     pub(crate) enum Error {
-        Evaluation {
-            source: expression::Error,
-        },
-        SpecifierCoercion {
-            source: std::array::TryFromSliceError,
-        },
+        Evaluation { source: expression::Error },
+        SpecifierCoercion,
     }
 
     /// The error that can arise while parsing a specifier from a string.
@@ -200,7 +196,7 @@ macro_rules! ret_labels {
         None
     };
     ($expr:ident, $macros:ident, $arg:ident) => {
-        Some($expr.labels($macros))
+        Some($expr.get_labels($macros))
     };
 }
 
@@ -217,18 +213,22 @@ macro_rules! ret_concretize {
     ($op:ident, $tree:ident, $labels:ident, $variables:ident, $macros:ident) => {
         Ok(Op::$op)
     };
-    ($op:ident, $tree:ident, $labels:ident, $variables:ident, $macros:ident, $arg:ident) => {
-        Ok(Op::$op(
-            $tree
-                .evaluate($labels, $variables, $macros)
-                .context(error::Evaluation)?
-                .to_bytes_be()
-                .1
-                .as_slice()
-                .try_into()
-                .context(error::SpecifierCoercion)?,
-        ))
-    };
+    ($op:ident, $tree:ident, $labels:ident, $variables:ident, $macros:ident, $arg:ident) => {{
+        let value = $tree
+            .evaluate($labels, $variables, $macros)
+            .context(error::Evaluation)?
+            .to_bytes_be();
+        let value = value.1.as_slice();
+
+        let mut buf = <Concrete as ImmediateTypes>::$arg::default();
+        if value.len() > buf.len() {
+            error::SpecifierCoercion.fail()
+        } else {
+            let start = buf.len() - value.len();
+            buf[start..].copy_from_slice(value);
+            Ok(Op::$op(buf))
+        }
+    }};
 }
 
 macro_rules! ret_assemble {
@@ -276,15 +276,6 @@ macro_rules! ret_with_expression {
     };
 }
 
-macro_rules! ret_with_expression {
-    ($expr:ident, $op:ident) => {
-        panic!()
-    };
-    ($expr:ident, $op:ident, $arg:ident) => {
-        Self::$op(Imm::from($expr))
-    };
-}
-
 macro_rules! ret_from_slice {
     ($imm:ident, $op:ident) => {
         Self::$op
@@ -300,15 +291,6 @@ macro_rules! ret_tree {
     };
     ($tree:ident, $op:ident, $arg:ident) => {
         Some($tree)
-    };
-}
-
-macro_rules! ret_expression {
-    ($imm:ident, $op:ident) => {
-        Self::$op
-    };
-    ($imm:ident, $op:ident, $arg:ident) => {
-        Self::$op(TryFrom::try_from(&$imm[1..]).unwrap())
     };
 }
 
@@ -579,7 +561,16 @@ macro_rules! ops {
             }
 
             /// The expression to be pushed on the stack. Only relevant for push instructions.
-            pub(crate) fn expression(&self) -> Option<&Expression> {
+            pub(crate) fn get_expression(&self) -> Option<&Expression> {
+                match self {
+                    $(
+                        pat_tree!(tree, $op$(, $arg)?) => ret_tree!(tree, $op$(, $arg)?),
+                    )*
+                }
+            }
+
+            /// The expression to be pushed on the stack. Only relevant for push instructions.
+            pub(crate) fn get_expression_mut(&mut self) -> Option<&mut Expression> {
                 match self {
                     $(
                         pat_tree!(tree, $op$(, $arg)?) => ret_tree!(tree, $op$(, $arg)?),
@@ -590,7 +581,7 @@ macro_rules! ops {
             }
 
             /// The labels in an expression. Only relevant for push instructions.
-            pub(crate) fn labels(&self, macros: &Macros) -> Option<Result<Vec<String>, expression::Error>> {
+            pub(crate) fn get_labels(&self, macros: &Macros) -> Option<Result<Vec<String>, expression::Error>> {
                 match self {
                     $(
                         pat_labels!(tree, $op$(, $arg)?) => ret_labels!(tree, macros$(, $arg)?),
@@ -1140,18 +1131,27 @@ impl AbstractOp {
     }
 
     /// The labels in an expression. Only relevant for push instructions.
-    pub fn labels(&self, macros: &Macros) -> Option<Result<Vec<String>, expression::Error>> {
+    pub fn get_labels(&self, macros: &Macros) -> Option<Result<Vec<String>, expression::Error>> {
         match self {
-            Self::Op(op) => op.labels(macros),
-            Self::Push(imm) => Some(imm.tree.labels(macros)),
+            Self::Op(op) => op.get_labels(macros),
+            Self::Push(imm) => Some(imm.tree.get_labels(macros)),
             _ => None,
         }
     }
 
     /// The expression to be pushed on the stack. Only relevant for push instructions.
-    pub(crate) fn expression(&self) -> Option<&Expression> {
+    pub(crate) fn get_expression(&self) -> Option<&Expression> {
         match self {
-            Self::Op(op) => op.expression(),
+            Self::Op(op) => op.get_expression(),
+            Self::Push(Imm { tree, .. }) => Some(tree),
+            _ => None,
+        }
+    }
+
+    /// The expression to be pushed on the stack. Only relevant for push instructions.
+    pub(crate) fn get_expression_mut(&mut self) -> Option<&mut Expression> {
+        match self {
+            Self::Op(op) => op.get_expression_mut(),
             Self::Push(Imm { tree, .. }) => Some(tree),
             _ => None,
         }
