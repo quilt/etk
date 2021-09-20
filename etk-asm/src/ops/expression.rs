@@ -71,7 +71,7 @@ impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Expression::Expression(s) => write!(f, r#"({})"#, s),
-            Expression::Macro(m) => unimplemented!(),
+            Expression::Macro(m) => write!(f, r#"{}"#, m),
             Expression::Terminal(t) => write!(f, r#"{}"#, t),
             Expression::Plus(lhs, rhs) => write!(f, r#"{}+{}"#, lhs, rhs),
             Expression::Minus(lhs, rhs) => write!(f, r#"{}-{}"#, lhs, rhs),
@@ -199,30 +199,28 @@ impl Expression {
     }
 
     /// Returns a list of all labels used in the expression.
-    pub fn replace_label(&mut self, old: &str, new: &str, macros: &Macros) -> Result<(), Error> {
-        fn dfs(x: &mut Expression, old: &str, new: &str, m: &Macros) -> Result<(), Error> {
+    pub fn replace_label(&mut self, old: &str, new: &str) {
+        fn dfs(x: &mut Expression, old: &str, new: &str) {
             match x {
-                Expression::Expression(e) => dfs(e, new, old, m),
-                Expression::Macro(_) => Ok(()),
+                Expression::Expression(e) => dfs(e, new, old),
+
                 Expression::Terminal(Terminal::Label(ref mut label)) => {
                     if *label == old {
                         *label = new.to_string();
                     }
-                    Ok(())
                 }
-                Expression::Terminal(_) => Ok(()),
                 Expression::Plus(lhs, rhs)
                 | Expression::Minus(lhs, rhs)
                 | Expression::Times(lhs, rhs)
                 | Expression::Divide(lhs, rhs) => {
-                    dfs(lhs, new, old, m)?;
-                    dfs(rhs, new, old, m)?;
-                    Ok(())
+                    dfs(lhs, new, old);
+                    dfs(rhs, new, old);
                 }
+                Expression::Macro(_) | Expression::Terminal(_) => (),
             }
         }
 
-        dfs(self, old, new, macros)
+        dfs(self, old, new)
     }
 }
 

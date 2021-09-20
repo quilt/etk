@@ -575,8 +575,6 @@ macro_rules! ops {
                     $(
                         pat_tree!(tree, $op$(, $arg)?) => ret_tree!(tree, $op$(, $arg)?),
                     )*
-
-                    _ => None,
                 }
             }
 
@@ -1106,7 +1104,7 @@ impl AbstractOp {
         variables: &Variables,
         macros: &Macros,
     ) -> Result<Op<Concrete>, error::Error> {
-        let res = match self {
+        match self {
             Self::Op(op) => op.concretize(labels, variables, macros),
             // Self::Push(Imm { tree, ..}) => tree.evaluate(labels, variables, macros),
             Self::Push(imm) => {
@@ -1125,9 +1123,7 @@ impl AbstractOp {
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),
             Self::MacroDefinition(_) => panic!("macro definitions cannot be concretized"),
-        };
-
-        res
+        }
     }
 
     /// The labels in an expression. Only relevant for push instructions.

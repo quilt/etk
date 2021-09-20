@@ -105,7 +105,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
 use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
 
 /// An item to be assembled, which can be either an [`AbstractOp`] or a raw byte
 /// sequence.
@@ -230,10 +229,10 @@ impl Assembler {
             return match undef {
                 RawOp::Op(op) => match op.get_labels(&self.declared_macros) {
                     Some(Ok(labels)) => {
-                        let declared_labels = HashSet::from_iter(self.declared_labels.into_keys());
-                        let labels = HashSet::<String>::from_iter(labels);
-                        let missing = labels
-                            .difference(&declared_labels)
+                        let declared: HashSet<_> = self.declared_labels.into_keys().collect();
+                        let invoked: HashSet<_> = labels.into_iter().collect();
+                        let missing = invoked
+                            .difference(&declared)
                             .cloned()
                             .collect::<Vec<String>>();
                         error::UndeclaredLabels { labels: missing }.fail()
@@ -542,13 +541,7 @@ impl Assembler {
         let mut sizes: HashMap<u64, Specifier> = self
             .pending
             .iter()
-            .filter(|op| {
-                if let RawOp::Op(AbstractOp::Push(_)) = op {
-                    true
-                } else {
-                    false
-                }
-            })
+            .filter(|op| matches!(op, RawOp::Op(AbstractOp::Push(_))))
             .map(|op| {
                 let expr = op.get_expression().unwrap();
                 let mut s = DefaultHasher::new();
@@ -657,21 +650,19 @@ impl Assembler {
                     if let Some(expr) = op.get_expression_mut() {
                         for lbl in expr.get_labels(&self.declared_macros).unwrap() {
                             if labels.contains_key(&lbl) {
-                                let a =
-                                    expr.replace_label(&lbl, &labels[&lbl], &self.declared_macros);
+                                expr.replace_label(&lbl, &labels[&lbl]);
                             }
                         }
                     }
 
                     // Attempt to fill in parameters
-                    if let Some(_) = op.get_expression() {
-                        match op.clone().concretize(
+                    if op.get_expression().is_some() {
+                        if let Ok(cop) = op.clone().concretize(
                             &self.declared_labels,
                             &parameters,
                             &self.declared_macros,
                         ) {
-                            Ok(cop) => *op = cop.into(),
-                            Err(_) => (),
+                            *op = cop.into();
                         }
                     }
                 }
@@ -1141,7 +1132,7 @@ mod tests {
             AbstractOp::Op(Op::Gas),
         ])?;
         let err = asm.finish().unwrap_err();
-        assert_matches!(err, Error::UndeclaredLabels { labels, .. } if labels == vec!["foo", "bar"]);
+        assert_matches!(err, Error::UndeclaredLabels { labels, .. } if (labels.contains(&"foo".to_string())) && labels.contains(&"bar".to_string()));
         Ok(())
     }
 
