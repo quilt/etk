@@ -42,7 +42,6 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
             Node::IncludeHex(args.0)
         }
         Rule::push_macro => {
-            // TODO: This should accept labels, literals, or variables, not just labels.
             let expr = expression::parse(pair.into_inner().next().unwrap())?;
             Node::Op(AbstractOp::Push(expr.into()))
         }

@@ -70,8 +70,6 @@ where
         let mut got = 0;
 
         let result = (arg::<T>(&mut pairs, expected, &mut got)?,);
-        println!("{:?}", result);
-        println!("{:?}", pairs);
 
         match pairs.next() {
             Some(_) => error::ExtraArgument { expected }.fail(),

@@ -255,6 +255,15 @@ macro_rules! ret_with_immediate {
     };
 }
 
+macro_rules! ret_with_label {
+    ($imm:ident, $op:ident) => {
+        panic!()
+    };
+    ($imm:ident, $op:ident, $arg:ident) => {
+        Self::$op(Terminal::Label($imm).into())
+    };
+}
+
 macro_rules! ret_with_expression {
     ($expr:ident, $op:ident) => {
         panic!()
@@ -515,6 +524,22 @@ macro_rules! ops {
         }
 
         impl Op<Abstract> {
+            /// Construct an `Op` with the given label.
+            ///
+            /// ## Panics
+            ///
+            /// This function panics if the instruction described by the specifier
+            /// does not accept immediate arguments.
+            pub fn with_label<S: Into<String>>(spec: Op<Spec>, lbl: S) -> Self {
+                let lbl = lbl.into();
+
+                match spec {
+                    $(
+                        pat_spec!($op$(, $arg)?) => ret_with_label!(lbl, $op$(, $arg)?),
+                    )*
+                }
+            }
+
             /// Construct an `Op` with the given immediate argument.
             ///
             /// An error is returned if `imm` doesn't match the immediate size for
