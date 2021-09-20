@@ -57,7 +57,7 @@ fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let spec = Specifier::push(size).unwrap();
     let expr = expression::parse(operand)?;
 
-    if let Some(val) = expr.eval().ok() {
+    if let Ok(val) = expr.eval() {
         let max = BigInt::pow(&BigInt::from(2), 8 * size);
         if val >= max {
             return error::ImmediateTooLarge.fail();
