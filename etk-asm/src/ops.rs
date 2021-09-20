@@ -157,21 +157,9 @@ macro_rules! write_concrete {
         write!($f, "{}", $sp)
     };
     ($f:ident, $sp:expr, $imm:expr, $arg:ident) => {
-        write!($f, "{} {:?}", $sp, $imm)
+        write!($f, "{} 0x{}", $sp, hex::encode($imm))
     };
 }
-
-// macro_rules! pat_const {
-//     ($cap:ident, $op:ident) => {
-//         Self::$op
-//     };
-//     ($konst:ident, $op:ident, $arg:ident) => {
-//         Self::$op(Imm {
-//             tree: Expression::Terminal(Terminal::Number($konst)),
-//             ..
-//         })
-//     };
-// }
 
 macro_rules! pat_tree {
     ($tree:ident, $op:ident) => {
