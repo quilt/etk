@@ -126,9 +126,9 @@ impl RawOp {
         }
     }
 
-    fn expression(&self) -> Option<&Expression> {
+    fn expr(&self) -> Option<&Expression> {
         match self {
-            Self::Op(op) => op.expression(),
+            Self::Op(op) => op.expr(),
             Self::Raw(_) => None,
         }
     }
@@ -217,7 +217,7 @@ impl Assembler {
     pub fn finish(self) -> Result<(), Error> {
         if let Some(undef) = self.pending.front() {
             return match undef {
-                RawOp::Op(op) => match op.expression().map(|e| e.labels(&self.declared_macros)) {
+                RawOp::Op(op) => match op.expr().map(|e| e.labels(&self.declared_macros)) {
                     Some(Ok(labels)) => {
                         let declared: HashSet<_> = self.declared_labels.into_keys().collect();
                         let invoked: HashSet<_> = labels.into_iter().collect();
@@ -297,7 +297,7 @@ impl Assembler {
         // 1. get all labels used by `rop`
         // 2. check if they've been defined
         // 3. if not, note them as "undeclared"
-        if let Some(Ok(labels)) = rop.expression().map(|e| e.labels(&self.declared_macros)) {
+        if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
             for label in labels {
                 if !self.declared_labels.contains_key(&label) {
                     self.undeclared_labels.insert(label.to_owned());
@@ -375,7 +375,7 @@ impl Assembler {
                     }
                     Err(ops::Error::SpecifierCoercion { .. }) => {
                         return error::ExpressionTooLarge {
-                            expr: op.expression().unwrap().clone(),
+                            expr: op.expr().unwrap().clone(),
                         }
                         .fail()
                     }
@@ -494,7 +494,7 @@ impl Assembler {
                 }
                 Err(ops::Error::SpecifierCoercion) => {
                     return error::ExpressionTooLarge {
-                        expr: op.expression().unwrap().clone(),
+                        expr: op.expr().unwrap().clone(),
                     }
                     .fail();
                 }
@@ -515,7 +515,7 @@ impl Assembler {
             .iter()
             .filter(|op| matches!(op, RawOp::Op(AbstractOp::Push(_))))
             .map(|op| {
-                let expr = op.expression().unwrap();
+                let expr = op.expr().unwrap();
                 let mut s = DefaultHasher::new();
                 expr.hash(&mut s);
                 (s.finish(), Specifier::push_for(1).unwrap())
@@ -619,7 +619,7 @@ impl Assembler {
 
                 // Second pass, update local label invocations.
                 for op in m.contents.iter_mut() {
-                    if let Some(expr) = op.expression_mut() {
+                    if let Some(expr) = op.expr_mut() {
                         for lbl in expr.labels(&self.declared_macros).unwrap() {
                             if labels.contains_key(&lbl) {
                                 expr.replace_label(&lbl, &labels[&lbl]);
@@ -628,7 +628,7 @@ impl Assembler {
                     }
 
                     // Attempt to fill in parameters
-                    if op.expression().is_some() {
+                    if op.expr().is_some() {
                         if let Ok(cop) = op.clone().concretize(
                             (&self.declared_labels, &self.declared_macros, &parameters).into(),
                         ) {

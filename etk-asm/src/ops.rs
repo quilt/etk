@@ -551,7 +551,7 @@ macro_rules! ops {
             }
 
             /// The expression to be pushed on the stack. Only relevant for push instructions.
-            pub(crate) fn expression(&self) -> Option<&Expression> {
+            pub(crate) fn expr(&self) -> Option<&Expression> {
                 match self {
                     $(
                         pat_expr!(expr, $op$(, $arg)?) => ret_expr!(expr, $op$(, $arg)?),
@@ -560,7 +560,7 @@ macro_rules! ops {
             }
 
             /// The expression to be pushed on the stack. Only relevant for push instructions.
-            pub(crate) fn expression_mut(&mut self) -> Option<&mut Expression> {
+            pub(crate) fn expr_mut(&mut self) -> Option<&mut Expression> {
                 match self {
                     $(
                         pat_expr!(expr, $op$(, $arg)?) => ret_expr!(expr, $op$(, $arg)?),
@@ -1099,18 +1099,18 @@ impl AbstractOp {
     }
 
     /// The expression to be pushed on the stack. Only relevant for push instructions.
-    pub(crate) fn expression(&self) -> Option<&Expression> {
+    pub(crate) fn expr(&self) -> Option<&Expression> {
         match self {
-            Self::Op(op) => op.expression(),
+            Self::Op(op) => op.expr(),
             Self::Push(Imm { tree, .. }) => Some(tree),
             _ => None,
         }
     }
 
     /// The expression to be pushed on the stack. Only relevant for push instructions.
-    pub(crate) fn expression_mut(&mut self) -> Option<&mut Expression> {
+    pub(crate) fn expr_mut(&mut self) -> Option<&mut Expression> {
         match self {
-            Self::Op(op) => op.expression_mut(),
+            Self::Op(op) => op.expr_mut(),
             Self::Push(Imm { tree, .. }) => Some(tree),
             _ => None,
         }

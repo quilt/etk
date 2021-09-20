@@ -258,12 +258,11 @@ impl Expression {
         dfs(self, macros)
     }
 
-    /// Returns a list of all labels used in the expression.
+    /// Replaces all instances of `old` with `new` in the expression.
     pub fn replace_label(&mut self, old: &str, new: &str) {
         fn dfs(x: &mut Expression, old: &str, new: &str) {
             match x {
                 Expression::Expression(e) => dfs(e, new, old),
-
                 Expression::Terminal(Terminal::Label(ref mut label)) => {
                     if *label == old {
                         *label = new.to_string();
@@ -348,11 +347,7 @@ mod tests {
     #[test]
     fn expr_simple() {
         // 24 + 42 = 66
-        let expr = Expression::Plus(
-            Terminal::Number(24.into()).into(),
-            Terminal::Number(42.into()).into(),
-        );
-
+        let expr = Expression::Plus(24.into(), 42.into());
         let out = expr.eval().unwrap();
         assert_eq!(out, BigInt::from(66));
     }
@@ -361,20 +356,8 @@ mod tests {
     fn expr_nested() {
         //((1+2)*3-(4/2) = 7
         let expr = Expression::Minus(
-            Expression::Times(
-                Expression::Plus(
-                    Terminal::Number(1.into()).into(),
-                    Terminal::Number(2.into()).into(),
-                )
-                .into(),
-                Terminal::Number(3.into()).into(),
-            )
-            .into(),
-            Expression::Divide(
-                Terminal::Number(4.into()).into(),
-                Terminal::Number(2.into()).into(),
-            )
-            .into(),
+            Expression::Times(Expression::Plus(1.into(), 2.into()).into(), 3.into()).into(),
+            Expression::Divide(4.into(), 2.into()).into(),
         );
         let out = expr.eval().unwrap();
         assert_eq!(out, BigInt::from(7));
@@ -383,36 +366,22 @@ mod tests {
     #[test]
     fn expr_with_label() {
         // foo + 1 = 42
-        let expr = Expression::Plus(
-            Terminal::Label(String::from("foo")).into(),
-            Terminal::Number(1.into()).into(),
-        );
-
-        let mut labels = HashMap::new();
-        labels.insert("foo".into(), Some(41));
-
+        let expr = Expression::Plus(Terminal::Label(String::from("foo")).into(), 1.into());
+        let labels: HashMap<_, _> = vec![("foo".to_string(), Some(41))].into_iter().collect();
         let out = expr.eval_with_context(Context::from(&labels)).unwrap();
         assert_eq!(out, BigInt::from(42));
     }
 
     #[test]
     fn expr_unknown_label() {
-        let expr = Expression::Plus(
-            Terminal::Label(String::from("foo")).into(),
-            Terminal::Number(1.into()).into(),
-        );
-
+        // missing label
+        let expr = Expression::Plus(Terminal::Label(String::from("foo")).into(), 1.into());
         let err = expr.eval().unwrap_err();
         assert_matches!(err, Error::UnknownLabel { label, .. } if label == "foo");
 
-        let expr = Expression::Plus(
-            Terminal::Label(String::from("foo")).into(),
-            Terminal::Number(1.into()).into(),
-        );
-
-        let mut labels = HashMap::new();
-        labels.insert("foo".into(), None);
-
+        // label w/o defined address
+        let expr = Expression::Plus(Terminal::Label(String::from("foo")).into(), 1.into());
+        let labels: HashMap<_, _> = vec![("foo".to_string(), None)].into_iter().collect();
         let err = expr.eval_with_context(Context::from(&labels)).unwrap_err();
         assert_matches!(err, Error::UnknownLabel { label, .. } if label == "foo");
     }
