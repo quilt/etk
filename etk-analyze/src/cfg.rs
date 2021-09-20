@@ -1,4 +1,6 @@
-use crate::blocks::annotated::{AnnotatedBlock, Exit};
+use crate::blocks::annotated::ExitExt;
+
+use etk_dasm::blocks::annotated::{AnnotatedBlock, Exit};
 
 use petgraph::dot::Dot;
 use petgraph::graph::{Graph, NodeIndex};
@@ -286,12 +288,12 @@ impl ControlFlowGraph {
 
 #[cfg(test)]
 mod tests {
-    use crate::blocks::basic::Separator;
-
     use assert_matches::assert_matches;
 
     use etk_asm::disasm::Disassembler;
     use etk_asm::ingest::Ingest;
+
+    use etk_dasm::blocks::basic::Separator;
 
     use super::*;
 

@@ -24,7 +24,7 @@ There are also several examples in the [`etk-asm/tests/asm`](etk-asm/tests/asm) 
 `etk` requires `rustc` version `1.51`.
 
 ```console
-cargo install --features cli etk-asm etk-analyze
+cargo install --features cli etk-asm etk-dasm
 ```
 
 #### Syntax Highlighting

@@ -24,7 +24,7 @@ cargo install \
     --git 'https://github.com/quilt/etk' \
     --features cli \
     etk-asm \
-    etk-analyze
+    etk-dasm
 ```
 
 ### Install Released Version
@@ -32,7 +32,7 @@ cargo install \
 Once you have Rust and cargo installed, you just have to type this snippet in your terminal:
 
 ```bash
-cargo install --features cli etk-asm etk-analyze
+cargo install --features cli etk-asm etk-dasm
 ```
 
 ## Install from Binaries

@@ -1,9 +1,7 @@
 etk-analyze
 ===========
 
-The EVM Toolkit's analysis tools:
-
- - `disease` disassembler
+The EVM Toolkit's analysis tools.
 
 ## Documentation
 
