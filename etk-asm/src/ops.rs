@@ -156,12 +156,12 @@ macro_rules! write_concrete {
     };
 }
 
-macro_rules! pat_tree {
-    ($tree:ident, $op:ident) => {
+macro_rules! pat_expr {
+    ($expr:ident, $op:ident) => {
         Self::$op
     };
-    ($tree:ident, $op:ident, $arg:ident) => {
-        Self::$op(Imm { $tree, .. })
+    ($expr:ident, $op:ident, $arg:ident) => {
+        Self::$op(Imm { tree: $expr, .. })
     };
 }
 
@@ -182,15 +182,15 @@ macro_rules! ret_concretize {
         let value = $tree
             .eval_with_context($ctx)
             .context(error::Evaluation)?
-            .to_bytes_be();
-        let value = value.1.as_slice();
+            .to_bytes_be()
+            .1;
 
         let mut buf = <Concrete as ImmediateTypes>::$arg::default();
         if value.len() > buf.len() {
             error::SpecifierCoercion.fail()
         } else {
             let start = buf.len() - value.len();
-            buf[start..].copy_from_slice(value);
+            buf[start..].copy_from_slice(&value);
             Ok(Op::$op(buf))
         }
     }};
@@ -259,12 +259,12 @@ macro_rules! ret_from_slice {
     };
 }
 
-macro_rules! ret_tree {
-    ($tree:ident, $op:ident) => {
+macro_rules! ret_expr {
+    ($expr:ident, $op:ident) => {
         None
     };
-    ($tree:ident, $op:ident, $arg:ident) => {
-        Some($tree)
+    ($expr:ident, $op:ident, $arg:ident) => {
+        Some($expr)
     };
 }
 
@@ -554,7 +554,7 @@ macro_rules! ops {
             pub(crate) fn expression(&self) -> Option<&Expression> {
                 match self {
                     $(
-                        pat_tree!(tree, $op$(, $arg)?) => ret_tree!(tree, $op$(, $arg)?),
+                        pat_expr!(expr, $op$(, $arg)?) => ret_expr!(expr, $op$(, $arg)?),
                     )*
                 }
             }
@@ -563,7 +563,7 @@ macro_rules! ops {
             pub(crate) fn expression_mut(&mut self) -> Option<&mut Expression> {
                 match self {
                     $(
-                        pat_tree!(tree, $op$(, $arg)?) => ret_tree!(tree, $op$(, $arg)?),
+                        pat_expr!(expr, $op$(, $arg)?) => ret_expr!(expr, $op$(, $arg)?),
                     )*
                 }
             }
@@ -571,7 +571,7 @@ macro_rules! ops {
             pub(crate) fn concretize(self, ctx: Context) -> Result<Op<Concrete>, error::Error> {
                 match self {
                     $(
-                        pat_tree!(tree, $op$(, $arg)?) => ret_concretize!($op, tree, ctx$(, $arg)?),
+                        pat_expr!(expr, $op$(, $arg)?) => ret_concretize!($op, expr, ctx$(, $arg)?),
                     )*
                 }
             }
