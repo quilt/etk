@@ -30,7 +30,7 @@ mod types;
 pub(crate) use self::error::Error;
 
 pub use self::error::UnknownSpecifierError;
-pub use self::expression::{Expression, Terminal};
+pub use self::expression::{Context, Expression, Terminal};
 pub use self::imm::{Imm, Immediate, TryFromSliceError};
 
 pub use self::macros::{
@@ -41,7 +41,6 @@ use self::types::ImmediateTypes;
 pub use self::types::{Abstract, Concrete, Spec};
 
 use std::cmp::{Eq, PartialEq};
-use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
@@ -99,10 +98,6 @@ pub trait Metadata {
     /// How many stack elements this instruction pushes.
     fn pushes(&self) -> usize;
 }
-
-type Labels = HashMap<String, Option<u32>>;
-type Variables = HashMap<String, Expression>;
-type Macros = HashMap<String, MacroDefinition>;
 
 macro_rules! tuple {
     ($arg:ident) => {
@@ -170,24 +165,6 @@ macro_rules! pat_tree {
     };
 }
 
-macro_rules! pat_labels {
-    ($tree:ident, $op:ident) => {
-        Self::$op
-    };
-    ($tree:ident, $op:ident, $arg:ident) => {
-        Self::$op(Imm { $tree, .. })
-    };
-}
-
-macro_rules! ret_labels {
-    ($expr:ident, $macros:ident) => {
-        None
-    };
-    ($expr:ident, $macros:ident, $arg:ident) => {
-        Some($expr.get_labels($macros))
-    };
-}
-
 macro_rules! ret_from_concrete {
     ($op:ident, $raw:ident) => {
         Self::$op
@@ -198,12 +175,12 @@ macro_rules! ret_from_concrete {
 }
 
 macro_rules! ret_concretize {
-    ($op:ident, $tree:ident, $labels:ident, $variables:ident, $macros:ident) => {
+    ($op:ident, $tree:ident, $ctx:ident) => {
         Ok(Op::$op)
     };
-    ($op:ident, $tree:ident, $labels:ident, $variables:ident, $macros:ident, $arg:ident) => {{
+    ($op:ident, $tree:ident, $ctx:ident, $arg:ident) => {{
         let value = $tree
-            .evaluate($labels, $variables, $macros)
+            .eval_with_context($ctx)
             .context(error::Evaluation)?
             .to_bytes_be();
         let value = value.1.as_slice();
@@ -574,7 +551,7 @@ macro_rules! ops {
             }
 
             /// The expression to be pushed on the stack. Only relevant for push instructions.
-            pub(crate) fn get_expression(&self) -> Option<&Expression> {
+            pub(crate) fn expression(&self) -> Option<&Expression> {
                 match self {
                     $(
                         pat_tree!(tree, $op$(, $arg)?) => ret_tree!(tree, $op$(, $arg)?),
@@ -583,7 +560,7 @@ macro_rules! ops {
             }
 
             /// The expression to be pushed on the stack. Only relevant for push instructions.
-            pub(crate) fn get_expression_mut(&mut self) -> Option<&mut Expression> {
+            pub(crate) fn expression_mut(&mut self) -> Option<&mut Expression> {
                 match self {
                     $(
                         pat_tree!(tree, $op$(, $arg)?) => ret_tree!(tree, $op$(, $arg)?),
@@ -591,19 +568,10 @@ macro_rules! ops {
                 }
             }
 
-            /// The labels in an expression. Only relevant for push instructions.
-            pub(crate) fn get_labels(&self, macros: &Macros) -> Option<Result<Vec<String>, expression::Error>> {
+            pub(crate) fn concretize(self, ctx: Context) -> Result<Op<Concrete>, error::Error> {
                 match self {
                     $(
-                        pat_labels!(tree, $op$(, $arg)?) => ret_labels!(tree, macros$(, $arg)?),
-                    )*
-                }
-            }
-
-            pub(crate) fn concretize(self, labels: &Labels, variables: &Variables, macros: &Macros) -> Result<Op<Concrete>, error::Error> {
-                match self {
-                    $(
-                        pat_tree!(tree, $op$(, $arg)?) => ret_concretize!($op, tree, labels, variables, macros$(, $arg)?),
+                        pat_tree!(tree, $op$(, $arg)?) => ret_concretize!($op, tree, ctx$(, $arg)?),
                     )*
                 }
             }
@@ -1111,27 +1079,18 @@ impl AbstractOp {
         Ok(Self::Op(Op::<Abstract>::with_immediate(spec, imm)?))
     }
 
-    pub(crate) fn concretize(
-        self,
-        labels: &Labels,
-        variables: &Variables,
-        macros: &Macros,
-    ) -> Result<Op<Concrete>, error::Error> {
+    pub(crate) fn concretize(self, ctx: Context) -> Result<Op<Concrete>, error::Error> {
         match self {
-            Self::Op(op) => op.concretize(labels, variables, macros),
-            // Self::Push(Imm { tree, ..}) => tree.evaluate(labels, variables, macros),
+            Self::Op(op) => op.concretize(ctx),
             Self::Push(imm) => {
-                let res = imm
-                    .tree
-                    .evaluate(labels, variables, macros)
-                    .context(error::Evaluation)?;
+                let res = imm.tree.eval_with_context(ctx).context(error::Evaluation)?;
                 let size = (res.bits() as u32 + 8 - 1) / 8;
                 let spec = Specifier::push(size).unwrap();
                 let bytes = res.to_bytes_be().1;
                 let start = bytes.len() - spec.extra_len() as usize;
                 AbstractOp::with_immediate(spec, &bytes[start..])
                     .unwrap()
-                    .concretize(labels, variables, macros)
+                    .concretize(ctx)
             }
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),
@@ -1139,28 +1098,19 @@ impl AbstractOp {
         }
     }
 
-    /// The labels in an expression. Only relevant for push instructions.
-    pub fn get_labels(&self, macros: &Macros) -> Option<Result<Vec<String>, expression::Error>> {
-        match self {
-            Self::Op(op) => op.get_labels(macros),
-            Self::Push(imm) => Some(imm.tree.get_labels(macros)),
-            _ => None,
-        }
-    }
-
     /// The expression to be pushed on the stack. Only relevant for push instructions.
-    pub(crate) fn get_expression(&self) -> Option<&Expression> {
+    pub(crate) fn expression(&self) -> Option<&Expression> {
         match self {
-            Self::Op(op) => op.get_expression(),
+            Self::Op(op) => op.expression(),
             Self::Push(Imm { tree, .. }) => Some(tree),
             _ => None,
         }
     }
 
     /// The expression to be pushed on the stack. Only relevant for push instructions.
-    pub(crate) fn get_expression_mut(&mut self) -> Option<&mut Expression> {
+    pub(crate) fn expression_mut(&mut self) -> Option<&mut Expression> {
         match self {
-            Self::Op(op) => op.get_expression_mut(),
+            Self::Op(op) => op.expression_mut(),
             Self::Push(Imm { tree, .. }) => Some(tree),
             _ => None,
         }

@@ -1,6 +1,5 @@
-use super::expression::{self, Expression, Terminal};
+use super::expression::{Expression, Terminal};
 use super::macros::ExpressionMacroInvocation;
-use super::Macros;
 use num_bigint::{BigInt, Sign};
 use snafu::{Backtrace, Snafu};
 use std::convert::TryFrom;
@@ -60,11 +59,6 @@ impl<T> Imm<T> {
     /// Construct an `Imm` with an expression macro.
     pub fn with_macro(m: ExpressionMacroInvocation) -> Self {
         Expression::Macro(m).into()
-    }
-
-    /// Returns all labels referenced in an immediate's expression.
-    pub fn get_labels(&self, macros: &Macros) -> Result<Vec<String>, expression::Error> {
-        self.tree.get_labels(macros)
     }
 }
 

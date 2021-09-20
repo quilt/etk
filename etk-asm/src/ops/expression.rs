@@ -1,12 +1,11 @@
 use super::macros::{ExpressionMacroInvocation, MacroDefinition};
-use super::{Labels, Macros, Variables};
 use num_bigint::BigInt;
 use snafu::OptionExt;
 use snafu::{Backtrace, Snafu};
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 
-/// An error that arises when a label is used without being declared.
+/// An error that arises when an expression cannot be evaluated.
 #[derive(Snafu, Debug)]
 #[snafu(visibility = "pub")]
 pub enum Error {
@@ -24,6 +23,83 @@ pub enum Error {
     #[snafu(display("undefined macro variable `{}`", name))]
     #[non_exhaustive]
     UndefinedVariable { name: String, backtrace: Backtrace },
+}
+
+type LabelsMap = HashMap<String, Option<u32>>;
+type VariablesMap = HashMap<String, Expression>;
+type MacrosMap = HashMap<String, MacroDefinition>;
+
+/// Evaluation context for `Expression`.
+#[derive(Clone, Copy, Debug)]
+pub struct Context<'a> {
+    labels: Option<&'a LabelsMap>,
+    macros: Option<&'a MacrosMap>,
+    variables: Option<&'a VariablesMap>,
+}
+
+impl<'a> Context<'a> {
+    /// Instantiates an empty `Context`.
+    pub fn empty() -> Self {
+        Context {
+            labels: None,
+            macros: None,
+            variables: None,
+        }
+    }
+
+    /// Looks up a label in the current context.
+    pub fn get_label(&self, key: &str) -> Option<&Option<u32>> {
+        match self.labels {
+            Some(labels) => labels.get(key),
+            None => None,
+        }
+    }
+
+    /// Looks up a macro in the current context.
+    pub fn get_macro(&self, key: &str) -> Option<&MacroDefinition> {
+        match self.macros {
+            Some(macros) => macros.get(key),
+            None => None,
+        }
+    }
+
+    /// Looks up a variable in the current context.
+    pub fn get_variable(&self, key: &str) -> Option<&Expression> {
+        match self.variables {
+            Some(variables) => variables.get(key),
+            None => None,
+        }
+    }
+}
+
+impl<'a> From<&'a LabelsMap> for Context<'a> {
+    fn from(labels: &'a LabelsMap) -> Self {
+        Self {
+            labels: Some(labels),
+            macros: None,
+            variables: None,
+        }
+    }
+}
+
+impl<'a> From<(&'a LabelsMap, &'a MacrosMap)> for Context<'a> {
+    fn from(x: (&'a LabelsMap, &'a MacrosMap)) -> Self {
+        Self {
+            labels: Some(x.0),
+            macros: Some(x.1),
+            variables: None,
+        }
+    }
+}
+
+impl<'a> From<(&'a LabelsMap, &'a MacrosMap, &'a VariablesMap)> for Context<'a> {
+    fn from(x: (&'a LabelsMap, &'a MacrosMap, &'a VariablesMap)) -> Self {
+        Self {
+            labels: Some(x.0),
+            macros: Some(x.1),
+            variables: Some(x.2),
+        }
+    }
 }
 
 /// An mathematical expression.
@@ -96,23 +172,23 @@ pub enum Terminal {
 
 impl Terminal {
     /// Evaluates a terminal into an integer value.
-    pub fn evaluate(
-        &self,
-        labels: &Labels,
-        variables: &Variables,
-        macros: &Macros,
-    ) -> Result<BigInt, Error> {
+    pub fn eval(&self) -> Result<BigInt, Error> {
+        self.eval_with_context(Context::empty())
+    }
+
+    /// Evaluates a terminal into an integer value.
+    pub fn eval_with_context(&self, ctx: Context) -> Result<BigInt, Error> {
         let ret = match self {
             Terminal::Number(n) => n.clone(),
-            Terminal::Label(label) => labels
-                .get(label)
+            Terminal::Label(label) => ctx
+                .get_label(label)
                 .context(UnknownLabel { label })?
                 .context(UnknownLabel { label })?
                 .into(),
-            Terminal::Variable(name) => variables
-                .get(name)
+            Terminal::Variable(name) => ctx
+                .get_variable(name)
                 .context(UndefinedVariable { name })?
-                .evaluate(labels, variables, macros)?,
+                .eval_with_context(ctx)?,
         };
 
         Ok(ret)
@@ -121,68 +197,52 @@ impl Terminal {
 
 impl Expression {
     /// Returns the constant value of the expression.
-    pub fn constant(&self) -> Option<BigInt> {
-        self.evaluate(&HashMap::new(), &HashMap::new(), &HashMap::new())
-            .ok()
+    pub fn eval(&self) -> Result<BigInt, Error> {
+        self.eval_with_context(Context::empty())
     }
+
     /// Evaluates the expression, substituting resolved label address for labels.
-    pub fn evaluate(
-        &self,
-        labels: &HashMap<String, Option<u32>>,
-        variables: &HashMap<String, Expression>,
-        macros: &HashMap<String, MacroDefinition>,
-    ) -> Result<BigInt, Error> {
-        fn recursive_eval(
-            e: &Expression,
-            l: &HashMap<String, Option<u32>>,
-            v: &HashMap<String, Expression>,
-            m: &HashMap<String, MacroDefinition>,
-        ) -> Result<BigInt, Error> {
+    pub fn eval_with_context(&self, ctx: Context) -> Result<BigInt, Error> {
+        fn eval(e: &Expression, ctx: Context) -> Result<BigInt, Error> {
             let ret = match e {
-                Expression::Expression(expr) => recursive_eval(expr, l, v, m)?,
-                Expression::Macro(mac) => m
-                    .get(&mac.name)
+                Expression::Expression(expr) => eval(expr, ctx)?,
+                Expression::Macro(mac) => ctx
+                    .get_macro(&mac.name)
                     .context(UnknownMacro {
                         macro_name: mac.name.clone(),
                     })?
                     .unwrap_expression()
                     .content
                     .tree
-                    .evaluate(l, v, m)?,
-                Expression::Terminal(term) => term.evaluate(l, v, m)?,
-                Expression::Plus(lhs, rhs) => {
-                    recursive_eval(lhs, l, v, m)? + recursive_eval(rhs, l, v, m)?
-                }
-                Expression::Minus(lhs, rhs) => {
-                    recursive_eval(lhs, l, v, m)? - recursive_eval(rhs, l, v, m)?
-                }
-                Expression::Times(lhs, rhs) => {
-                    recursive_eval(lhs, l, v, m)? * recursive_eval(rhs, l, v, m)?
-                }
-                Expression::Divide(lhs, rhs) => {
-                    recursive_eval(lhs, l, v, m)? / recursive_eval(rhs, l, v, m)?
-                }
+                    .eval_with_context(ctx)?,
+                Expression::Terminal(term) => term.eval_with_context(ctx)?,
+                Expression::Plus(lhs, rhs) => eval(lhs, ctx)? + eval(rhs, ctx)?,
+                Expression::Minus(lhs, rhs) => eval(lhs, ctx)? - eval(rhs, ctx)?,
+                Expression::Times(lhs, rhs) => eval(lhs, ctx)? * eval(rhs, ctx)?,
+                Expression::Divide(lhs, rhs) => eval(lhs, ctx)? / eval(rhs, ctx)?,
             };
+
             Ok(ret)
         }
+
         // TODO error if top level receives negative value.
-        recursive_eval(self, labels, variables, macros)
+        eval(self, ctx)
     }
 
     /// Returns a list of all labels used in the expression.
-    pub fn get_labels(&self, macros: &Macros) -> Result<Vec<String>, Error> {
-        fn dfs(x: &Expression, m: &Macros) -> Result<Vec<String>, Error> {
+    pub fn labels(&self, macros: &MacrosMap) -> Result<Vec<String>, Error> {
+        fn dfs(x: &Expression, m: &MacrosMap) -> Result<Vec<String>, Error> {
             match x {
                 Expression::Expression(e) => dfs(e, m),
-                Expression::Macro(mac) => m
-                    .get(&mac.name)
+                Expression::Macro(macro_invocation) => m
+                    .get(&macro_invocation.name)
                     .context(UnknownMacro {
-                        macro_name: mac.name.clone(),
+                        macro_name: macro_invocation.name.clone(),
                     })?
                     .unwrap_expression()
                     .content
                     .tree
-                    .get_labels(m),
+                    .labels(m),
                 Expression::Terminal(Terminal::Label(label)) => Ok(vec![label.clone()]),
                 Expression::Terminal(_) => Ok(vec![]),
                 Expression::Plus(lhs, rhs)
@@ -293,9 +353,7 @@ mod tests {
             Terminal::Number(42.into()).into(),
         );
 
-        let out = expr
-            .evaluate(&HashMap::new(), &HashMap::new(), &HashMap::new())
-            .unwrap();
+        let out = expr.eval().unwrap();
         assert_eq!(out, BigInt::from(66));
     }
 
@@ -318,9 +376,7 @@ mod tests {
             )
             .into(),
         );
-        let out = expr
-            .evaluate(&HashMap::new(), &HashMap::new(), &HashMap::new())
-            .unwrap();
+        let out = expr.eval().unwrap();
         assert_eq!(out, BigInt::from(7));
     }
 
@@ -335,9 +391,7 @@ mod tests {
         let mut labels = HashMap::new();
         labels.insert("foo".into(), Some(41));
 
-        let out = expr
-            .evaluate(&labels, &HashMap::new(), &HashMap::new())
-            .unwrap();
+        let out = expr.eval_with_context(Context::from(&labels)).unwrap();
         assert_eq!(out, BigInt::from(42));
     }
 
@@ -348,9 +402,7 @@ mod tests {
             Terminal::Number(1.into()).into(),
         );
 
-        let err = expr
-            .evaluate(&HashMap::new(), &HashMap::new(), &HashMap::new())
-            .unwrap_err();
+        let err = expr.eval().unwrap_err();
         assert_matches!(err, Error::UnknownLabel { label, .. } if label == "foo");
 
         let expr = Expression::Plus(
@@ -361,9 +413,7 @@ mod tests {
         let mut labels = HashMap::new();
         labels.insert("foo".into(), None);
 
-        let err = expr
-            .evaluate(&labels, &HashMap::new(), &HashMap::new())
-            .unwrap_err();
+        let err = expr.eval_with_context(Context::from(&labels)).unwrap_err();
         assert_matches!(err, Error::UnknownLabel { label, .. } if label == "foo");
     }
 }
