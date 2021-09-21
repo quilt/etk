@@ -49,6 +49,7 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
 
 fn parse_radix_str(s: &str, radix: u32) -> Expression {
     let buf: Vec<u8> = s
+        .trim()
         .to_string()
         .chars()
         .map(|c| c.to_digit(radix).unwrap() as u8)

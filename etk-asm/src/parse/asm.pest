@@ -24,9 +24,9 @@ op = @{
 	"basefee" | "invalid"
 }
 push = ${ "push" ~  word_size ~ WHITESPACE ~ operand }
-swap = { "swap" ~ half_word_size }
-dup  = { "dup" ~ half_word_size }
-log = { "log" ~ '0'..'4' }
+swap = @{ "swap" ~ half_word_size }
+dup  = @{ "dup" ~ half_word_size }
+log = @{ "log" ~ '0'..'4' }
 
 word_size = @{ ('1'..'2' ~ '0'..'9') | ("3" ~ '0'..'2') | '1'..'9' }
 half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
@@ -34,12 +34,11 @@ half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
 ////////////////////////
 // instruction macros //
 ////////////////////////
-instruction_macro_definition = !{ "%macro" ~ function_declaration ~ NEWLINE* ~ ((label_definition | instruction_macro_push | op ) ~ NEWLINE)* ~ "%end" }
+instruction_macro_definition = { "%macro" ~ function_declaration ~ NEWLINE* ~ ((label_definition | instruction_macro_push | op ) ~ NEWLINE)* ~ "%end" }
 instruction_macro = !{ "%" ~ function_invocation }
 
-instruction_macro_push = ${ "push" ~  word_size ~ WHITESPACE ~ instruction_macro_operand }
-instruction_macro_operand = _{ selector | instruction_macro_variable | expression_macro | expression }
-instruction_macro_variable = { "$" ~ function_parameter }
+instruction_macro_push = ${ "push" ~  word_size ~ WHITESPACE ~ expression }
+instruction_macro_variable = @{ "$" ~ function_parameter }
 
 local_macro = { instruction_macro_definition | instruction_macro  | expression_macro_definition }
 builtin = ${ "%" ~ ( import | include | include_hex | push_macro ) }
@@ -66,7 +65,7 @@ selector = { "selector(\"" ~ function_declaration ~ "\")" }
 function_declaration = { function_name ~ "(" ~ function_parameter* ~ ("," ~ function_parameter)* ~ ")" }
 function_invocation = _{ function_name ~ "(" ~ operand* ~ ("," ~ operand)* ~ ")" }
 function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
-function_parameter = { ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
+function_parameter = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 
 //////////////
 // operands //
@@ -86,14 +85,14 @@ label_definition = { label ~ ":" }
 ////////////////
 // infix math //
 ////////////////
-expression = { term ~ (operation ~ term)* }
-term = _{ label | number | int | "(" ~ expression ~ ")" }
+expression = !{ term ~ (operation ~ term)* }
+term = _{ instruction_macro_variable | label | number | int | "(" ~ expression ~ ")" }
 int = { ("-")? ~ ASCII_DIGIT+ }
 operation = _{ plus | minus | times | divide }
-plus      = { "+" }
+plus = { "+" }
 minus = { "-" }
 times = { "*" }
-divide   = { "/" }
+divide = { "/" }
 
 ///////////////
 // overrides //

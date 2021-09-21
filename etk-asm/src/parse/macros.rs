@@ -127,9 +127,7 @@ fn parse_expression_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
 
 pub(crate) fn parse_expression_macro(pair: Pair<Rule>) -> Result<Expression, ParseError> {
     let mut pairs = pair.into_inner();
-    println!("{:?}", pairs);
     let name = pairs.next().unwrap();
-    println!("{:?}", name.as_str());
     let mut parameters = Vec::<Expression>::new();
     for pair in pairs {
         let expr = expression::parse(pair)?;

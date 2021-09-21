@@ -438,8 +438,7 @@ mod tests {
             %macro my_macro(foo, bar)
                 gasprice
                 pop
-                push1 $foo
-                push1 $bar
+                push1 $foo + $bar
             %end
             %my_macro(0x42, 10)
             "#,
@@ -452,8 +451,13 @@ mod tests {
                     contents: vec![
                         Op::GasPrice.into(),
                         Op::Pop.into(),
-                        AbstractOp::Op(Op::Push1(Imm::with_variable("foo"))),
-                        AbstractOp::Op(Op::Push1(Imm::with_variable("bar"))),
+                        AbstractOp::Op(Op::Push1(
+                            Expression::Plus(
+                                Terminal::Variable("foo".to_string()).into(),
+                                Terminal::Variable("bar".to_string()).into()
+                            )
+                            .into()
+                        )),
                     ]
                 }
                 .into()
@@ -470,9 +474,8 @@ mod tests {
                 ]
             })
         ];
-        println!("{:?}", parse_asm(&asm));
-        println!("{:?}", expected);
-        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+
+        assert_eq!(parse_asm(&asm).unwrap(), expected)
     }
 
     #[test]

@@ -8,14 +8,12 @@ use std::marker::PhantomData;
 
 /// An error that arises when converting an integer into an immediate.
 #[derive(Snafu, Debug)]
-#[snafu(visibility = "pub")]
 pub struct TryFromIntError {
     backtrace: Backtrace,
 }
 
 /// An error that arises when converting a slice into an immediate.
 #[derive(Snafu, Debug)]
-#[snafu(visibility = "pub")]
 pub struct TryFromSliceError {
     backtrace: Backtrace,
 }
@@ -132,7 +130,6 @@ macro_rules! impl_try_from_slice {
             type Error = TryFromSliceError;
 
             fn try_from(x: &[u8]) -> Result<Self, Self::Error> {
-                println!("trying from slice: {} > {}", x.len(), $ii);
                 if x.len() > $ii {
                     return TryFromSliceContext.fail();
                 }

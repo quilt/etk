@@ -341,7 +341,6 @@ impl Assembler {
     }
 
     fn push_ready(&mut self, rop: RawOp) -> Result<(), Error> {
-        println!("push_ready: {:?}, size: {:?}", rop, rop.size());
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
                 let old = self
