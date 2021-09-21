@@ -216,23 +216,33 @@ impl Assembler {
     /// may remain.
     pub fn finish(self) -> Result<(), Error> {
         if let Some(undef) = self.pending.front() {
+            println!("{:?}", self.pending);
             return match undef {
-                RawOp::Op(op) => match op.expr().map(|e| e.labels(&self.declared_macros)) {
-                    Some(Ok(labels)) => {
-                        let declared: HashSet<_> = self.declared_labels.into_keys().collect();
-                        let invoked: HashSet<_> = labels.into_iter().collect();
-                        let missing = invoked
-                            .difference(&declared)
-                            .cloned()
-                            .collect::<Vec<String>>();
-                        error::UndeclaredLabels { labels: missing }.fail()
+                RawOp::Op(op) => {
+                    match op
+                        .clone()
+                        .concretize((&self.declared_labels, &self.declared_macros).into())
+                    {
+                        Ok(_) => unreachable!(),
+                        Err(ops::Error::Evaluation {
+                            source: expression::Error::UnknownMacro { macro_name, .. },
+                        }) => error::UndeclaredInstructionMacro { macro_name }.fail(),
+                        Err(ops::Error::Evaluation {
+                            source: expression::Error::UnknownLabel { .. },
+                        }) => {
+                            let labels = op.expr().unwrap().labels(&self.declared_macros).unwrap();
+                            let declared: HashSet<_> = self.declared_labels.into_keys().collect();
+                            let invoked: HashSet<_> = labels.into_iter().collect();
+                            let missing = invoked
+                                .difference(&declared)
+                                .cloned()
+                                .collect::<Vec<String>>();
+                            error::UndeclaredLabels { labels: missing }.fail()
+                        }
+                        err => unreachable!("{:?}", err),
                     }
-                    Some(Err(expression::Error::UnknownMacro { macro_name, .. })) => {
-                        error::UndeclaredInstructionMacro { macro_name }.fail()
-                    }
-                    _ => unimplemented!(),
-                },
-                _ => unimplemented!(),
+                }
+                _ => unreachable!(),
             };
         }
 

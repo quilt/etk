@@ -28,24 +28,33 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let pairs = AsmParser::parse(Rule::program, asm)?;
     for pair in pairs {
         let node = match pair.as_rule() {
-            Rule::local_macro => macros::parse(pair)?,
             Rule::builtin => macros::parse_builtin(pair)?,
-            Rule::label_definition => {
-                AbstractOp::Label(pair.into_inner().next().unwrap().as_str().to_string()).into()
-            }
-            Rule::push => parse_push(pair)?.into(),
-            Rule::op => {
-                let spec: Specifier = pair.as_str().parse().unwrap();
-                let op = Op::new(spec).unwrap();
-                let aop = AbstractOp::Op(op);
-                aop.into()
-            }
-            _ => continue,
+            Rule::EOI => continue,
+            _ => parse_abstract_op(pair)?.into(),
         };
         program.push(node);
     }
 
     Ok(program)
+}
+
+fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+    let ret = match pair.as_rule() {
+        Rule::local_macro => macros::parse(pair)?,
+        Rule::label_definition => {
+            AbstractOp::Label(pair.into_inner().next().unwrap().as_str().to_string()).into()
+        }
+        Rule::push => parse_push(pair)?.into(),
+        Rule::op => {
+            let spec: Specifier = pair.as_str().parse().unwrap();
+            let op = Op::new(spec).unwrap();
+            let aop = AbstractOp::Op(op);
+            aop.into()
+        }
+        _ => unreachable!(),
+    };
+
+    Ok(ret)
 }
 
 fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {

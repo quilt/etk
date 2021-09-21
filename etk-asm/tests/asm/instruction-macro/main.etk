@@ -12,6 +12,11 @@
 %macro foobar(tag, gat)
 	push2 $tag
 	push2 $gat
+	push1 delayed_expr(7)
+%end
+
+%def delayed_expr(x)
+	$x + 1
 %end
 
 start:

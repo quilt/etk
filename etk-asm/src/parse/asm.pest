@@ -23,7 +23,7 @@ op = @{
 	"staticcall" | "revert" | "selfdestruct" | "byte" | "chainid" | "selfbalance" |
 	"basefee" | "invalid"
 }
-push = ${ "push" ~  word_size ~ WHITESPACE ~ operand }
+push = ${ "push" ~  word_size ~ WHITESPACE ~ expression }
 swap = @{ "swap" ~ half_word_size }
 dup  = @{ "dup" ~ half_word_size }
 log = @{ "log" ~ '0'..'4' }
@@ -34,11 +34,10 @@ half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
 ////////////////////////
 // instruction macros //
 ////////////////////////
-instruction_macro_definition = { "%macro" ~ function_declaration ~ NEWLINE* ~ ((label_definition | instruction_macro_push | op ) ~ NEWLINE)* ~ "%end" }
-instruction_macro = !{ "%" ~ function_invocation }
-
-instruction_macro_push = ${ "push" ~  word_size ~ WHITESPACE ~ expression }
+instruction_macro_definition = { "%macro" ~ function_declaration ~ NEWLINE* ~ (instruction_macro_stmt ~ NEWLINE)* ~ "%end" }
+instruction_macro_stmt = _{ label_definition | builtin | instruction_macro | push | op }
 instruction_macro_variable = @{ "$" ~ function_parameter }
+instruction_macro = !{ "%" ~ function_invocation }
 
 local_macro = { instruction_macro_definition | instruction_macro  | expression_macro_definition }
 builtin = ${ "%" ~ ( import | include | include_hex | push_macro ) }
@@ -58,20 +57,19 @@ string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }
 ///////////////////////
 // expression macros //
 ///////////////////////
-expression_macro_definition = !{ "%def" ~ function_declaration ~ NEWLINE ~ operand ~ NEWLINE ~ "%end" }
+expression_macro_definition = !{ "%def" ~ function_declaration ~ NEWLINE ~ expression ~ NEWLINE ~ "%end" }
 expression_macro = { function_invocation }
 
-selector = { "selector(\"" ~ function_declaration ~ "\")" }
+selector = ${ "selector(\"" ~ selector_function_declaration ~ "\")" }
+selector_function_declaration = @{ function_name ~ "(" ~ function_parameter* ~ ("," ~ function_parameter)* ~ ")" }
 function_declaration = { function_name ~ "(" ~ function_parameter* ~ ("," ~ function_parameter)* ~ ")" }
-function_invocation = _{ function_name ~ "(" ~ operand* ~ ("," ~ operand)* ~ ")" }
+function_invocation = _{ function_name ~ "(" ~ expression* ~ ("," ~ expression)* ~ ")" }
 function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
 function_parameter = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 
 //////////////
 // operands //
 //////////////
-operand = _{ selector | expression_macro | expression }
-
 number = _{ binary | octal | hex | decimal }
 
 binary = @{ "0b" ~ ASCII_BIN_DIGIT+ }
@@ -86,7 +84,7 @@ label_definition = { label ~ ":" }
 // infix math //
 ////////////////
 expression = !{ term ~ (operation ~ term)* }
-term = _{ instruction_macro_variable | label | number | int | "(" ~ expression ~ ")" }
+term = _{ instruction_macro_variable | selector | expression_macro | label | number | int | "(" ~ expression ~ ")" }
 int = { ("-")? ~ ASCII_DIGIT+ }
 operation = _{ plus | minus | times | divide }
 plus = { "+" }

@@ -1,16 +1,16 @@
 use super::args::Signature;
 use super::error::ParseError;
+use super::expression;
 use super::parser::Rule;
-use super::{expression, parse_push};
 use crate::ast::Node;
 use crate::ops::{
     AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation,
-    InstructionMacroDefinition, InstructionMacroInvocation, Op, Specifier,
+    InstructionMacroDefinition, InstructionMacroInvocation,
 };
 use pest::iterators::Pair;
 use std::path::PathBuf;
 
-pub(crate) fn parse(pair: Pair<Rule>) -> Result<Node, ParseError> {
+pub(crate) fn parse(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let mut pairs = pair.into_inner();
     let pair = pairs.next().unwrap();
 
@@ -47,10 +47,11 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
         }
         _ => unreachable!(),
     };
+
     Ok(node)
 }
 
-fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
+fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let mut pairs = pair.into_inner();
 
     let mut macro_defn = pairs.next().unwrap().into_inner();
@@ -63,24 +64,7 @@ fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
 
     let mut contents = Vec::<AbstractOp>::new();
     for pair in pairs {
-        match pair.as_rule() {
-            Rule::label_definition => {
-                let mut pair = pair.into_inner();
-                let label = pair.next().unwrap();
-                let txt = label.as_str();
-                contents.push(AbstractOp::Label(txt.to_string()));
-            }
-            Rule::instruction_macro_push => {
-                contents.push(parse_push(pair)?);
-            }
-            Rule::op => {
-                let spec: Specifier = pair.as_str().parse().unwrap();
-                let op = Op::new(spec).unwrap();
-                let aop = AbstractOp::Op(op);
-                contents.push(aop);
-            }
-            _ => continue,
-        }
+        contents.push(super::parse_abstract_op(pair)?);
     }
 
     let defn = InstructionMacroDefinition {
@@ -88,10 +72,11 @@ fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
         parameters,
         contents,
     };
+
     Ok(defn.into())
 }
 
-fn parse_instruction_macro(pair: Pair<Rule>) -> Result<Node, ParseError> {
+fn parse_instruction_macro(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let mut pairs = pair.into_inner();
     let name = pairs.next().unwrap();
     let mut parameters = Vec::<Expression>::new();
@@ -103,10 +88,11 @@ fn parse_instruction_macro(pair: Pair<Rule>) -> Result<Node, ParseError> {
         name: name.as_str().to_string(),
         parameters,
     };
-    Ok(AbstractOp::Macro(invocation).into())
+
+    Ok(AbstractOp::Macro(invocation))
 }
 
-fn parse_expression_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
+fn parse_expression_macro_defn(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let mut pairs = pair.into_inner();
 
     let mut macro_defn = pairs.next().unwrap().into_inner();
@@ -122,6 +108,7 @@ fn parse_expression_macro_defn(pair: Pair<Rule>) -> Result<Node, ParseError> {
         parameters,
         content: expression::parse(pairs.next().unwrap())?.into(),
     };
+
     Ok(defn.into())
 }
 

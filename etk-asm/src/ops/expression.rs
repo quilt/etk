@@ -206,15 +206,26 @@ impl Expression {
         fn eval(e: &Expression, ctx: Context) -> Result<BigInt, Error> {
             let ret = match e {
                 Expression::Expression(expr) => eval(expr, ctx)?,
-                Expression::Macro(mac) => ctx
-                    .get_macro(&mac.name)
-                    .context(UnknownMacro {
-                        macro_name: mac.name.clone(),
-                    })?
-                    .unwrap_expression()
-                    .content
-                    .tree
-                    .eval_with_context(ctx)?,
+                Expression::Macro(invc) => {
+                    let defn = ctx.get_macro(&invc.name).context(UnknownMacro {
+                        macro_name: invc.name.clone(),
+                    })?;
+
+                    let vars = defn
+                        .parameters()
+                        .iter()
+                        .cloned()
+                        .zip(invc.parameters.iter().cloned())
+                        .collect();
+
+                    let mut ctx = ctx.clone();
+                    ctx.variables = Some(&vars);
+
+                    defn.unwrap_expression()
+                        .content
+                        .tree
+                        .eval_with_context(ctx)?
+                }
                 Expression::Terminal(term) => term.eval_with_context(ctx)?,
                 Expression::Plus(lhs, rhs) => eval(lhs, ctx)? + eval(rhs, ctx)?,
                 Expression::Minus(lhs, rhs) => eval(lhs, ctx)? - eval(rhs, ctx)?,
