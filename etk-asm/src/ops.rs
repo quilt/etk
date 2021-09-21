@@ -1,14 +1,22 @@
 //! Definitions of all instructions supported by the assembler.
 
 mod error {
-    use super::expression;
+    use super::{expression, Specifier};
+    use num_bigint::BigInt;
     use snafu::{Backtrace, Snafu};
 
     #[derive(Snafu, Debug)]
     #[snafu(visibility = "pub(crate)")]
     pub(crate) enum Error {
-        Evaluation { source: expression::Error },
-        SpecifierCoercion,
+        EvaluationError {
+            source: expression::Error,
+            backtrace: Backtrace,
+        },
+        ExpressionTooLarge {
+            value: BigInt,
+            spec: Specifier,
+            backtrace: Backtrace,
+        },
     }
 
     /// The error that can arise while parsing a specifier from a string.
@@ -181,16 +189,19 @@ macro_rules! ret_concretize {
     ($op:ident, $tree:ident, $ctx:ident, $arg:ident) => {{
         let value = $tree
             .eval_with_context($ctx)
-            .context(error::Evaluation)?
-            .to_bytes_be()
-            .1;
+            .context(error::EvaluationError)?;
+        let bytes = value.to_bytes_be().1;
 
         let mut buf = <Concrete as ImmediateTypes>::$arg::default();
-        if value.len() > buf.len() {
-            error::SpecifierCoercion.fail()
+        if bytes.len() > buf.len() {
+            error::ExpressionTooLarge {
+                value,
+                spec: Specifier::from(buf.len() as u8),
+            }
+            .fail()
         } else {
-            let start = buf.len() - value.len();
-            buf[start..].copy_from_slice(&value);
+            let start = buf.len() - bytes.len();
+            buf[start..].copy_from_slice(&bytes);
             Ok(Op::$op(buf))
         }
     }};
@@ -1083,7 +1094,10 @@ impl AbstractOp {
         match self {
             Self::Op(op) => op.concretize(ctx),
             Self::Push(imm) => {
-                let res = imm.tree.eval_with_context(ctx).context(error::Evaluation)?;
+                let res = imm
+                    .tree
+                    .eval_with_context(ctx)
+                    .context(error::EvaluationError)?;
                 let size = (res.bits() as u32 + 8 - 1) / 8;
                 let spec = Specifier::push(size).unwrap();
                 let bytes = res.to_bytes_be().1;

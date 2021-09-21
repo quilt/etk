@@ -6,7 +6,7 @@
 mod error {
     use crate::ops::{Expression, Specifier};
     use crate::ParseError;
-
+    use num_bigint::BigInt;
     use snafu::{Backtrace, Snafu};
 
     /// Errors that can occur while assembling instructions.
@@ -46,6 +46,9 @@ mod error {
         ExpressionTooLarge {
             /// The oversized expression.
             expr: Expression,
+
+            /// The evaluated value of the expression.
+            value: BigInt,
 
             /// The specifier.
             spec: Specifier,
@@ -237,11 +240,13 @@ impl Assembler {
                         .concretize((&self.declared_labels, &self.declared_macros).into())
                     {
                         Ok(_) => unreachable!(),
-                        Err(ops::Error::Evaluation {
+                        Err(ops::Error::EvaluationError {
                             source: expression::Error::UnknownMacro { name, .. },
+                            ..
                         }) => error::UndeclaredExpressionMacro { name }.fail(),
-                        Err(ops::Error::Evaluation {
+                        Err(ops::Error::EvaluationError {
                             source: expression::Error::UnknownLabel { .. },
+                            ..
                         }) => {
                             let labels = op.expr().unwrap().labels(&self.declared_macros).unwrap();
                             let declared: HashSet<_> = self.declared_labels.into_keys().collect();
@@ -252,10 +257,9 @@ impl Assembler {
                                 .collect::<Vec<String>>();
                             error::UndeclaredLabels { labels: missing }.fail()
                         }
-                        err => unreachable!("{:?}", err),
+                        _ => unreachable!(),
                     }
                 }
-
                 _ => unreachable!(),
             };
         }
@@ -289,7 +293,7 @@ impl Assembler {
 
     /// Insert explicilty declared macros and labels, via `AbstractOp`, and implictly declared
     /// macros and labels via usage in `Op`.
-    pub fn declare_content(&mut self, rop: &RawOp) -> Result<(), Error> {
+    fn declare_content(&mut self, rop: &RawOp) -> Result<(), Error> {
         match rop {
             RawOp::Op(AbstractOp::Label(ref label)) => {
                 match self.declared_labels.entry(label.to_owned()) {
@@ -315,9 +319,8 @@ impl Assembler {
             _ => (),
         };
 
-        // 1. get all labels used by `rop`
-        // 2. check if they've been defined
-        // 3. if not, note them as "undeclared"
+        // Get all labels used by `rop`, check if they've been defined, and if not, note them as
+        // "undeclared".
         if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
             for label in labels {
                 if !self.declared_labels.contains_key(&label) {
@@ -349,7 +352,6 @@ impl Assembler {
         }
 
         self.push_unchecked(rop)?;
-
         Ok(self.ready.len())
     }
 
@@ -393,10 +395,11 @@ impl Assembler {
                         self.concrete_len += cop.size();
                         cop.assemble(&mut self.ready);
                     }
-                    Err(ops::Error::SpecifierCoercion { .. }) => {
+                    Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
                         return error::ExpressionTooLarge {
                             expr: op.expr().unwrap().clone(),
-                            spec: op.specifier().unwrap(),
+                            value,
+                            spec,
                         }
                         .fail()
                     }
@@ -429,13 +432,10 @@ impl Assembler {
                 size = raw.len() as u32;
                 self.ready.extend(raw);
             }
-            RawOp::Op(AbstractOp::Macro(m)) => match self.expand_macro(&m.name, &m.parameters)? {
-                Some(n) => size = n as u32,
-                None => size = 0,
-            },
             RawOp::Op(aop) => {
                 let cop = aop
                     .concretize((&self.declared_labels, &self.declared_macros).into())
+                    // Already able to concretize in `push_pending` loop.
                     .unwrap();
                 size = cop.size();
                 cop.assemble(&mut self.ready);
@@ -524,14 +524,16 @@ impl Assembler {
                     let front = self.pending.front_mut().unwrap();
                     *front = RawOp::Op(cop.into());
                 }
-                Err(ops::Error::SpecifierCoercion) => {
+                Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
                     return error::ExpressionTooLarge {
                         expr: op.expr().unwrap().clone(),
-                        spec: op.specifier().unwrap(),
+                        value,
+                        spec,
                     }
                     .fail();
                 }
                 Err(_) => {
+                    // Still waiting for some definition.
                     break;
                 }
             }
