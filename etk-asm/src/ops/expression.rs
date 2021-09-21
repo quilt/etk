@@ -173,7 +173,7 @@ impl Terminal {
         self.eval_with_context(Context::empty())
     }
 
-    /// Evaluates a terminal into an integer value.
+    /// Evaluates a terminal into an integer value, with a given given `Context`..
     pub fn eval_with_context(&self, ctx: Context) -> Result<BigInt, Error> {
         let ret = match self {
             Terminal::Number(n) => n.clone(),
@@ -198,7 +198,7 @@ impl Expression {
         self.eval_with_context(Context::empty())
     }
 
-    /// Evaluates the expression, substituting resolved label address for labels.
+    /// Evaluates the expression given a certain `Context`.
     pub fn eval_with_context(&self, ctx: Context) -> Result<BigInt, Error> {
         fn eval(e: &Expression, ctx: Context) -> Result<BigInt, Error> {
             let ret = match e {
