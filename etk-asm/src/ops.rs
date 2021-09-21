@@ -17,6 +17,10 @@ mod error {
             spec: Specifier,
             backtrace: Backtrace,
         },
+        ExpressionNegative {
+            value: BigInt,
+            backtrace: Backtrace,
+        },
     }
 
     /// The error that can arise while parsing a specifier from a string.
@@ -190,7 +194,13 @@ macro_rules! ret_concretize {
         let value = $tree
             .eval_with_context($ctx)
             .context(error::EvaluationError)?;
-        let bytes = value.to_bytes_be().1;
+        let (sign, bytes) = value.to_bytes_be();
+
+        if sign == num_bigint::Sign::Minus {
+            return error::ExpressionNegative {
+                value
+            }.fail()
+        }
 
         let mut buf = <Concrete as ImmediateTypes>::$arg::default();
         if bytes.len() > buf.len() {

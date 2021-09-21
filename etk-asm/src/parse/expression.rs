@@ -32,7 +32,13 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
             Rule::binary => parse_radix_str(&txt[2..], 2),
             Rule::octal => parse_radix_str(&txt[2..], 8),
             Rule::hex => parse_radix_str(&txt[2..], 16),
-            Rule::decimal | Rule::int => parse_radix_str(txt, 10),
+            Rule::decimal => parse_radix_str(txt, 10),
+            Rule::negative_decimal => {
+                let expr = parse_radix_str(&txt[1..], 10);
+                BigInt::from_radix_be(Sign::Minus, &expr.eval().unwrap().to_bytes_be().1, 10)
+                    .unwrap()
+                    .into()
+            }
             Rule::label => Terminal::Label(txt.to_string()).into(),
             Rule::selector => parse_selector(pair),
             Rule::expression_macro => macros::parse_expression_macro(pair).unwrap(),

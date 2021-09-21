@@ -490,14 +490,17 @@ mod tests {
     fn parse_expression() {
         let asm = format!(
             r#"
-            push1 1+1
+            push1 1+-1
             push1 2*foo
             push1 (1+(2*foo))-(bar/42)
             push1 0x20+0o1+0b10
             "#,
         );
         let expected = nodes![
-            Op::Push1(Imm::with_expression(Expression::Plus(1.into(), 1.into(),))),
+            Op::Push1(Imm::with_expression(Expression::Plus(
+                1.into(),
+                BigInt::from(-1).into(),
+            ))),
             Op::Push1(Imm::with_expression(Expression::Times(
                 2.into(),
                 Terminal::Label("foo".into()).into()

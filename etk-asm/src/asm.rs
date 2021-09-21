@@ -38,8 +38,9 @@ mod error {
 
         /// A push instruction was too small for the result of the expression.
         #[snafu(display(
-            "value of expression `{}` was too large for the specifier {}",
+            "the expression `{}={}` was too large for the specifier {}",
             expr,
+            value,
             spec
         ))]
         #[non_exhaustive]
@@ -52,6 +53,23 @@ mod error {
 
             /// The specifier.
             spec: Specifier,
+
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
+
+        /// An expression evaluated to a negative number.
+        #[snafu(display(
+            "the expression `{}={}` is negative and can't be represented as push operand",
+            expr,
+            value
+        ))]
+        ExpressionNegative {
+            /// The oversized expression.
+            expr: Expression,
+
+            /// The evaluated value of the expression.
+            value: BigInt,
 
             /// The location of the error.
             backtrace: Backtrace,
@@ -400,6 +418,13 @@ impl Assembler {
                             expr: op.expr().unwrap().clone(),
                             value,
                             spec,
+                        }
+                        .fail()
+                    }
+                    Err(ops::Error::ExpressionNegative { value, .. }) => {
+                        return error::ExpressionNegative {
+                            expr: op.expr().unwrap().clone(),
+                            value,
                         }
                         .fail()
                     }
@@ -1151,6 +1176,18 @@ mod tests {
         assert_eq!(sz, 2);
         let out = asm.take();
         assert_eq!(out, hex!("6002"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_expression_negative() -> Result<(), Error> {
+        let ops = vec![AbstractOp::Op(Op::Push1(Imm::with_expression(
+            BigInt::from(-1).into(),
+        )))];
+        let mut asm = Assembler::new();
+        let err = asm.push_all(ops).unwrap_err();
+        assert_matches!(err, Error::ExpressionNegative { value, .. } if value == BigInt::from(-1));
 
         Ok(())
     }

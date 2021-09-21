@@ -84,8 +84,8 @@ label_definition = { label ~ ":" }
 // infix math //
 ////////////////
 expression = !{ term ~ (operation ~ term)* }
-term = _{ instruction_macro_variable | selector | expression_macro | label | number | int | "(" ~ expression ~ ")" }
-int = { ("-")? ~ ASCII_DIGIT+ }
+term = _{ instruction_macro_variable | selector | expression_macro | label | number | negative_decimal | "(" ~ expression ~ ")" }
+negative_decimal = @{ "-" ~ ASCII_DIGIT+ }
 operation = _{ plus | minus | times | divide }
 plus = { "+" }
 minus = { "-" }
