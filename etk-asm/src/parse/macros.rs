@@ -18,7 +18,7 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
         Rule::instruction_macro_definition => parse_instruction_macro_defn(pair),
         Rule::instruction_macro => parse_instruction_macro(pair),
         Rule::expression_macro_definition => parse_expression_macro_defn(pair),
-        rule => unreachable!("unreachable macro type: {:?}", rule),
+        _ => unreachable!(),
     }
 }
 
