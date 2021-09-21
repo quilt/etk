@@ -8,7 +8,7 @@ mod error {
     #[derive(Snafu, Debug)]
     #[snafu(visibility = "pub(crate)")]
     pub(crate) enum Error {
-        EvaluationError {
+        ContextIncomplete {
             source: expression::Error,
             backtrace: Backtrace,
         },
@@ -193,13 +193,11 @@ macro_rules! ret_concretize {
     ($op:ident, $tree:ident, $ctx:ident, $arg:ident) => {{
         let value = $tree
             .eval_with_context($ctx)
-            .context(error::EvaluationError)?;
+            .context(error::ContextIncomplete)?;
         let (sign, bytes) = value.to_bytes_be();
 
         if sign == num_bigint::Sign::Minus {
-            return error::ExpressionNegative {
-                value
-            }.fail()
+            return error::ExpressionNegative { value }.fail();
         }
 
         let mut buf = <Concrete as ImmediateTypes>::$arg::default();
@@ -1107,7 +1105,7 @@ impl AbstractOp {
                 let res = imm
                     .tree
                     .eval_with_context(ctx)
-                    .context(error::EvaluationError)?;
+                    .context(error::ContextIncomplete)?;
                 let size = (res.bits() as u32 + 8 - 1) / 8;
                 let spec = Specifier::push(size).unwrap();
                 let bytes = res.to_bytes_be().1;

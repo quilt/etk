@@ -258,11 +258,11 @@ impl Assembler {
                         .concretize((&self.declared_labels, &self.declared_macros).into())
                     {
                         Ok(_) => unreachable!(),
-                        Err(ops::Error::EvaluationError {
+                        Err(ops::Error::ContextIncomplete {
                             source: expression::Error::UnknownMacro { name, .. },
                             ..
                         }) => error::UndeclaredExpressionMacro { name }.fail(),
-                        Err(ops::Error::EvaluationError {
+                        Err(ops::Error::ContextIncomplete {
                             source: expression::Error::UnknownLabel { .. },
                             ..
                         }) => {
