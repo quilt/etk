@@ -49,6 +49,9 @@ mod error {
 
             /// The specifier.
             spec: Specifier,
+
+            /// The location of the error.
+            backtrace: Backtrace,
         },
 
         /// The value provided to an unsized push (`%push`) was too large.
@@ -223,8 +226,11 @@ impl Assembler {
     /// may remain.
     pub fn finish(self) -> Result<(), Error> {
         if let Some(undef) = self.pending.front() {
-            println!("{:?}", self.pending);
             return match undef {
+                RawOp::Op(AbstractOp::Macro(invc)) => error::UndeclaredInstructionMacro {
+                    name: invc.name.clone(),
+                }
+                .fail(),
                 RawOp::Op(op) => {
                     match op
                         .clone()
@@ -249,6 +255,7 @@ impl Assembler {
                         err => unreachable!("{:?}", err),
                     }
                 }
+
                 _ => unreachable!(),
             };
         }
@@ -455,7 +462,7 @@ impl Assembler {
             }
         }
 
-        // Handle labels.
+        // Handle new label and macro definitions.
         match (self.pending_len, rop) {
             (Some(pending_len), RawOp::Op(AbstractOp::Label(lbl))) => {
                 // The label has a defined address.
@@ -469,7 +476,14 @@ impl Assembler {
                     self.choose_sizes()?;
                 }
             }
-            (_, RawOp::Op(AbstractOp::MacroDefinition(_))) => (),
+            (_, RawOp::Op(AbstractOp::MacroDefinition(defn))) => {
+                if let Some(RawOp::Op(AbstractOp::Macro(invc))) = self.pending.front().cloned() {
+                    if defn.name() == &invc.name {
+                        self.pending.pop_front();
+                        self.expand_macro(&invc.name, &invc.parameters)?;
+                    }
+                }
+            }
             (_, rop) => {
                 // Not a label.
                 self.pending.push_back(rop);
@@ -491,6 +505,10 @@ impl Assembler {
                     }
                 }
                 RawOp::Op(AbstractOp::Label(_)) => unreachable!(),
+                RawOp::Op(AbstractOp::Macro(_)) => {
+                    // Still waiting on more macros.
+                    break;
+                }
                 RawOp::Op(op) => op,
                 RawOp::Raw(_) => {
                     self.pop_pending()?;
@@ -652,7 +670,17 @@ impl Assembler {
 
                 Ok(Some(self.push_all(m.contents)?))
             }
-            _ => error::UndeclaredInstructionMacro { name }.fail(),
+            _ => {
+                assert_eq!(self.pending_len, Some(0));
+                self.pending_len = None;
+                self.pending.push_back(RawOp::Op(AbstractOp::Macro(
+                    ops::InstructionMacroInvocation {
+                        name: name.to_string(),
+                        parameters: parameters.to_vec(),
+                    },
+                )));
+                Ok(None)
+            }
         }
     }
 }
@@ -958,12 +986,45 @@ mod tests {
     }
 
     #[test]
+    fn assemble_instruction_macro_delayed_definition() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::Label("b".into()),
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![],
+            }),
+            InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![
+                    AbstractOp::Label("a".into()),
+                    AbstractOp::Op(Op::JumpDest),
+                    AbstractOp::Op(Op::Push1(Imm::with_label("a"))),
+                    AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
+                ],
+            }
+            .into(),
+        ];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 8);
+        let out = asm.take();
+        assert_eq!(out, hex!("5b60005b60036000"));
+
+        Ok(())
+    }
+
+    #[test]
     fn assemble_undeclared_instruction_macro() -> Result<(), Error> {
         let ops = vec![AbstractOp::Macro(
             InstructionMacroInvocation::with_zero_parameters("my_macro".into()),
         )];
         let mut asm = Assembler::new();
-        let err = asm.push_all(ops).unwrap_err();
+        asm.push_all(ops)?;
+        let err = asm.finish().unwrap_err();
         assert_matches!(err, Error::UndeclaredInstructionMacro { name, .. } if name == "my_macro");
 
         Ok(())
