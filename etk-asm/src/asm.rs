@@ -627,11 +627,9 @@ impl Assembler {
                     }
 
                     // Attempt to fill in parameters
-                    if op.expr().is_some() {
-                        if let Ok(cop) = op.clone().concretize(
-                            (&self.declared_labels, &self.declared_macros, &parameters).into(),
-                        ) {
-                            *op = cop.into();
+                    if let Some(expr) = op.expr_mut() {
+                        for (name, value) in parameters.iter() {
+                            expr.fill_variable(name, value)
                         }
                     }
                 }

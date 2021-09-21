@@ -281,6 +281,30 @@ impl Expression {
 
         dfs(self, old, new)
     }
+
+    /// Replaces all instances of `var` with `expr` in the expression.
+    pub fn fill_variable(&mut self, var: &str, expr: &Expression) {
+        fn dfs(x: &mut Expression, var: &str, expr: &Expression) {
+            match x {
+                Expression::Terminal(Terminal::Variable(name)) => {
+                    if var == name {
+                        *x = expr.clone();
+                    }
+                }
+                Expression::Expression(e) => dfs(e, var, expr),
+                Expression::Plus(lhs, rhs)
+                | Expression::Minus(lhs, rhs)
+                | Expression::Times(lhs, rhs)
+                | Expression::Divide(lhs, rhs) => {
+                    dfs(lhs, var, expr);
+                    dfs(rhs, var, expr);
+                }
+                Expression::Macro(_) | Expression::Terminal(_) => (),
+            }
+        }
+
+        dfs(self, var, expr)
+    }
 }
 
 impl Debug for Terminal {
