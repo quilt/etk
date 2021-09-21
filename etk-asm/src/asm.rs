@@ -4,7 +4,7 @@
 //! [`mod@crate::ingest`] module for a higher-level interface.
 
 mod error {
-    use crate::ops::Expression;
+    use crate::ops::{Expression, Specifier};
     use crate::ParseError;
 
     use snafu::{Backtrace, Snafu};
@@ -26,30 +26,29 @@ mod error {
         },
 
         /// A macro was declared multiple times.
-        #[snafu(display("macro `{}` declared multiple times", macro_name))]
+        #[snafu(display("macro `{}` declared multiple times", name))]
         #[non_exhaustive]
         DuplicateMacro {
             /// The name of the conflicting macro.
-            macro_name: String,
+            name: String,
 
             /// The location of the error.
             backtrace: Backtrace,
         },
 
         /// A push instruction was too small for the result of the expression.
-        #[snafu(display("value of expression `{}` was too large for the given opcode", expr))]
+        #[snafu(display(
+            "value of expression `{}` was too large for the specifier {}",
+            expr,
+            spec
+        ))]
         #[non_exhaustive]
         ExpressionTooLarge {
             /// The oversized expression.
             expr: Expression,
-        },
 
-        /// The value provided to a sized push was too large.
-        #[snafu(display("value was too large for chosen push"))]
-        #[non_exhaustive]
-        SizedPushTooLarge {
-            /// The location of the error.
-            backtrace: Backtrace,
+            /// The specifier.
+            spec: Specifier,
         },
 
         /// The value provided to an unsized push (`%push`) was too large.
@@ -71,12 +70,23 @@ mod error {
             backtrace: Backtrace,
         },
 
-        /// A macro was used without being defined.
-        #[snafu(display("macro `{}` was never defined", macro_name))]
+        /// An instruction macro was used without being defined.
+        #[snafu(display("instruction macro `{}` was never defined", name))]
         #[non_exhaustive]
         UndeclaredInstructionMacro {
             /// The macro that was used without being defined.
-            macro_name: String,
+            name: String,
+
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
+
+        /// An expression macro was used without being defined.
+        #[snafu(display("expression macro `{}` was never defined", name))]
+        #[non_exhaustive]
+        UndeclaredExpressionMacro {
+            /// The macro that was used without being defined.
+            name: String,
 
             /// The location of the error.
             backtrace: Backtrace,
@@ -94,13 +104,10 @@ mod error {
     }
 }
 
+pub use self::error::Error;
 use crate::ops::expression::{self, Terminal};
 use crate::ops::{self, AbstractOp, Expression, Imm, MacroDefinition, Specifier};
-
-pub use self::error::Error;
-
 use snafu::OptionExt;
-
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
@@ -225,8 +232,8 @@ impl Assembler {
                     {
                         Ok(_) => unreachable!(),
                         Err(ops::Error::Evaluation {
-                            source: expression::Error::UnknownMacro { macro_name, .. },
-                        }) => error::UndeclaredInstructionMacro { macro_name }.fail(),
+                            source: expression::Error::UnknownMacro { name, .. },
+                        }) => error::UndeclaredExpressionMacro { name }.fail(),
                         Err(ops::Error::Evaluation {
                             source: expression::Error::UnknownLabel { .. },
                         }) => {
@@ -291,10 +298,7 @@ impl Assembler {
             RawOp::Op(AbstractOp::MacroDefinition(ref defn)) => {
                 match self.declared_macros.entry(defn.name().to_owned()) {
                     hash_map::Entry::Occupied(_) => {
-                        return error::DuplicateMacro {
-                            macro_name: defn.name(),
-                        }
-                        .fail()
+                        return error::DuplicateMacro { name: defn.name() }.fail()
                     }
                     hash_map::Entry::Vacant(v) => {
                         v.insert(defn.to_owned());
@@ -385,6 +389,7 @@ impl Assembler {
                     Err(ops::Error::SpecifierCoercion { .. }) => {
                         return error::ExpressionTooLarge {
                             expr: op.expr().unwrap().clone(),
+                            spec: op.specifier().unwrap(),
                         }
                         .fail()
                     }
@@ -504,6 +509,7 @@ impl Assembler {
                 Err(ops::Error::SpecifierCoercion) => {
                     return error::ExpressionTooLarge {
                         expr: op.expr().unwrap().clone(),
+                        spec: op.specifier().unwrap(),
                     }
                     .fail();
                 }
@@ -646,7 +652,7 @@ impl Assembler {
 
                 Ok(Some(self.push_all(m.contents)?))
             }
-            _ => error::UndeclaredInstructionMacro { macro_name: name }.fail(),
+            _ => error::UndeclaredInstructionMacro { name }.fail(),
         }
     }
 }
@@ -958,7 +964,7 @@ mod tests {
         )];
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
-        assert_matches!(err, Error::UndeclaredInstructionMacro { macro_name, .. } if macro_name == "my_macro");
+        assert_matches!(err, Error::UndeclaredInstructionMacro { name, .. } if name == "my_macro");
 
         Ok(())
     }
@@ -981,7 +987,7 @@ mod tests {
         ];
         let mut asm = Assembler::new();
         let err = asm.push_all(ops).unwrap_err();
-        assert_matches!(err, Error::DuplicateMacro { macro_name, .. } if macro_name == "my_macro");
+        assert_matches!(err, Error::DuplicateMacro { name, .. } if name == "my_macro");
 
         Ok(())
     }

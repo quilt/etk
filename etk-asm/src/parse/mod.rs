@@ -42,14 +42,13 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let ret = match pair.as_rule() {
         Rule::local_macro => macros::parse(pair)?,
         Rule::label_definition => {
-            AbstractOp::Label(pair.into_inner().next().unwrap().as_str().to_string()).into()
+            AbstractOp::Label(pair.into_inner().next().unwrap().as_str().to_string())
         }
-        Rule::push => parse_push(pair)?.into(),
+        Rule::push => parse_push(pair)?,
         Rule::op => {
             let spec: Specifier = pair.as_str().parse().unwrap();
             let op = Op::new(spec).unwrap();
-            let aop = AbstractOp::Op(op);
-            aop.into()
+            AbstractOp::Op(op)
         }
         _ => unreachable!(),
     };

@@ -13,12 +13,9 @@ pub enum Error {
     #[non_exhaustive]
     UnknownLabel { label: String, backtrace: Backtrace },
 
-    #[snafu(display("unknown macro `{}`", macro_name))]
+    #[snafu(display("unknown macro `{}`", name))]
     #[non_exhaustive]
-    UnknownMacro {
-        macro_name: String,
-        backtrace: Backtrace,
-    },
+    UnknownMacro { name: String, backtrace: Backtrace },
 
     #[snafu(display("undefined macro variable `{}`", name))]
     #[non_exhaustive]
@@ -208,7 +205,7 @@ impl Expression {
                 Expression::Expression(expr) => eval(expr, ctx)?,
                 Expression::Macro(invc) => {
                     let defn = ctx.get_macro(&invc.name).context(UnknownMacro {
-                        macro_name: invc.name.clone(),
+                        name: invc.name.clone(),
                     })?;
 
                     let vars = defn
@@ -218,7 +215,7 @@ impl Expression {
                         .zip(invc.parameters.iter().cloned())
                         .collect();
 
-                    let mut ctx = ctx.clone();
+                    let mut ctx = ctx;
                     ctx.variables = Some(&vars);
 
                     defn.unwrap_expression()
@@ -248,7 +245,7 @@ impl Expression {
                 Expression::Macro(macro_invocation) => m
                     .get(&macro_invocation.name)
                     .context(UnknownMacro {
-                        macro_name: macro_invocation.name.clone(),
+                        name: macro_invocation.name.clone(),
                     })?
                     .unwrap_expression()
                     .content
