@@ -66,7 +66,6 @@ fn parse_radix_str(s: &str, radix: u32) -> Expression {
 }
 
 fn parse_selector(pair: Pair<Rule>) -> Expression {
-    println!("{:?}", pair);
     let raw = pair.into_inner().next().unwrap().as_str();
     let mut hasher = Keccak256::new();
     hasher.update(raw.as_bytes());
