@@ -9,8 +9,8 @@ mod error {
     #[snafu(visibility = "pub(crate)")]
     pub(crate) enum Error {
         ContextIncomplete {
+            #[snafu(backtrace)]
             source: expression::Error,
-            backtrace: Backtrace,
         },
         ExpressionTooLarge {
             value: BigInt,
