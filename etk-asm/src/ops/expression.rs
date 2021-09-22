@@ -27,7 +27,7 @@ type VariablesMap = HashMap<String, Expression>;
 type MacrosMap = HashMap<String, MacroDefinition>;
 
 /// Evaluation context for `Expression`.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Context<'a> {
     labels: Option<&'a LabelsMap>,
     macros: Option<&'a MacrosMap>,
@@ -35,15 +35,6 @@ pub struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    /// Instantiates an empty `Context`.
-    pub fn empty() -> Self {
-        Context {
-            labels: None,
-            macros: None,
-            variables: None,
-        }
-    }
-
     /// Looks up a label in the current context.
     pub fn get_label(&self, key: &str) -> Option<&Option<u32>> {
         match self.labels {
@@ -157,7 +148,7 @@ impl fmt::Display for Expression {
 /// A terminal value in an expression.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Terminal {
-    /// A integer value.
+    /// An integer value.
     Number(BigInt),
 
     /// A label.
@@ -170,7 +161,7 @@ pub enum Terminal {
 impl Terminal {
     /// Evaluates a terminal into an integer value.
     pub fn eval(&self) -> Result<BigInt, Error> {
-        self.eval_with_context(Context::empty())
+        self.eval_with_context(Context::default())
     }
 
     /// Evaluates a terminal into an integer value, with a given given `Context`..
@@ -195,7 +186,7 @@ impl Terminal {
 impl Expression {
     /// Returns the constant value of the expression.
     pub fn eval(&self) -> Result<BigInt, Error> {
-        self.eval_with_context(Context::empty())
+        self.eval_with_context(Context::default())
     }
 
     /// Evaluates the expression given a certain `Context`.

@@ -502,8 +502,9 @@ impl Assembler {
                 }
             }
             (_, RawOp::Op(AbstractOp::MacroDefinition(defn))) => {
-                if let Some(RawOp::Op(AbstractOp::Macro(invc))) = self.pending.front().cloned() {
+                if let Some(RawOp::Op(AbstractOp::Macro(invc))) = self.pending.front() {
                     if defn.name() == &invc.name {
+                        let invc = invc.clone();
                         self.pending.pop_front();
                         self.expand_macro(&invc.name, &invc.parameters)?;
                     }
@@ -517,7 +518,7 @@ impl Assembler {
 
         // Repeatedly check if the front of the pending list is ready.
         while let Some(next) = self.pending.front() {
-            let op = match next.to_owned() {
+            let op = match next {
                 RawOp::Op(AbstractOp::Push(Imm {
                     tree: Expression::Terminal(Terminal::Label(_)),
                     ..

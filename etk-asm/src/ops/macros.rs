@@ -22,7 +22,7 @@ impl MacroDefinition {
     }
 
     /// Returns the specified parameters of the defined macro.
-    pub fn parameters(&self) -> &Vec<String> {
+    pub fn parameters(&self) -> &[String] {
         match self {
             Self::Instruction(m) => &m.parameters,
             Self::Expression(m) => &m.parameters,
