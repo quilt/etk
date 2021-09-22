@@ -87,7 +87,7 @@ mod error {
         #[snafu(display("labels `{:?}` were never defined", labels))]
         #[non_exhaustive]
         UndeclaredLabels {
-            /// The label that was used without being defined.
+            /// The labels that were used without being defined.
             labels: Vec<String>,
 
             /// The location of the error.
