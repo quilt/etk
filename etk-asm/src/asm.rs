@@ -981,6 +981,80 @@ mod tests {
     }
 
     #[test]
+    fn assemble_instruction_macro_label_underscore() -> Result<(), Error> {
+        let ops = vec![
+            InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![
+                    AbstractOp::Label("a".into()),
+                ],
+            }
+            .into(),
+            InstructionMacroDefinition {
+                name: "my".into(),
+                parameters: vec![],
+                contents: vec![
+                    AbstractOp::Label("macro_a".into()),
+                ],
+            }
+            .into(),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![],
+            }),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my".into(),
+                parameters: vec![],
+            }),
+        ];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 8);
+        let out = asm.take();
+        assert_eq!(out, []);
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_instruction_macro_twice() -> Result<(), Error> {
+        let ops = vec![
+            InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![
+                    AbstractOp::Label("a".into()),
+                    AbstractOp::Op(Op::JumpDest),
+                    AbstractOp::Op(Op::Push1(Imm::with_label("a"))),
+                    AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
+                ],
+            }
+            .into(),
+            AbstractOp::Label("b".into()),
+            AbstractOp::Op(Op::JumpDest),
+            AbstractOp::Op(Op::Push1(Imm::with_label("b"))),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![],
+            }),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![],
+            }),
+        ];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(sz, 13);
+        let out = asm.take();
+        assert_eq!(out, hex!("5b60005b600360005b60086000"));
+
+        Ok(())
+    }
+
+    #[test]
     fn assemble_instruction_macro() -> Result<(), Error> {
         let ops = vec![
             InstructionMacroDefinition {
