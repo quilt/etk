@@ -429,7 +429,7 @@ impl Assembler {
                         .fail()
                     }
                     Err(_) => {
-                        assert_eq!(self.pending_len, Some(0));
+                        assert_eq!(self.pending_len, None);
                         self.pending_len = rop.size();
                         self.pending.push_back(rop);
                     }
@@ -1041,6 +1041,37 @@ mod tests {
         assert_eq!(sz, 8);
         let out = asm.take();
         assert_eq!(out, hex!("5b60005b60036000"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_instruction_macro_with_variable_push() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![],
+            }),
+            InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec![],
+                contents: vec![
+                    AbstractOp::Op(Op::JumpDest),
+                    AbstractOp::Push(Imm::with_label("label1")),
+                    AbstractOp::Push(Imm::with_label("label2")),
+                    AbstractOp::Label("label1".into()),
+                    AbstractOp::Op(Op::GetPc),
+                    AbstractOp::Label("label2".into()),
+                    AbstractOp::Op(Op::GetPc),
+                ],
+            }
+            .into(),
+        ];
+
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(ops)?;
+        assert_eq!(7, sz);
+        assert_eq!(asm.take(), hex!("5b600560065858"));
 
         Ok(())
     }
