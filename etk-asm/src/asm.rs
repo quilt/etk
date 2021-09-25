@@ -132,10 +132,8 @@ pub use self::error::Error;
 use crate::ops::expression::{self, Terminal};
 use crate::ops::{self, AbstractOp, Expression, Imm, MacroDefinition, Specifier};
 use snafu::OptionExt;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
-use std::hash::{Hash, Hasher};
 
 /// An item to be assembled, which can be either an [`AbstractOp`] or a raw byte
 /// sequence.
@@ -571,16 +569,11 @@ impl Assembler {
     }
 
     fn choose_sizes(&mut self) -> Result<(), Error> {
-        let mut sizes: HashMap<u64, Specifier> = self
+        let mut sizes: HashMap<Expression, Specifier> = self
             .pending
             .iter()
             .filter(|op| matches!(op, RawOp::Op(AbstractOp::Push(_))))
-            .map(|op| {
-                let expr = op.expr().unwrap();
-                let mut s = DefaultHasher::new();
-                expr.hash(&mut s);
-                (s.finish(), Specifier::push_for(1).unwrap())
-            })
+            .map(|op| (op.expr().unwrap().clone(), Specifier::push_for(1).unwrap()))
             .collect();
 
         let mut subasm;
@@ -598,9 +591,7 @@ impl Assembler {
                 .map(|op| {
                     let new = match op {
                         RawOp::Op(AbstractOp::Push(Imm { tree, .. })) => {
-                            let mut s = DefaultHasher::new();
-                            tree.hash(&mut s);
-                            let spec = sizes[&s.finish()];
+                            let spec = sizes[tree];
                             let aop = AbstractOp::with_expression(spec, tree.clone());
                             RawOp::Op(aop)
                         }
@@ -618,10 +609,7 @@ impl Assembler {
                 }
                 Err(Error::ExpressionTooLarge { expr, .. }) => {
                     // If an expression is too large for an op, increase the width of that op.
-                    let mut s = DefaultHasher::new();
-                    expr.hash(&mut s);
-                    let item = sizes.get_mut(&s.finish()).unwrap();
-
+                    let item = sizes.get_mut(&expr).unwrap();
                     let new_size = item.upsize().context(error::UnsizedPushTooLarge)?;
                     *item = new_size;
                 }
