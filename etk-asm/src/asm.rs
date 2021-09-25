@@ -131,6 +131,7 @@ mod error {
 pub use self::error::Error;
 use crate::ops::expression::{self, Terminal};
 use crate::ops::{self, AbstractOp, Expression, Imm, MacroDefinition, Specifier};
+use rand::Rng;
 use snafu::OptionExt;
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
@@ -646,13 +647,13 @@ impl Assembler {
                     .collect();
 
                 let mut labels = HashMap::<String, String>::new();
+                let mut rng = rand::thread_rng();
 
                 // First pass, find locally defined labels and rename them.
                 for op in m.contents.iter_mut() {
                     match op {
                         AbstractOp::Label(ref mut label) => {
-                            // TODO: add mangled extension later
-                            let mangled = format!("{}_{}", m.name, label);
+                            let mangled = format!("{}_{}_{}", m.name, label, rng.gen::<u64>());
                             let old = labels.insert(label.to_owned(), mangled.clone());
                             if old.is_some() {
                                 return error::DuplicateLabel {
