@@ -374,7 +374,7 @@ impl Assembler {
     }
 
     fn push_unchecked(&mut self, rop: RawOp) -> Result<(), Error> {
-        if self.pending.is_empty() && !self.pending_len.is_none() {
+        if self.pending.is_empty() && self.pending_len.is_some() {
             self.push_ready(rop)
         } else {
             self.push_pending(rop)
