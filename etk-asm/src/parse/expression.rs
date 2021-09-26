@@ -40,7 +40,8 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
                     .into()
             }
             Rule::label => Terminal::Label(txt.to_string()).into(),
-            Rule::selector => parse_selector(pair),
+            Rule::selector => parse_selector(pair, 4),
+            Rule::topic => parse_selector(pair, 32),
             Rule::expression_macro => macros::parse_expression_macro(pair).unwrap(),
             Rule::instruction_macro_variable => {
                 let variable = txt.strip_prefix('$').unwrap();
@@ -65,10 +66,9 @@ fn parse_radix_str(s: &str, radix: u32) -> Expression {
         .into()
 }
 
-fn parse_selector(pair: Pair<Rule>) -> Expression {
+fn parse_selector(pair: Pair<Rule>, size: usize) -> Expression {
     let raw = pair.into_inner().next().unwrap().as_str();
     let mut hasher = Keccak256::new();
     hasher.update(raw.as_bytes());
-    // TODO: return full hash
-    BigInt::from_bytes_be(Sign::Plus, &hasher.finalize()[0..4]).into()
+    BigInt::from_bytes_be(Sign::Plus, &hasher.finalize()[0..size]).into()
 }

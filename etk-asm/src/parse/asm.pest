@@ -61,6 +61,7 @@ expression_macro_definition = !{ "%def" ~ function_declaration ~ NEWLINE ~ expre
 expression_macro = { function_invocation }
 
 selector = ${ "selector(\"" ~ selector_function_declaration ~ "\")" }
+topic = ${ "topic(\"" ~ selector_function_declaration ~ "\")" }
 selector_function_declaration = @{ function_name ~ "(" ~ function_parameter* ~ ("," ~ function_parameter)* ~ ")" }
 function_declaration = { function_name ~ "(" ~ function_parameter* ~ ("," ~ function_parameter)* ~ ")" }
 function_invocation = _{ function_name ~ "(" ~ expression* ~ ("," ~ expression)* ~ ")" }
@@ -84,7 +85,7 @@ label_definition = { label ~ ":" }
 // infix math //
 ////////////////
 expression = !{ term ~ (operation ~ term)* }
-term = _{ instruction_macro_variable | selector | expression_macro | label | number | negative_decimal | "(" ~ expression ~ ")" }
+term = _{ instruction_macro_variable | selector | topic | expression_macro | label | number | negative_decimal | "(" ~ expression ~ ")" }
 negative_decimal = @{ "-" ~ ASCII_DIGIT+ }
 operation = _{ plus | minus | times | divide }
 plus = { "+" }

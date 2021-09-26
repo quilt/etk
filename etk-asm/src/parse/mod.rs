@@ -288,7 +288,7 @@ mod tests {
             push4 selector("balanceOf(address)")
             push4 selector("transfer(address,uint256)")
             push4 selector("approve(address,uint256)")
-            push32 selector("transfer(address,uint256)")
+            push32 topic("transfer(address,uint256)")
         "#;
         let expected = nodes![
             Op::Push4(Imm::from(hex!("06fdde03"))),
@@ -296,7 +296,7 @@ mod tests {
             Op::Push4(Imm::from(hex!("a9059cbb"))),
             Op::Push4(Imm::from(hex!("095ea7b3"))),
             Op::Push32(Imm::from(hex!(
-                "00000000000000000000000000000000000000000000000000000000a9059cbb"
+                "a9059cbb2ab09eb219583f4a59a5d0623ade346d962bcd4e46b11da047c9049b"
             ))),
         ];
         println!("{:?}\n\n{:?}", parse_asm(asm), expected);
