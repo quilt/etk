@@ -976,17 +976,13 @@ mod tests {
             InstructionMacroDefinition {
                 name: "my_macro".into(),
                 parameters: vec![],
-                contents: vec![
-                    AbstractOp::Label("a".into()),
-                ],
+                contents: vec![AbstractOp::Label("a".into())],
             }
             .into(),
             InstructionMacroDefinition {
                 name: "my".into(),
                 parameters: vec![],
-                contents: vec![
-                    AbstractOp::Label("macro_a".into()),
-                ],
+                contents: vec![AbstractOp::Label("macro_a".into())],
             }
             .into(),
             AbstractOp::Macro(InstructionMacroInvocation {
@@ -1001,7 +997,7 @@ mod tests {
 
         let mut asm = Assembler::new();
         let sz = asm.push_all(ops)?;
-        assert_eq!(sz, 8);
+        assert_eq!(sz, 0);
         let out = asm.take();
         assert_eq!(out, []);
 
