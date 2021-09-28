@@ -445,38 +445,6 @@ impl Assembler {
         }
     }
 
-    // TODO: move below `push_pending`
-    fn pop_pending(&mut self) -> Result<(), Error> {
-        let popped = self.pending.pop_front().unwrap();
-
-        let size;
-
-        match popped {
-            RawOp::Raw(raw) => {
-                size = raw.len() as u32;
-                self.ready.extend(raw);
-            }
-            RawOp::Op(aop) => {
-                let cop = aop
-                    .concretize((&self.declared_labels, &self.declared_macros).into())
-                    // Already able to concretize in `push_pending` loop.
-                    .unwrap();
-                size = cop.size();
-                cop.assemble(&mut self.ready);
-            }
-        }
-
-        self.concrete_len += size;
-
-        if self.pending.is_empty() {
-            self.pending_len = Some(0);
-        } else if let Some(ref mut pending_len) = self.pending_len {
-            *pending_len -= size;
-        }
-
-        Ok(())
-    }
-
     fn push_pending(&mut self, rop: RawOp) -> Result<(), Error> {
         // Update total size of pending ops.
         if let Some(ref mut pending_len) = self.pending_len {
@@ -564,6 +532,37 @@ impl Assembler {
             }
 
             self.pop_pending()?;
+        }
+
+        Ok(())
+    }
+
+    fn pop_pending(&mut self) -> Result<(), Error> {
+        let popped = self.pending.pop_front().unwrap();
+
+        let size;
+
+        match popped {
+            RawOp::Raw(raw) => {
+                size = raw.len() as u32;
+                self.ready.extend(raw);
+            }
+            RawOp::Op(aop) => {
+                let cop = aop
+                    .concretize((&self.declared_labels, &self.declared_macros).into())
+                    // Already able to concretize in `push_pending` loop.
+                    .unwrap();
+                size = cop.size();
+                cop.assemble(&mut self.ready);
+            }
+        }
+
+        self.concrete_len += size;
+
+        if self.pending.is_empty() {
+            self.pending_len = Some(0);
+        } else if let Some(ref mut pending_len) = self.pending_len {
+            *pending_len -= size;
         }
 
         Ok(())
