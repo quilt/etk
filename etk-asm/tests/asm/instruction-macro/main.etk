@@ -1,0 +1,33 @@
+%macro foo()
+	push1 start
+	jump
+%end
+
+%macro bar()
+	start:
+	push1 0x40
+	push1 start
+%end
+
+%macro foobar(tag, gat)
+	push2 $tag
+	push2 $gat
+	push1 delayed_expr(7)
+%end
+
+%def delayed_expr(x)
+	$x + 1
+%end
+
+start:
+	jumpdest
+	pc
+	%foo()
+	%bar()
+	push1 delayed
+	push1 delayed2
+
+delayed:
+	%foobar(start, 0x42)
+delayed2:
+	%foobar(start, 0x42)

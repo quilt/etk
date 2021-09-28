@@ -112,13 +112,14 @@ fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, Error> {
         path: path.as_ref().to_owned(),
     })?;
     let nodes = parse_asm(&asm)?;
+
     Ok(nodes)
 }
 
 #[derive(Debug)]
 enum Scope {
     Same,
-    Independent(Assembler),
+    Independent(Box<Assembler>),
 }
 
 impl Scope {
@@ -127,7 +128,7 @@ impl Scope {
     }
 
     fn independent() -> Self {
-        Self::Independent(Assembler::new())
+        Self::Independent(Box::new(Assembler::new()))
     }
 }
 

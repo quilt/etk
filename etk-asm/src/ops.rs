@@ -1,7 +1,27 @@
 //! Definitions of all instructions supported by the assembler.
 
 mod error {
+    use super::{expression, Specifier};
+    use num_bigint::BigInt;
     use snafu::{Backtrace, Snafu};
+
+    #[derive(Snafu, Debug)]
+    #[snafu(visibility = "pub(crate)")]
+    pub(crate) enum Error {
+        ContextIncomplete {
+            #[snafu(backtrace)]
+            source: expression::Error,
+        },
+        ExpressionTooLarge {
+            value: BigInt,
+            spec: Specifier,
+            backtrace: Backtrace,
+        },
+        ExpressionNegative {
+            value: BigInt,
+            backtrace: Backtrace,
+        },
+    }
 
     /// The error that can arise while parsing a specifier from a string.
     #[derive(Debug, Snafu)]
@@ -14,20 +34,31 @@ mod error {
     }
 }
 
-mod imm;
+pub(crate) mod expression;
+pub(crate) mod imm;
+mod macros;
 mod types;
 
+pub(crate) use self::error::Error;
+
 pub use self::error::UnknownSpecifierError;
-pub use self::imm::{Imm, Immediate, TryFromIntError, TryFromSliceError};
+pub use self::expression::{Context, Expression, Terminal};
+pub use self::imm::{Imm, Immediate, TryFromSliceError};
+
+pub use self::macros::{
+    ExpressionMacroDefinition, ExpressionMacroInvocation, InstructionMacroDefinition,
+    InstructionMacroInvocation, MacroDefinition,
+};
 use self::types::ImmediateTypes;
 pub use self::types::{Abstract, Concrete, Spec};
-
-use snafu::OptionExt;
 
 use std::cmp::{Eq, PartialEq};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
+
+use num_bigint::{BigInt, Sign};
+use snafu::ResultExt;
 
 /// The access mode (read, write, both) of an instruction.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -110,72 +141,78 @@ macro_rules! pat_cap_concrete {
     };
 }
 
-macro_rules! pat_cap {
-    ($cap:ident, $op:ident) => {
+macro_rules! pat_imm {
+    ($imm:ident, $op:ident) => {
         Self::$op
     };
-    ($cap:ident, $op:ident, $arg:ident) => {
-        Self::$op($cap)
+    ($imm:ident, $op:ident, $arg:ident) => {
+        Self::$op($imm)
     };
 }
 
-macro_rules! write_cap {
-    ($f:ident, $sp:expr, $cap:expr) => {
+macro_rules! write_imm {
+    ($f:ident, $sp:expr, $imm:expr) => {
         write!($f, "{}", $sp)
     };
-    ($f:ident, $sp:expr, $cap:expr, $arg:ident) => {
-        write!($f, "{} {}", $sp, $cap)
+    ($f:ident, $sp:expr, $imm:expr, $arg:ident) => {
+        write!($f, "{} {}", $sp, $imm)
     };
 }
 
-macro_rules! pat_const {
-    ($cap:ident, $op:ident) => {
+macro_rules! write_concrete {
+    ($f:ident, $sp:expr, $imm:expr) => {
+        write!($f, "{}", $sp)
+    };
+    ($f:ident, $sp:expr, $imm:expr, $arg:ident) => {
+        write!($f, "{} 0x{}", $sp, hex::encode($imm))
+    };
+}
+
+macro_rules! pat_expr {
+    ($expr:ident, $op:ident) => {
         Self::$op
     };
-    ($cap:ident, $op:ident, $arg:ident) => {
-        Self::$op(Imm::Constant($cap))
-    };
-}
-
-macro_rules! pat_label {
-    ($cap:ident, $op:ident) => { Self::$op };
-    ($cap:ident, $op:ident, $arg:ident) => { Self::$op(Imm::Label(ref $cap)) };
-}
-
-macro_rules! ret_label {
-    ($cap:ident) => {
-        None
-    };
-    ($cap:ident, $arg:ident) => {
-        Some($cap)
-    };
-}
-
-macro_rules! ret_realize {
-    ($op:ident, $addr:ident) => {
-        panic!()
-    };
-    ($op:ident, $addr:ident, $arg:ident) => {
-        Op::$op($addr.try_into()?)
+    ($expr:ident, $op:ident, $arg:ident) => {
+        Self::$op(Imm { tree: $expr, .. })
     };
 }
 
 macro_rules! ret_from_concrete {
-    ($op:ident, $addr:ident) => {
+    ($op:ident, $raw:ident) => {
         Self::$op
     };
-    ($op:ident, $addr:expr, $arg:ident) => {
-        Self::$op(Imm::Constant($addr))
+    ($op:ident, $raw:expr, $arg:ident) => {
+        Self::$op(Terminal::Number(BigInt::from_bytes_be(Sign::Plus, &$raw[..])).into())
     };
 }
 
 macro_rules! ret_concretize {
-    ($op:ident, $addr:ident) => {
-        Op::$op
+    ($op:ident, $tree:ident, $ctx:ident) => {
+        Ok(Op::$op)
     };
-    ($op:ident, $addr:expr, $arg:ident) => {
-        Op::$op($addr)
-    };
+    ($op:ident, $tree:ident, $ctx:ident, $arg:ident) => {{
+        let value = $tree
+            .eval_with_context($ctx)
+            .context(error::ContextIncomplete)?;
+        let (sign, bytes) = value.to_bytes_be();
+
+        if sign == num_bigint::Sign::Minus {
+            return error::ExpressionNegative { value }.fail();
+        }
+
+        let mut buf = <Concrete as ImmediateTypes>::$arg::default();
+        if bytes.len() > buf.len() {
+            error::ExpressionTooLarge {
+                value,
+                spec: Specifier::from(buf.len() as u8),
+            }
+            .fail()
+        } else {
+            let start = buf.len() - bytes.len();
+            buf[start..].copy_from_slice(&bytes);
+            Ok(Op::$op(buf))
+        }
+    }};
 }
 
 macro_rules! ret_assemble {
@@ -219,7 +256,16 @@ macro_rules! ret_with_label {
         panic!()
     };
     ($imm:ident, $op:ident, $arg:ident) => {
-        Self::$op($imm.into())
+        Self::$op(Terminal::Label($imm).into())
+    };
+}
+
+macro_rules! ret_with_expression {
+    ($expr:ident, $op:ident) => {
+        panic!()
+    };
+    ($expr:ident, $op:ident, $arg:ident) => {
+        Self::$op(Imm::from($expr))
     };
 }
 
@@ -229,6 +275,15 @@ macro_rules! ret_from_slice {
     };
     ($imm:ident, $op:ident, $arg:ident) => {
         Self::$op(TryFrom::try_from(&$imm[1..]).unwrap())
+    };
+}
+
+macro_rules! ret_expr {
+    ($expr:ident, $op:ident) => {
+        None
+    };
+    ($expr:ident, $op:ident, $arg:ident) => {
+        Some($expr)
     };
 }
 
@@ -299,7 +354,7 @@ macro_rules! ops {
         /// Enumeration of all supported instructions.
         ///
         /// There are three flavors of `Op`:
-        ///  - Abstract: `Op` that may use labels or constants.
+        ///  - Abstract: `Op` that may use labels, variables, or constants.
         ///  - Concrete: `Op` that may only use constants.
         ///  - Specifier: `Op` without any arguments.
         #[derive(Debug, Clone, PartialEq, Eq)]
@@ -500,34 +555,43 @@ macro_rules! ops {
                 Ok(op)
             }
 
-            /// The label to be pushed on the stack. Only relevant for push instructions.
-            pub(crate) fn immediate_label(&self) -> Option<&str> {
-                match self {
+            /// Construct an `Op` with the given expression.
+            ///
+            /// ## Panics
+            ///
+            /// This function panics if the instruction described by the specifier
+            /// does not accept immediate arguments.
+            pub fn with_expression(spec: Op<Spec>, var: Expression) -> Self {
+                match spec {
                     $(
-                        pat_label!(a, $op$(, $arg)?) => ret_label!(a$(, $arg)?),
+                        pat_spec!($op$(, $arg)?) => ret_with_expression!(var, $op$(, $arg)?),
                     )*
-
-                    _ => None,
                 }
             }
 
-            // TODO: Rename `realize`
-            pub(crate) fn realize(&self, address: u32) -> Result<Self, TryFromIntError> {
-                let op = match self {
-                    $(
-                        pat_label!(_a, $op$(, $arg)?) => ret_realize!($op, address$(, $arg)?),
-                    )*
-                    _ => panic!("only push ops with labels can be realized"),
-                };
-                Ok(op)
-            }
-
-            pub(crate) fn concretize(self) -> Op<Concrete> {
+            /// The expression to be pushed on the stack. Only relevant for push instructions.
+            pub(crate) fn expr(&self) -> Option<&Expression> {
                 match self {
                     $(
-                        pat_const!(a, $op$(, $arg)?) => ret_concretize!($op, a$(, $arg)?),
+                        pat_expr!(expr, $op$(, $arg)?) => ret_expr!(expr, $op$(, $arg)?),
                     )*
-                    _ => panic!("labels must be resolved be concretizing"),
+                }
+            }
+
+            /// The expression to be pushed on the stack. Only relevant for push instructions.
+            pub(crate) fn expr_mut(&mut self) -> Option<&mut Expression> {
+                match self {
+                    $(
+                        pat_expr!(expr, $op$(, $arg)?) => ret_expr!(expr, $op$(, $arg)?),
+                    )*
+                }
+            }
+
+            pub(crate) fn concretize(self, ctx: Context) -> Result<Op<Concrete>, error::Error> {
+                match self {
+                    $(
+                        pat_expr!(expr, $op$(, $arg)?) => ret_concretize!($op, expr, ctx$(, $arg)?),
+                    )*
                 }
             }
         }
@@ -549,8 +613,8 @@ macro_rules! ops {
 
                 match self {
                     $(
-                        pat_cap!(a, $op$(, $arg)?) => {
-                            write_cap!(f, sp, a$(, $arg)?)
+                        pat_imm!(imm, $op$(, $arg)?) => {
+                            write_imm!(f, sp, imm$(, $arg)?)
                         }
                     )*
                 }
@@ -612,7 +676,7 @@ macro_rules! ops {
 
                 let args = match self {
                     $(
-                        pat_cap!(a, $op$(, $arg)?) => {
+                        pat_imm!(a, $op$(, $arg)?) => {
                             ret_assemble!(a$(, $arg)?)
                         }
                     )*
@@ -628,8 +692,8 @@ macro_rules! ops {
 
                 match self {
                     $(
-                        pat_cap!(a, $op$(, $arg)?) => {
-                            write_cap!(f, sp, Imm::Constant(a)$(, $arg)?)
+                        pat_imm!(imm, $op$(, $arg)?) => {
+                            write_concrete!(f, sp, imm$(, $arg)?)
                         }
                     )*
                 }
@@ -994,6 +1058,12 @@ pub enum AbstractOp {
 
     /// A variable sized push, which is a virtual instruction.
     Push(Imm<Vec<u8>>),
+
+    /// A user-defined macro definition, which is a virtual instruction.
+    MacroDefinition(MacroDefinition),
+
+    /// A user-defined macro, which is a virtual instruction.
+    Macro(InstructionMacroInvocation),
 }
 
 impl AbstractOp {
@@ -1005,14 +1075,14 @@ impl AbstractOp {
         Some(Self::Op(Op::new(spec)?))
     }
 
-    /// Construct an `AbstractOp` with the given label.
+    /// Construct an `AbstractOp` with the given expression.
     ///
     /// ## Panics
     ///
     /// This function panics if the instruction described by the specifier
     /// does not accept immediate arguments.
-    pub fn with_label<S: Into<String>>(spec: Op<Spec>, lbl: S) -> Self {
-        Self::Op(Op::with_label(spec, lbl))
+    pub fn with_expression(spec: Op<Spec>, expr: Expression) -> Self {
+        Self::Op(Op::with_expression(spec, expr))
     }
 
     /// Construct an `AbstractOp` with the given immediate argument.
@@ -1028,50 +1098,44 @@ impl AbstractOp {
         Ok(Self::Op(Op::<Abstract>::with_immediate(spec, imm)?))
     }
 
-    pub(crate) fn immediate_label(&self) -> Option<&str> {
+    pub(crate) fn concretize(self, ctx: Context) -> Result<Op<Concrete>, error::Error> {
         match self {
-            Self::Op(op) => op.immediate_label(),
-            Self::Push(Imm::Label(lbl)) => Some(lbl),
-            Self::Push(_) => None,
-            Self::Label(_) => None,
+            Self::Op(op) => op.concretize(ctx),
+            Self::Push(imm) => {
+                let res = imm
+                    .tree
+                    .eval_with_context(ctx)
+                    .context(error::ContextIncomplete)?;
+                let size = (res.bits() as u32 + 8 - 1) / 8;
+                let spec = Specifier::push(size).unwrap();
+                let bytes = res.to_bytes_be().1;
+                let start = bytes.len() - spec.extra_len() as usize;
+                AbstractOp::with_immediate(spec, &bytes[start..])
+                    .unwrap()
+                    .concretize(ctx)
+            }
+            Self::Label(_) => panic!("labels cannot be concretized"),
+            Self::Macro(_) => panic!("macros cannot be concretized"),
+            Self::MacroDefinition(_) => panic!("macro definitions cannot be concretized"),
         }
     }
 
-    pub(crate) fn realize(&self, address: u32) -> Result<Self, TryFromIntError> {
-        let ret = match self {
-            Self::Push(Imm::Label(_)) => {
-                let spec = Specifier::push_for(address).context(imm::TryFromIntContext)?;
-                let bytes = address.to_be_bytes();
-                let start = bytes.len() - spec.extra_len() as usize;
-                AbstractOp::with_immediate(spec, &bytes[start..]).unwrap()
-            }
-            Self::Push(Imm::Constant(_)) => {
-                panic!("only pushes with a label can be realized");
-            }
-            Self::Op(op) => Self::Op(op.realize(address)?),
-            Self::Label(_) => panic!("labels cannot be realized"),
-        };
-
-        Ok(ret)
+    /// The expression to be pushed on the stack. Only relevant for push instructions.
+    pub(crate) fn expr(&self) -> Option<&Expression> {
+        match self {
+            Self::Op(op) => op.expr(),
+            Self::Push(Imm { tree, .. }) => Some(tree),
+            _ => None,
+        }
     }
 
-    pub(crate) fn concretize(self) -> Option<Op<Concrete>> {
-        let res = match self {
-            Self::Op(op) => op.concretize(),
-            Self::Push(Imm::Label(_)) => panic!("label immediates must be realized first"),
-            Self::Push(Imm::Constant(konst)) => {
-                let mut trimmed = konst.as_slice();
-                while !trimmed.is_empty() && trimmed[0] == 0 {
-                    trimmed = &trimmed[1..];
-                }
-                let spec = Specifier::push(trimmed.len() as u32)?;
-
-                Op::<Concrete>::with_immediate(spec, trimmed).unwrap()
-            }
-            Self::Label(_) => panic!("labels cannot be concretized"),
-        };
-
-        Some(res)
+    /// The expression to be pushed on the stack. Only relevant for push instructions.
+    pub(crate) fn expr_mut(&mut self) -> Option<&mut Expression> {
+        match self {
+            Self::Op(op) => op.expr_mut(),
+            Self::Push(Imm { tree, .. }) => Some(tree),
+            _ => None,
+        }
     }
 
     /// Return the total encoded size for this instruction, including the
@@ -1084,6 +1148,8 @@ impl AbstractOp {
             Self::Op(op) => Some(op.size()),
             Self::Label(_) => Some(0),
             Self::Push(_) => None,
+            Self::Macro(_) => None,
+            Self::MacroDefinition(_) => None,
         }
     }
 
@@ -1102,12 +1168,26 @@ impl From<Op<Concrete>> for AbstractOp {
     }
 }
 
+impl From<InstructionMacroDefinition> for AbstractOp {
+    fn from(item: InstructionMacroDefinition) -> Self {
+        AbstractOp::MacroDefinition(item.into())
+    }
+}
+
+impl From<ExpressionMacroDefinition> for AbstractOp {
+    fn from(item: ExpressionMacroDefinition) -> Self {
+        AbstractOp::MacroDefinition(item.into())
+    }
+}
+
 impl fmt::Display for AbstractOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Op(op) => write!(f, "{}", op),
             Self::Push(txt) => write!(f, r#"%push({})"#, txt),
-            Self::Label(lbl) => write!(f, r#".{}:"#, lbl),
+            Self::Label(lbl) => write!(f, r#"{}:"#, lbl),
+            Self::Macro(m) => write!(f, "{}", m),
+            Self::MacroDefinition(defn) => write!(f, "{}", defn),
         }
     }
 }
@@ -1118,6 +1198,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.is_jump(),
             Self::Push(_) => false,
             Self::Label(_) => false,
+            Self::Macro(_) => false,
+            Self::MacroDefinition(_) => false,
         }
     }
 
@@ -1126,6 +1208,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.is_jump_target(),
             Self::Push(_) => false,
             Self::Label(_) => false,
+            Self::Macro(_) => false,
+            Self::MacroDefinition(_) => false,
         }
     }
 
@@ -1134,6 +1218,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.is_exit(),
             Self::Push(_) => false,
             Self::Label(_) => false,
+            Self::Macro(_) => false,
+            Self::MacroDefinition(_) => false,
         }
     }
 
@@ -1142,6 +1228,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.storage_access(),
             Self::Push(_) => None,
             Self::Label(_) => None,
+            Self::Macro(_) => None,
+            Self::MacroDefinition(_) => None,
         }
     }
 
@@ -1150,6 +1238,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.storage_access(),
             Self::Push(_) => None,
             Self::Label(_) => None,
+            Self::Macro(_) => None,
+            Self::MacroDefinition(_) => None,
         }
     }
 
@@ -1158,6 +1248,8 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.pops(),
             Self::Push(_) => 0,
             Self::Label(_) => 0,
+            Self::Macro(_) => 0,
+            Self::MacroDefinition(_) => 0,
         }
     }
 
@@ -1166,30 +1258,31 @@ impl Metadata for AbstractOp {
             Self::Op(op) => op.pushes(),
             Self::Push(_) => 1,
             Self::Label(_) => 0,
+            Self::Macro(_) => 0,
+            Self::MacroDefinition(_) => 0,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
-
-    use std::convert::TryInto;
-
     use super::*;
+    use std::convert::TryInto;
 
     #[test]
     fn u8_into_imm1() {
         let x: u8 = 0xdc;
         let imm: Imm<[u8; 1]> = x.into();
-        assert_matches!(imm, Imm::Constant([0xdc]));
+        let res: Imm<[u8; 1]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]
     fn u16_try_into_imm1() {
         let x: u16 = 0xFF;
         let imm: Imm<[u8; 1]> = x.try_into().unwrap();
-        assert_matches!(imm, Imm::Constant([0xFF]));
+        let res: Imm<[u8; 1]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]
@@ -1208,28 +1301,24 @@ mod tests {
     fn u8_into_imm2() {
         let x: u8 = 0xdc;
         let imm: Imm<[u8; 2]> = x.into();
-        assert_matches!(imm, Imm::Constant([0x00, 0xdc]));
+        let res: Imm<[u8; 2]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]
     fn u16_into_imm2() {
         let x: u16 = 0xfedc;
         let imm: Imm<[u8; 2]> = x.into();
-        assert_matches!(imm, Imm::Constant([0xfe, 0xdc]));
+        let res: Imm<[u8; 2]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]
     fn u128_into_imm32() {
         let x: u128 = 0x1023456789abcdef0123456789abcdef;
         let imm: Imm<[u8; 32]> = x.into();
-        assert_matches!(
-            imm,
-            Imm::Constant([
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x00, 0x00, 0x10, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67,
-                0x89, 0xab, 0xcd, 0xef,
-            ])
-        );
+        let res: Imm<[u8; 32]> = Terminal::Number(x.into()).into();
+        assert_eq!(imm, res);
     }
 
     #[test]

@@ -1,4 +1,7 @@
 mod args;
+mod expression;
+mod macros;
+
 pub(crate) mod error;
 mod parser {
     #![allow(clippy::upper_case_acronyms)]
@@ -10,167 +13,79 @@ mod parser {
     pub(super) struct AsmParser;
 }
 
+use self::{
+    error::ParseError,
+    parser::{AsmParser, Rule},
+};
 use crate::ast::Node;
-use crate::ops::{AbstractOp, Imm, Op, Specifier};
-
-use pest::Parser;
-
-use self::args::{Label, Signature};
-use self::error::ParseError;
-use self::parser::{AsmParser, Rule};
-
-use sha3::{Digest, Keccak256};
-
-use snafu::OptionExt;
-
-use std::path::PathBuf;
+use crate::ops::{AbstractOp, Op, Specifier};
+use num_bigint::BigInt;
+use pest::{iterators::Pair, Parser};
 
 pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let mut program: Vec<Node> = Vec::new();
 
     let pairs = AsmParser::parse(Rule::program, asm)?;
     for pair in pairs {
-        match pair.as_rule() {
-            Rule::builtin => {
-                let mut pairs = pair.into_inner();
-                let inst_macro = pairs.next().unwrap();
-                assert!(pairs.next().is_none());
-                let node = parse_inst_macro(inst_macro)?;
-                program.push(node);
-            }
-            Rule::label_definition => {
-                let mut pair = pair.into_inner();
-                let label = pair.next().unwrap();
-                let txt = label.as_str();
-                program.push(AbstractOp::Label(txt.into()).into());
-            }
-            Rule::push => {
-                program.push(parse_push(pair)?.into());
-            }
-            Rule::op => {
-                let spec: Specifier = pair.as_str().parse().unwrap();
-                let op = Op::new(spec).unwrap();
-                let aop = AbstractOp::Op(op);
-                program.push(aop.into());
-            }
-            _ => continue,
-        }
+        let node = match pair.as_rule() {
+            Rule::builtin => macros::parse_builtin(pair)?,
+            Rule::EOI => continue,
+            _ => parse_abstract_op(pair)?.into(),
+        };
+        program.push(node);
     }
 
     Ok(program)
 }
 
-fn parse_push(pair: pest::iterators::Pair<Rule>) -> Result<AbstractOp, ParseError> {
-    let mut pair = pair.into_inner();
-    let size = pair.next().unwrap();
-    let size: usize = size.as_str().parse().unwrap();
-    let operand = pair.next().unwrap();
-
-    let spec = Specifier::push(size as u32).unwrap();
-
-    let op = match operand.as_rule() {
-        Rule::binary => {
-            let raw = operand.as_str();
-            let imm = radix_str_to_vec(&raw[2..], 2, size)?;
-            AbstractOp::with_immediate(spec, imm.as_ref())
-                .ok()
-                .context(error::ImmediateTooLarge)?
+fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+    let ret = match pair.as_rule() {
+        Rule::local_macro => macros::parse(pair)?,
+        Rule::label_definition => {
+            AbstractOp::Label(pair.into_inner().next().unwrap().as_str().to_string())
         }
-        Rule::octal => {
-            let raw = operand.as_str();
-            let imm = radix_str_to_vec(&raw[2..], 8, size)?;
-            AbstractOp::with_immediate(spec, imm.as_ref())
-                .ok()
-                .context(error::ImmediateTooLarge)?
+        Rule::push => parse_push(pair)?,
+        Rule::op => {
+            let spec: Specifier = pair.as_str().parse().unwrap();
+            let op = Op::new(spec).unwrap();
+            AbstractOp::Op(op)
         }
-        Rule::decimal => {
-            let raw = operand.as_str();
-            let imm = radix_str_to_vec(raw, 10, size)?;
-            AbstractOp::with_immediate(spec, imm.as_ref())
-                .ok()
-                .context(error::ImmediateTooLarge)?
-        }
-        Rule::hex => {
-            let raw = operand.as_str();
-            let imm = hex::decode(&raw[2..]).unwrap();
-            AbstractOp::with_immediate(spec, imm.as_ref())
-                .ok()
-                .context(error::ImmediateTooLarge)?
-        }
-        Rule::selector => {
-            let raw = operand.into_inner().next().unwrap().as_str();
-            let mut hasher = Keccak256::new();
-            hasher.update(raw.as_bytes());
-            AbstractOp::with_immediate(spec, &hasher.finalize()[0..(spec.size() - 1) as usize])
-                .ok()
-                .context(error::ImmediateTooLarge)?
-        }
-        Rule::label => {
-            let label = operand.as_str().to_string();
-            AbstractOp::with_label(spec, label)
-        }
-        r => unreachable!(format!("{:?}", r)),
-    };
-
-    Ok(op)
-}
-
-fn parse_inst_macro(pair: pest::iterators::Pair<Rule>) -> Result<Node, ParseError> {
-    let rule = pair.as_rule();
-
-    let node = match rule {
-        Rule::import => {
-            let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
-            Node::Import(args.0)
-        }
-
-        Rule::include => {
-            let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
-            Node::Include(args.0)
-        }
-
-        Rule::include_hex => {
-            let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
-            Node::IncludeHex(args.0)
-        }
-
-        Rule::push_macro => {
-            // TODO: This should accept labels or literals, not just labels.
-            let args = <(Label,)>::parse_arguments(pair.into_inner())?;
-            let arg = Imm::from(args.0 .0);
-            Node::Op(AbstractOp::Push(arg))
-        }
-
         _ => unreachable!(),
     };
-    Ok(node)
+
+    Ok(ret)
 }
 
-fn radix_str_to_vec(s: &str, radix: u32, min: usize) -> Result<Vec<u8>, ParseError> {
-    let n = u128::from_str_radix(s, radix)
-        .ok()
-        .context(error::ImmediateTooLarge)?;
+fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+    let mut pair = pair.into_inner();
+    let size = pair.next().unwrap();
+    let size: u32 = size.as_str().parse().unwrap();
+    let operand = pair.next().unwrap();
 
-    let msb = 128 - n.leading_zeros();
-    let mut len = (msb / 8) as usize;
-    if msb % 8 != 0 {
-        len += 1;
+    let spec = Specifier::push(size).unwrap();
+    let expr = expression::parse(operand)?;
+
+    if let Ok(val) = expr.eval() {
+        let max = BigInt::pow(&BigInt::from(2), 8 * size);
+        if val >= max {
+            return error::ImmediateTooLarge.fail();
+        }
     }
 
-    len = std::cmp::max(len, min);
-
-    Ok(n.to_be_bytes()[16 - len..].to_vec())
+    Ok(AbstractOp::with_expression(spec, expr))
 }
 
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
-
-    use crate::ops::Imm;
-
-    use hex_literal::hex;
-
     use super::*;
+    use crate::ops::{
+        Expression, ExpressionMacroDefinition, ExpressionMacroInvocation, Imm,
+        InstructionMacroDefinition, InstructionMacroInvocation, Terminal,
+    };
+    use assert_matches::assert_matches;
+    use hex_literal::hex;
+    use num_bigint::Sign;
+    use std::path::PathBuf;
 
     macro_rules! nodes {
         ($($x:expr),+ $(,)?) => (
@@ -237,6 +152,7 @@ mod tests {
             Op::Push1(Imm::from([7])),
             Op::Push2(Imm::from([1, 0])),
         ];
+        println!("{:?}\n\n{:?}", parse_asm(asm), expected);
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -257,7 +173,7 @@ mod tests {
             push4 4294967295
         "#;
         let expected = nodes![
-            Op::Push1(Imm::from([0])),
+            Op::Push1(0.into()),
             Op::Push1(Imm::from([1])),
             Op::Push2(Imm::from([0, 42])),
             Op::Push2(Imm::from(hex!("0100"))),
@@ -346,7 +262,7 @@ mod tests {
             push2 snake_case
             jumpi
         "#;
-        let expected = nodes![Op::Push2(Imm::from("snake_case")), Op::JumpI];
+        let expected = nodes![Op::Push2(Imm::with_label("snake_case")), Op::JumpI];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -359,7 +275,7 @@ mod tests {
         "#;
         let expected = nodes![
             AbstractOp::Label("push1".into()),
-            Op::Push1(Imm::from("push1")),
+            Op::Push1(Imm::with_label("push1")),
             Op::JumpI
         ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
@@ -372,7 +288,7 @@ mod tests {
             push4 selector("balanceOf(address)")
             push4 selector("transfer(address,uint256)")
             push4 selector("approve(address,uint256)")
-            push32 selector("transfer(address,uint256)")
+            push32 topic("transfer(address,uint256)")
         "#;
         let expected = nodes![
             Op::Push4(Imm::from(hex!("06fdde03"))),
@@ -383,6 +299,7 @@ mod tests {
                 "a9059cbb2ab09eb219583f4a59a5d0623ade346d962bcd4e46b11da047c9049b"
             ))),
         ];
+        println!("{:?}\n\n{:?}", parse_asm(asm), expected);
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -516,9 +433,140 @@ mod tests {
         );
         let expected = nodes![
             Op::Push1(Imm::from(1)),
-            AbstractOp::Push("hello".into()),
+            AbstractOp::Push(Imm::with_label("hello")),
             Op::Push1(Imm::from(2)),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+    }
+
+    #[test]
+    fn parse_instruction_macro() {
+        let asm = format!(
+            r#"
+            %macro my_macro(foo, bar)
+                gasprice
+                pop
+                push1 $foo + $bar
+            %end
+            %my_macro(0x42, 10)
+            "#,
+        );
+        let expected = nodes![
+            AbstractOp::MacroDefinition(
+                InstructionMacroDefinition {
+                    name: "my_macro".into(),
+                    parameters: vec!["foo".into(), "bar".into()],
+                    contents: vec![
+                        Op::GasPrice.into(),
+                        Op::Pop.into(),
+                        AbstractOp::Op(Op::Push1(
+                            Expression::Plus(
+                                Terminal::Variable("foo".to_string()).into(),
+                                Terminal::Variable("bar".to_string()).into()
+                            )
+                            .into()
+                        )),
+                    ]
+                }
+                .into()
+            ),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![
+                    BigInt::from_bytes_be(Sign::Plus, &vec![0x42]).into(),
+                    BigInt::from_bytes_be(
+                        Sign::Plus,
+                        &vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10]
+                    )
+                    .into()
+                ]
+            })
+        ];
+
+        assert_eq!(parse_asm(&asm).unwrap(), expected)
+    }
+
+    #[test]
+    fn parse_expression() {
+        let asm = format!(
+            r#"
+            push1 1+-1
+            push1 2*foo
+            push1 (1+(2*foo))-(bar/42)
+            push1 0x20+0o1+0b10
+            "#,
+        );
+        let expected = nodes![
+            Op::Push1(Imm::with_expression(Expression::Plus(
+                1.into(),
+                BigInt::from(-1).into(),
+            ))),
+            Op::Push1(Imm::with_expression(Expression::Times(
+                2.into(),
+                Terminal::Label("foo".into()).into()
+            ))),
+            Op::Push1(Imm::with_expression(Expression::Minus(
+                Box::new(Expression::Plus(
+                    1.into(),
+                    Box::new(Expression::Times(
+                        2.into(),
+                        Terminal::Label("foo".into()).into()
+                    ))
+                )),
+                Box::new(Expression::Divide(
+                    Terminal::Label("bar".into()).into(),
+                    42.into()
+                ))
+            ))),
+            Op::Push1(Imm::with_expression(Expression::Plus(
+                Box::new(Expression::Plus(
+                    Terminal::Number(0x20.into()).into(),
+                    1.into()
+                )),
+                2.into()
+            )))
+        ];
+        assert_eq!(parse_asm(&asm).unwrap(), expected)
+    }
+
+    #[test]
+    fn parse_push_macro_with_expression() {
+        let asm = format!(
+            r#"
+            push1 1
+            %push( 1 + 1 )
+            push1 2
+            "#,
+        );
+        let expected = nodes![
+            Op::Push1(Imm::from(1)),
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(1.into(), 1.into()))),
+            Op::Push1(Imm::from(2)),
+        ];
+        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+    }
+
+    #[test]
+    fn parse_expression_macro() {
+        let asm = format!(
+            r#"
+            %def foobar()
+                1+2
+            %end
+            push1 foobar()
+            "#,
+        );
+        let expected = nodes![
+            ExpressionMacroDefinition {
+                name: "foobar".into(),
+                parameters: vec![],
+                content: Imm::with_expression(Expression::Plus(1.into(), 2.into())),
+            },
+            Op::Push1(Imm::with_macro(ExpressionMacroInvocation {
+                name: "foobar".into(),
+                parameters: vec![]
+            })),
+        ];
+        assert_eq!(parse_asm(&asm).unwrap(), expected);
     }
 }

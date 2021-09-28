@@ -1,10 +1,7 @@
-use pest::iterators::{Pair, Pairs};
-
-use snafu::{ensure, OptionExt};
-
-use std::path::PathBuf;
-
 use super::{error, ParseError, Rule};
+use pest::iterators::{Pair, Pairs};
+use snafu::{ensure, OptionExt};
+use std::path::PathBuf;
 
 pub(super) trait FromPair: Sized {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError>;
@@ -29,8 +26,7 @@ pub(super) struct Label(pub(super) String);
 
 impl FromPair for Label {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError> {
-        ensure!(pair.as_rule() == Rule::label, error::ArgumentType);
-        let txt = pair.as_str();
+        let txt = pair.as_str().trim();
         Ok(Self(txt.into()))
     }
 }
@@ -65,7 +61,7 @@ impl Signature for () {
 
 impl<T> Signature for (T,)
 where
-    T: FromPair,
+    T: FromPair + std::fmt::Debug,
 {
     type Output = Self;
 

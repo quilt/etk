@@ -1,13 +1,13 @@
-use hex::ToHex;
-
+use super::expression::{Expression, Terminal};
+use super::macros::ExpressionMacroInvocation;
+use num_bigint::{BigInt, Sign};
 use snafu::{Backtrace, Snafu};
-
 use std::convert::TryFrom;
 use std::fmt::{self, Debug};
+use std::marker::PhantomData;
 
 /// An error that arises when converting an integer into an immediate.
 #[derive(Snafu, Debug)]
-#[snafu(visibility = "pub(super)")]
 pub struct TryFromIntError {
     backtrace: Backtrace,
 }
@@ -18,6 +18,12 @@ pub struct TryFromSliceError {
     backtrace: Backtrace,
 }
 
+impl From<std::convert::Infallible> for TryFromSliceError {
+    fn from(e: std::convert::Infallible) -> Self {
+        match e {}
+    }
+}
+
 impl From<std::convert::Infallible> for TryFromIntError {
     fn from(e: std::convert::Infallible) -> Self {
         match e {}
@@ -25,24 +31,50 @@ impl From<std::convert::Infallible> for TryFromIntError {
 }
 
 /// An immediate value for push instructions.
-#[derive(Clone, Eq, PartialEq)]
-pub enum Imm<T> {
-    /// A label argument.
-    Label(String),
-
-    /// A constant argument.
-    Constant(T),
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Imm<T> {
+    /// An infix tree representing a mathematical expression.
+    pub tree: Expression,
+    _p: PhantomData<T>,
 }
 
-impl<T> From<&str> for Imm<T> {
-    fn from(label: &str) -> Self {
-        Imm::Label(label.to_owned())
+impl<T> Imm<T> {
+    /// Construct an `Imm` with a label.
+    pub fn with_label<S: Into<String>>(s: S) -> Self {
+        Terminal::Label(s.into()).into()
+    }
+
+    /// Construct an `Imm` with a variable.
+    pub fn with_variable<S: Into<String>>(s: S) -> Self {
+        Terminal::Variable(s.into()).into()
+    }
+
+    /// Construct an `Imm` with an expression.
+    pub fn with_expression(e: Expression) -> Self {
+        e.into()
+    }
+
+    /// Construct an `Imm` with an expression macro.
+    pub fn with_macro(m: ExpressionMacroInvocation) -> Self {
+        Expression::Macro(m).into()
     }
 }
 
-impl<T> From<String> for Imm<T> {
-    fn from(label: String) -> Self {
-        Imm::Label(label)
+impl From<Vec<u8>> for Imm<Vec<u8>> {
+    fn from(konst: Vec<u8>) -> Self {
+        Imm::from(Terminal::Number(BigInt::from_bytes_be(Sign::Plus, &konst)))
+    }
+}
+
+impl<T> fmt::Display for Imm<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.tree)
+    }
+}
+
+impl From<u128> for Imm<Vec<u8>> {
+    fn from(konst: u128) -> Self {
+        Imm::from(Terminal::Number(konst.into()))
     }
 }
 
@@ -50,7 +82,10 @@ macro_rules! impl_from {
     ($ii:literal;) => {
         impl From<[u8; $ii]> for Imm<[u8; $ii]> {
             fn from(konst: [u8; $ii]) -> Self {
-                Imm::Constant(konst)
+                Imm::from(Terminal::Number(BigInt::from_bytes_be(
+                    Sign::Plus,
+                    &konst,
+                )))
             }
         }
     };
@@ -58,11 +93,7 @@ macro_rules! impl_from {
     ($ii:literal; $ty:ty $(, $rest:ty)* $(,)*) => {
         impl From<$ty> for Imm<[u8; $ii]> {
             fn from(x: $ty) -> Self {
-                let mut output = [0u8; $ii];
-                let bytes = x.to_be_bytes();
-                let start = $ii - bytes.len();
-                (&mut output[start..$ii]).copy_from_slice(&bytes);
-                Imm::Constant(output)
+                Imm::from(Terminal::Number(x.into()))
             }
         }
 
@@ -85,11 +116,7 @@ macro_rules! impl_try_from {
                     return TryFromIntContext.fail();
                 }
 
-                let mut output = [0u8; $ii];
-                let bytes = x.to_be_bytes();
-                let start = std::mem::size_of::<$ty>() - $ii;
-                output.copy_from_slice(&bytes[start..]);
-                Ok(Imm::Constant(output))
+                Ok(Imm::from(Terminal::Number(x.into())))
             }
         }
 
@@ -107,9 +134,10 @@ macro_rules! impl_try_from_slice {
                     return TryFromSliceContext.fail();
                 }
 
-                let mut output = [0u8; $ii];
-                output.copy_from_slice(x);
-                Ok(Imm::Constant(output))
+                Ok(Imm::from(Terminal::Number(BigInt::from_bytes_be(
+                    Sign::Plus,
+                    x,
+                ))))
             }
         }
     };
@@ -197,27 +225,18 @@ impl_try_from!(13; u128);
 impl_try_from!(14; u128);
 impl_try_from!(15; u128);
 
-impl<T> Debug for Imm<T>
-where
-    T: ToHex,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Imm::Label(s) => write!(f, r#"Imm::Label("{}")"#, s),
-            Imm::Constant(c) => write!(f, "Imm::Constant(0x{})", c.encode_hex::<String>()),
+impl<T> From<Expression> for Imm<T> {
+    fn from(tree: Expression) -> Self {
+        Self {
+            tree,
+            _p: PhantomData,
         }
     }
 }
 
-impl<T> fmt::Display for Imm<T>
-where
-    T: ToHex,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Imm::Label(s) => write!(f, ":{}", s),
-            Imm::Constant(c) => write!(f, "0x{}", c.encode_hex::<String>()),
-        }
+impl<T> From<Terminal> for Imm<T> {
+    fn from(terminal: Terminal) -> Self {
+        Expression::Terminal(terminal).into()
     }
 }
 
@@ -231,18 +250,3 @@ pub trait Immediate<const N: usize>: Debug + Clone + Eq + PartialEq {
 impl<T, const N: usize> Immediate<N> for [T; N] where T: Debug + Clone + Eq + PartialEq {}
 impl<const N: usize> Immediate<N> for Imm<[u8; N]> {}
 impl<const N: usize> Immediate<N> for () {}
-
-#[cfg(test)]
-mod tests {
-    use assert_matches::assert_matches;
-
-    use hex_literal::hex;
-
-    use super::*;
-
-    #[test]
-    fn imm4_from_array() {
-        let imm = Imm::from(hex!("95ea7b30"));
-        assert_matches!(imm, Imm::Constant([0x95, 0xea, 0x7b, 0x30]));
-    }
-}

@@ -1,4 +1,4 @@
-use crate::ops::{AbstractOp, Op};
+use crate::ops::{AbstractOp, ExpressionMacroDefinition, InstructionMacroDefinition, Op};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,5 +19,17 @@ impl From<Op> for Node {
 impl From<AbstractOp> for Node {
     fn from(op: AbstractOp) -> Self {
         Node::Op(op)
+    }
+}
+
+impl From<InstructionMacroDefinition> for Node {
+    fn from(item: InstructionMacroDefinition) -> Self {
+        Node::Op(item.into())
+    }
+}
+
+impl From<ExpressionMacroDefinition> for Node {
+    fn from(item: ExpressionMacroDefinition) -> Self {
+        Node::Op(item.into())
     }
 }
