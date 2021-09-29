@@ -1,4 +1,4 @@
-use etk_types::U256;
+use etk_types::num::U256;
 
 use num_traits as num;
 
@@ -101,6 +101,61 @@ fn saturating_add_overflows_small_plus_big() {
     let rhs = U256::max_value();
 
     assert_eq!(lhs.saturating_add(rhs), U256::max_value());
+}
+
+#[test]
+fn wrapping_mul_fits() {
+    let rhs = U256::new(2);
+    let lhs = U256::with_high_order(
+        0x67676767676767676767676767676767,
+        0x34343434343434343434343434343434,
+    );
+
+    assert_eq!(
+        lhs.wrapping_mul(rhs),
+        U256::with_high_order(
+            0xcececececececececececececececece,
+            0x68686868686868686868686868686868
+        ),
+    );
+}
+
+#[test]
+fn wrapping_mul_zero() {
+    let rhs = U256::new(0);
+    let lhs = U256::new(0);
+
+    assert_eq!(lhs.wrapping_mul(rhs), U256::new(0),);
+}
+
+#[test]
+fn wrapping_mul_max_value() {
+    let rhs = U256::max_value();
+    let lhs = U256::max_value();
+
+    assert_eq!(lhs.wrapping_mul(rhs), U256::new(1),);
+}
+
+#[test]
+fn wrapping_mul_low_overflow() {
+    let lhs = U256::new((1 << 64) + 1);
+    let rhs = U256::new((1 << 64) + 0xFFFFFFFFFFFFFFFF);
+
+    assert_eq!(
+        lhs.wrapping_mul(rhs),
+        U256::with_high_order(0x2, 0xffffffffffffffff),
+    );
+}
+
+#[test]
+fn wrapping_mul() {
+    let lhs = U256::new(10000000000000000);
+    let rhs = U256::new(10000000000000000);
+
+    assert_eq!(
+        lhs.wrapping_mul(rhs),
+        U256::new(100000000000000000000000000000000),
+    );
 }
 
 assert_impl_all!(
