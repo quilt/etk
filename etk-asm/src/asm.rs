@@ -266,7 +266,8 @@ impl Assembler {
                             ..
                         }) => {
                             let labels = op.expr().unwrap().labels(&self.declared_macros).unwrap();
-                            let declared: HashSet<_> = self.declared_labels.into_keys().collect();
+                            let declared: HashSet<_> =
+                                self.declared_labels.into_iter().map(|(k, _)| k).collect();
                             let invoked: HashSet<_> = labels.into_iter().collect();
                             let missing = invoked
                                 .difference(&declared)
