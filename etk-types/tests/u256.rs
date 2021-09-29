@@ -54,6 +54,55 @@ fn ord_greater_big() {
     assert_eq!(lhs.cmp(&rhs), Ordering::Greater);
 }
 
+#[test]
+fn checked_add_fits() {
+    let lhs = U256::new(100);
+    let rhs = U256::new(101);
+
+    assert_eq!(lhs.checked_add(rhs), Some(U256::new(201)));
+}
+
+#[test]
+fn checked_add_carry() {
+    let lhs = U256::new(u128::max_value());
+    let rhs = U256::new(1);
+
+    let expected = U256::with_high_order(1, 0);
+    assert_eq!(lhs.checked_add(rhs), Some(expected));
+}
+
+#[test]
+fn checked_add_overflow() {
+    let lhs = U256::max_value();
+    let rhs = U256::new(1);
+
+    assert_eq!(lhs.checked_add(rhs), None);
+}
+
+#[test]
+fn saturating_add_fits() {
+    let lhs = U256::new(100);
+    let rhs = U256::new(1);
+
+    assert_eq!(lhs.saturating_add(rhs), U256::new(101));
+}
+
+#[test]
+fn saturating_add_overflows_big_plus_small() {
+    let lhs = U256::max_value();
+    let rhs = U256::new(1);
+
+    assert_eq!(lhs.saturating_add(rhs), U256::max_value());
+}
+
+#[test]
+fn saturating_add_overflows_small_plus_big() {
+    let lhs = U256::new(1);
+    let rhs = U256::max_value();
+
+    assert_eq!(lhs.saturating_add(rhs), U256::max_value());
+}
+
 assert_impl_all!(
     U256: num::Num,
     num::NumAssign,

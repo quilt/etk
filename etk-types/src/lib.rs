@@ -31,7 +31,7 @@ where
     }
 }
 
-macro_rules! try_from_u256 {
+macro_rules! impl_try_from_u256 {
     ($($int:ty, )+) => {
         $(
         impl TryFrom<U256> for $int {
@@ -63,7 +63,7 @@ macro_rules! try_from_u256 {
     }
 }
 
-try_from_u256!(i8, u8, i16, u16, i32, u32, i64, u64, i128, isize, usize,);
+impl_try_from_u256!(i8, u8, i16, u16, i32, u32, i64, u64, i128, isize, usize,);
 
 impl TryFrom<U256> for u128 {
     type Error = TryFromIntError;
@@ -142,9 +142,11 @@ impl U256 {
     }
 
     #[inline]
-    pub const fn saturating_add(self, _rhs: Self) -> Self {
-        // TODO
-        self
+    pub const fn saturating_add(self, rhs: Self) -> Self {
+        match self.checked_add(rhs) {
+            Some(v) => v,
+            None => Self::max_value(),
+        }
     }
 
     #[inline]
