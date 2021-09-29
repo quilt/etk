@@ -1,0 +1,18 @@
+[package]
+name = "etk-types"
+version = "0.2.0-dev"
+edition = "2018"
+authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "EVM Toolkit integer types"
+homepage = "https://quilt.github.io/etk"
+repository = "https://github.com/quilt/etk"
+readme = "README.md"
+keywords = ["etk", "ethereum"]
+categories = ["cryptography::cryptocurrencies"]
+
+[dependencies]
+num-traits = { version = "0.2.14", default-features = false }
+
+[dev-dependencies]
+static_assertions = "1.1.0"
