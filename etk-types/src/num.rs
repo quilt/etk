@@ -366,27 +366,39 @@ impl U256 {
     #[allow(clippy::wrong_self_convention)]
     #[inline]
     pub const fn from_be(v: Self) -> Self {
-        // TODO
-        v
+        #[cfg(target_endian = "big")]
+        return v;
+
+        #[cfg(target_endian = "little")]
+        return v.swap_bytes();
     }
 
     #[allow(clippy::wrong_self_convention)]
     #[inline]
     pub const fn from_le(v: Self) -> Self {
-        // TODO
-        v
+        #[cfg(target_endian = "little")]
+        return v;
+
+        #[cfg(target_endian = "big")]
+        return v.swap_bytes();
     }
 
     #[inline]
     pub const fn to_be(self) -> Self {
-        // TODO
-        self
+        #[cfg(target_endian = "big")]
+        return self;
+
+        #[cfg(target_endian = "little")]
+        return self.swap_bytes();
     }
 
     #[inline]
     pub const fn to_le(self) -> Self {
-        // TODO
-        self
+        #[cfg(target_endian = "little")]
+        return self;
+
+        #[cfg(target_endian = "big")]
+        return self.swap_bytes();
     }
 
     #[inline]

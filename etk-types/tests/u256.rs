@@ -268,6 +268,169 @@ fn saturating_mul() {
     );
 }
 
+#[test]
+fn swap_bytes() {
+    let input = U256::with_high_order(
+        0x102030405060708090a0b0c0d0e0f01c,
+        0x112233445566778899aabbccddeeff1d,
+    );
+
+    let expected = U256::with_high_order(
+        0x1dffeeddccbbaa998877665544332211,
+        0x1cf0e0d0c0b0a0908070605040302010,
+    );
+
+    assert_eq!(input.swap_bytes(), expected);
+}
+
+#[test]
+fn from_le() {
+    let input = U256::with_high_order(
+        0x102030405060708090a0b0c0d0e0f01c,
+        0x112233445566778899aabbccddeeff1d,
+    );
+
+    #[cfg(target_endian = "little")]
+    let expected = input;
+
+    #[cfg(target_endian = "big")]
+    let expected = U256::with_high_order(
+        u128::from_le(0x112233445566778899aabbccddeeff1d),
+        u128::from_le(0x102030405060708090a0b0c0d0e0f01c),
+    );
+
+    assert_eq!(U256::from_le(input), expected);
+}
+
+#[test]
+fn from_be() {
+    let input = U256::with_high_order(
+        0x102030405060708090a0b0c0d0e0f01c,
+        0x112233445566778899aabbccddeeff1d,
+    );
+
+    #[cfg(target_endian = "big")]
+    let expected = input;
+
+    #[cfg(target_endian = "little")]
+    let expected = U256::with_high_order(
+        u128::from_be(0x112233445566778899aabbccddeeff1d),
+        u128::from_be(0x102030405060708090a0b0c0d0e0f01c),
+    );
+
+    assert_eq!(U256::from_be(input), expected);
+}
+
+#[test]
+fn to_le() {
+    let input = U256::with_high_order(
+        0x102030405060708090a0b0c0d0e0f01c,
+        0x112233445566778899aabbccddeeff1d,
+    );
+
+    #[cfg(target_endian = "little")]
+    let expected = input;
+
+    #[cfg(target_endian = "big")]
+    let expected = U256::with_high_order(
+        0x112233445566778899aabbccddeeff1du128.to_le(),
+        0x102030405060708090a0b0c0d0e0f01cu128.to_le(),
+    );
+
+    assert_eq!(U256::to_le(input), expected);
+}
+
+#[test]
+fn to_be() {
+    let input = U256::with_high_order(
+        0x102030405060708090a0b0c0d0e0f01c,
+        0x112233445566778899aabbccddeeff1d,
+    );
+
+    #[cfg(target_endian = "big")]
+    let expected = input;
+
+    #[cfg(target_endian = "little")]
+    let expected = U256::with_high_order(
+        0x112233445566778899aabbccddeeff1du128.to_be(),
+        0x102030405060708090a0b0c0d0e0f01cu128.to_be(),
+    );
+
+    assert_eq!(U256::to_be(input), expected);
+}
+
+#[test]
+fn count_ones_max_value() {
+    let input = U256::max_value();
+    assert_eq!(input.count_ones(), 256);
+}
+
+#[test]
+fn count_ones_min_value() {
+    let input = U256::min_value();
+    assert_eq!(input.count_ones(), 0);
+}
+
+#[test]
+fn count_zeros_max_value() {
+    let input = U256::max_value();
+    assert_eq!(input.count_zeros(), 0);
+}
+
+#[test]
+fn count_zeros_min_value() {
+    let input = U256::min_value();
+    assert_eq!(input.count_zeros(), 256);
+}
+
+#[test]
+fn leading_zeros_max_value() {
+    let input = U256::max_value();
+    assert_eq!(input.leading_zeros(), 0);
+}
+
+#[test]
+fn leading_zeros_min_value() {
+    let input = U256::min_value();
+    assert_eq!(input.leading_zeros(), 256);
+}
+
+#[test]
+fn leading_zeros_127() {
+    let input = U256::with_high_order(1, u128::max_value());
+    assert_eq!(input.leading_zeros(), 127);
+}
+
+#[test]
+fn leading_zeros_129() {
+    let input = U256::new(u128::max_value() >> 1);
+    assert_eq!(input.leading_zeros(), 129);
+}
+
+#[test]
+fn trailing_zeros_max_value() {
+    let input = U256::max_value();
+    assert_eq!(input.trailing_zeros(), 0);
+}
+
+#[test]
+fn trailing_zeros_min_value() {
+    let input = U256::min_value();
+    assert_eq!(input.trailing_zeros(), 256);
+}
+
+#[test]
+fn trailing_zeros_127() {
+    let input = U256::new(1 << 127);
+    assert_eq!(input.trailing_zeros(), 127);
+}
+
+#[test]
+fn trailing_zeros_129() {
+    let input = U256::with_high_order(2, 0);
+    assert_eq!(input.trailing_zeros(), 129);
+}
+
 assert_impl_all!(
     U256: num::Num,
     num::NumAssign,
