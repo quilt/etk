@@ -210,15 +210,71 @@ impl U256 {
     }
 
     #[inline]
-    pub const fn checked_mul(self, _rhs: Self) -> Option<Self> {
-        // TODO
-        None
+    pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
+        // TODO: Needs more tests
+
+        let (s0, s1, s2, s3) = self.split();
+        let (r0, r1, r2, r3) = rhs.split();
+
+        /*
+         * Now we have:
+         *  self = (s0 * (1 << 192)) + (s1 * (1 << 128)) + (s2 * (1 << 64)) + s3
+         *  rhs  = (r0 * (1 << 192)) + (r1 * (1 << 128)) + (r2 * (1 << 64)) + r3
+         */
+
+        let s0_r3: u128 = s0 as u128 * r3 as u128;
+        let s1_r2: u128 = s1 as u128 * r2 as u128;
+        let s1_r3: u128 = s1 as u128 * r3 as u128;
+        let s2_r1: u128 = s2 as u128 * r1 as u128;
+        let s2_r2: u128 = s2 as u128 * r2 as u128;
+        let s2_r3: u128 = s2 as u128 * r3 as u128;
+        let s3_r0: u128 = s3 as u128 * r0 as u128;
+        let s3_r1: u128 = s3 as u128 * r1 as u128;
+        let s3_r2: u128 = s3 as u128 * r2 as u128;
+        let s3_r3: u128 = s3 as u128 * r3 as u128;
+
+        macro_rules! try_ {
+            ($v:expr) => {
+                if let Some(val) = $v {
+                    val
+                } else {
+                    return None;
+                }
+            };
+        }
+
+        let mut high = try_!(s0_r3.checked_shl(64));
+        high = try_!(high.checked_add(try_!(s1_r2.checked_shl(64))));
+        high = try_!(high.checked_add(s1_r3));
+        high = try_!(high.checked_add(try_!(s2_r1.checked_shl(64))));
+        high = try_!(high.checked_add(s2_r2));
+        high = try_!(high.checked_add(s2_r3.wrapping_shr(64)));
+
+        let low = s2_r3.wrapping_shl(64);
+
+        high = try_!(high.checked_add(try_!(s3_r0.checked_shl(64))));
+        high = try_!(high.checked_add(s3_r1));
+        high = try_!(high.checked_add(s3_r2.wrapping_shr(64)));
+
+        let (low, over) = low.overflowing_add(s3_r2.wrapping_shl(64));
+        if over {
+            high = try_!(high.checked_add(1));
+        }
+
+        let (low, over) = low.overflowing_add(s3_r3);
+        if over {
+            high = try_!(high.checked_add(1));
+        }
+
+        Some(Self { high, low })
     }
 
     #[inline]
-    pub const fn saturating_mul(self, _rhs: Self) -> Self {
-        // TODO
-        self
+    pub const fn saturating_mul(self, rhs: Self) -> Self {
+        match self.checked_mul(rhs) {
+            Some(v) => v,
+            None => Self::max_value(),
+        }
     }
 
     #[inline]

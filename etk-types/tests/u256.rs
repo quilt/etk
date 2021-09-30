@@ -158,6 +158,116 @@ fn wrapping_mul() {
     );
 }
 
+#[test]
+fn checked_mul_fits() {
+    let rhs = U256::new(2);
+    let lhs = U256::with_high_order(
+        0x67676767676767676767676767676767,
+        0x34343434343434343434343434343434,
+    );
+
+    assert_eq!(
+        lhs.checked_mul(rhs),
+        Some(U256::with_high_order(
+            0xcececececececececececececececece,
+            0x68686868686868686868686868686868
+        )),
+    );
+}
+
+#[test]
+fn checked_mul_zero() {
+    let rhs = U256::new(0);
+    let lhs = U256::new(0);
+
+    assert_eq!(lhs.checked_mul(rhs), Some(U256::new(0)));
+}
+
+#[test]
+fn checked_mul_max_value() {
+    let rhs = U256::max_value();
+    let lhs = U256::max_value();
+
+    assert_eq!(lhs.checked_mul(rhs), None);
+}
+
+#[test]
+fn checked_mul_low_overflow() {
+    let lhs = U256::new((1 << 64) + 1);
+    let rhs = U256::new((1 << 64) + 0xFFFFFFFFFFFFFFFF);
+
+    assert_eq!(
+        lhs.checked_mul(rhs),
+        Some(U256::with_high_order(0x2, 0xffffffffffffffff)),
+    );
+}
+
+#[test]
+fn checked_mul() {
+    let lhs = U256::new(10000000000000000);
+    let rhs = U256::new(10000000000000000);
+
+    assert_eq!(
+        lhs.checked_mul(rhs),
+        Some(U256::new(100000000000000000000000000000000)),
+    );
+}
+
+#[test]
+fn saturating_mul_fits() {
+    let rhs = U256::new(2);
+    let lhs = U256::with_high_order(
+        0x67676767676767676767676767676767,
+        0x34343434343434343434343434343434,
+    );
+
+    assert_eq!(
+        lhs.saturating_mul(rhs),
+        U256::with_high_order(
+            0xcececececececececececececececece,
+            0x68686868686868686868686868686868
+        ),
+    );
+}
+
+#[test]
+fn saturating_mul_zero() {
+    let rhs = U256::new(0);
+    let lhs = U256::new(0);
+
+    assert_eq!(lhs.saturating_mul(rhs), U256::new(0));
+}
+
+#[test]
+fn saturating_mul_max_value() {
+    let rhs = U256::max_value();
+    let lhs = U256::max_value();
+
+    assert_eq!(lhs.saturating_mul(rhs), U256::max_value());
+}
+
+#[test]
+fn saturating_mul_low_overflow() {
+    let lhs = U256::new((1 << 64) + 1);
+    let rhs = U256::new((1 << 64) + 0xFFFFFFFFFFFFFFFF);
+
+    assert_eq!(
+        lhs.saturating_mul(rhs),
+        U256::with_high_order(0x2, 0xffffffffffffffff),
+    );
+}
+
+#[test]
+fn saturating_mul() {
+    let lhs = U256::new(10000000000000000);
+    let rhs = U256::new(10000000000000000);
+
+    assert_eq!(
+        lhs.saturating_mul(rhs),
+        U256::new(100000000000000000000000000000000),
+    );
+}
+
 assert_impl_all!(
     U256: num::Num,
     num::NumAssign,
