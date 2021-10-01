@@ -150,5 +150,52 @@ fn multiplication(c: &mut Criterion) {
     });
 }
 
+fn endian(c: &mut Criterion) {
+    c.bench_function("etk_to_be_bytes", |b| {
+        let value = U256::with_high_order(
+            0x67676767676767676767676767676767,
+            0x34343434343434343434343434343434,
+        );
+
+        b.iter(|| black_box(black_box(value).to_be_bytes()))
+    });
+
+    #[cfg(feature = "benches-comparison")]
+    c.bench_function("pt_to_big_endian", |b| {
+        use primitive_types::U256;
+
+        let value = U256::from([
+            0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67,
+            0x67, 0x67, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34,
+            0x34, 0x34, 0x34, 0x34,
+        ]);
+
+        b.iter(|| black_box(value).to_big_endian(&mut black_box([0u8; 32])))
+    });
+
+    c.bench_function("etk_to_le_bytes", |b| {
+        let value = U256::with_high_order(
+            0x67676767676767676767676767676767,
+            0x34343434343434343434343434343434,
+        );
+
+        b.iter(|| black_box(black_box(value).to_le_bytes()))
+    });
+
+    #[cfg(feature = "benches-comparison")]
+    c.bench_function("pt_to_little_endian", |b| {
+        use primitive_types::U256;
+
+        let value = U256::from([
+            0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67,
+            0x67, 0x67, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34, 0x34,
+            0x34, 0x34, 0x34, 0x34,
+        ]);
+
+        b.iter(|| black_box(value).to_little_endian(&mut black_box([0u8; 32])))
+    });
+}
+
+criterion_group!(conversion, endian);
 criterion_group!(arithmetic, multiplication, addition);
-criterion_main!(arithmetic);
+criterion_main!(conversion, arithmetic);

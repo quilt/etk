@@ -210,6 +210,7 @@ impl U256 {
     }
 
     #[inline]
+    #[allow(clippy::question_mark)] // `?` isn't supported in const fn yet.
     pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
         // TODO: Needs more tests
 
@@ -484,21 +485,149 @@ impl U256 {
     }
 
     #[inline]
-    pub const fn to_le_bytes(self) -> [u8; 32] {
-        // TODO
-        [0; 32]
+    pub fn to_le_bytes(self) -> [u8; 32] {
+        // TODO: Optimize further.
+        union Transmute {
+            from: [u128; 2],
+            to: [u8; 32],
+        }
+
+        static_assertions::assert_eq_size!(Transmute, [u128; 2], [u8; 32]);
+        static_assertions::assert_eq_align!(Transmute, [u128; 2]);
+
+        unsafe {
+            Transmute {
+                from: [self.low.to_le(), self.high.to_le()],
+            }
+            .to
+        }
     }
 
     #[inline]
-    pub const fn to_be_bytes(self) -> [u8; 32] {
-        // TODO
-        [0; 32]
+    pub const fn to_le_bytes_const(self) -> [u8; 32] {
+        // TODO: Deprecate this in a later Rust version, once `const_fn_union`
+        //       is stabilized: https://github.com/rust-lang/rust/issues/51909
+        let low = self.low.to_le_bytes();
+        let high = self.high.to_le_bytes();
+
+        let mut output = [0; 32];
+        output[0] = low[0];
+        output[1] = low[1];
+        output[2] = low[2];
+        output[3] = low[3];
+        output[4] = low[4];
+        output[5] = low[5];
+        output[6] = low[6];
+        output[7] = low[7];
+        output[8] = low[8];
+        output[9] = low[9];
+        output[10] = low[10];
+        output[11] = low[11];
+        output[12] = low[12];
+        output[13] = low[13];
+        output[14] = low[14];
+        output[15] = low[15];
+        output[16] = high[0];
+        output[17] = high[1];
+        output[18] = high[2];
+        output[19] = high[3];
+        output[20] = high[4];
+        output[21] = high[5];
+        output[22] = high[6];
+        output[23] = high[7];
+        output[24] = high[8];
+        output[25] = high[9];
+        output[26] = high[10];
+        output[27] = high[11];
+        output[28] = high[12];
+        output[29] = high[13];
+        output[30] = high[14];
+        output[31] = high[15];
+
+        output
     }
 
     #[inline]
-    pub const fn to_ne_bytes(self) -> [u8; 32] {
-        // TODO
-        [0; 32]
+    pub fn to_be_bytes(self) -> [u8; 32] {
+        // TODO: Optimize further.
+        union Transmute {
+            from: [u128; 2],
+            to: [u8; 32],
+        }
+
+        static_assertions::assert_eq_size!(Transmute, [u128; 2], [u8; 32]);
+        static_assertions::assert_eq_align!(Transmute, [u128; 2]);
+
+        unsafe {
+            Transmute {
+                from: [self.high.to_be(), self.low.to_be()],
+            }
+            .to
+        }
+    }
+
+    #[inline]
+    pub const fn to_be_bytes_const(self) -> [u8; 32] {
+        // TODO: Deprecate this in a later Rust version, once `const_fn_union`
+        //       is stabilized: https://github.com/rust-lang/rust/issues/51909
+        let low = self.low.to_be_bytes();
+        let high = self.high.to_be_bytes();
+
+        let mut output = [0; 32];
+        output[0] = high[0];
+        output[1] = high[1];
+        output[2] = high[2];
+        output[3] = high[3];
+        output[4] = high[4];
+        output[5] = high[5];
+        output[6] = high[6];
+        output[7] = high[7];
+        output[8] = high[8];
+        output[9] = high[9];
+        output[10] = high[10];
+        output[11] = high[11];
+        output[12] = high[12];
+        output[13] = high[13];
+        output[14] = high[14];
+        output[15] = high[15];
+        output[16] = low[0];
+        output[17] = low[1];
+        output[18] = low[2];
+        output[19] = low[3];
+        output[20] = low[4];
+        output[21] = low[5];
+        output[22] = low[6];
+        output[23] = low[7];
+        output[24] = low[8];
+        output[25] = low[9];
+        output[26] = low[10];
+        output[27] = low[11];
+        output[28] = low[12];
+        output[29] = low[13];
+        output[30] = low[14];
+        output[31] = low[15];
+
+        output
+    }
+
+    #[inline]
+    pub fn to_ne_bytes(self) -> [u8; 32] {
+        #[cfg(target_endian = "big")]
+        return self.to_be_bytes();
+
+        #[cfg(target_endian = "little")]
+        return self.to_le_bytes();
+    }
+
+    #[inline]
+    pub const fn to_ne_bytes_const(self) -> [u8; 32] {
+        // TODO: Deprecate this in a later Rust version, once `const_fn_union`
+        //       is stabilized: https://github.com/rust-lang/rust/issues/51909
+        #[cfg(target_endian = "big")]
+        return self.to_be_bytes_const();
+
+        #[cfg(target_endian = "little")]
+        return self.to_le_bytes_const();
     }
 
     #[inline]
