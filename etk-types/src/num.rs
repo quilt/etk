@@ -287,21 +287,48 @@ impl U256 {
     }
 
     #[inline]
-    pub const fn wrapping_sub(self, _rhs: Self) -> Self {
-        // TODO
-        self
+    pub const fn wrapping_sub(self, rhs: Self) -> Self {
+        let (low, low_overflow) = self.low.overflowing_sub(rhs.low);
+        let high = self.high.wrapping_sub(rhs.high);
+        U256 {
+            low,
+            high: if low_overflow {
+                high.wrapping_sub(1)
+            } else {
+                high
+            },
+        }
     }
 
     #[inline]
-    pub const fn checked_sub(self, _rhs: Self) -> Option<Self> {
-        // TODO
-        None
+    pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
+        let (mid, mid_overflow) = self.high.overflowing_sub(rhs.high);
+
+        if mid_overflow {
+            return None;
+        }
+
+        let (low, low_overflow) = self.low.overflowing_sub(rhs.low);
+
+        if !low_overflow {
+            return Some(Self { high: mid, low });
+        }
+
+        let (high, high_overflow) = mid.overflowing_sub(1);
+
+        if high_overflow {
+            None
+        } else {
+            Some(Self { high, low })
+        }
     }
 
     #[inline]
-    pub const fn saturating_sub(self, _rhs: Self) -> Self {
-        // TODO
-        self
+    pub const fn saturating_sub(self, rhs: Self) -> Self {
+        match self.checked_sub(rhs) {
+            Some(v) => v,
+            None => Self::min_value(),
+        }
     }
 
     #[inline]

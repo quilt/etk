@@ -55,6 +55,31 @@ fn ord_greater_big() {
 }
 
 #[test]
+fn wrapping_add_fits() {
+    let lhs = U256::new(100);
+    let rhs = U256::new(101);
+
+    assert_eq!(lhs.wrapping_add(rhs), U256::new(201));
+}
+
+#[test]
+fn wrapping_add_carry() {
+    let lhs = U256::new(u128::max_value());
+    let rhs = U256::new(1);
+
+    let expected = U256::with_high_order(1, 0);
+    assert_eq!(lhs.wrapping_add(rhs), expected);
+}
+
+#[test]
+fn wrapping_add_overflow() {
+    let lhs = U256::max_value();
+    let rhs = U256::new(1);
+
+    assert_eq!(lhs.wrapping_add(rhs), U256::new(0));
+}
+
+#[test]
 fn checked_add_fits() {
     let lhs = U256::new(100);
     let rhs = U256::new(101);
@@ -101,6 +126,56 @@ fn saturating_add_overflows_small_plus_big() {
     let rhs = U256::max_value();
 
     assert_eq!(lhs.saturating_add(rhs), U256::max_value());
+}
+
+#[test]
+fn wrapping_sub_fits() {
+    let lhs = U256::new(201);
+    let rhs = U256::new(100);
+
+    assert_eq!(lhs.wrapping_sub(rhs), U256::new(101));
+}
+
+#[test]
+fn wrapping_sub_carry() {
+    let lhs = U256::with_high_order(1, 0);
+    let rhs = U256::new(1);
+
+    let expected = U256::new(u128::max_value());
+    assert_eq!(lhs.wrapping_sub(rhs), expected);
+}
+
+#[test]
+fn wrapping_sub_overflow() {
+    let lhs = U256::new(0);
+    let rhs = U256::new(1);
+
+    assert_eq!(lhs.wrapping_sub(rhs), U256::max_value());
+}
+
+#[test]
+fn checked_sub_fits() {
+    let lhs = U256::new(201);
+    let rhs = U256::new(100);
+
+    assert_eq!(lhs.checked_sub(rhs), Some(U256::new(101)));
+}
+
+#[test]
+fn checked_sub_carry() {
+    let lhs = U256::with_high_order(1, 0);
+    let rhs = U256::new(1);
+
+    let expected = U256::new(u128::max_value());
+    assert_eq!(lhs.checked_sub(rhs), Some(expected));
+}
+
+#[test]
+fn checked_sub_overflow() {
+    let lhs = U256::new(0);
+    let rhs = U256::new(1);
+
+    assert_eq!(lhs.checked_sub(rhs), None);
 }
 
 #[test]

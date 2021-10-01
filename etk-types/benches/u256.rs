@@ -2,6 +2,80 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use etk_types::num::U256;
 
+fn subtraction(c: &mut Criterion) {
+    c.bench_function("etk_wrapping_sub", |b| {
+        let lhs = U256::new(20);
+        let rhs = U256::with_high_order(
+            0x67676767676767676767676767676767,
+            0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+        );
+
+        b.iter(|| black_box(black_box(lhs).wrapping_sub(black_box(rhs))))
+    });
+
+    #[cfg(feature = "benches-comparison")]
+    c.bench_function("pt_overflowing_sub", |b| {
+        use primitive_types::U256;
+
+        let lhs = U256::from(20);
+        let rhs = U256::from([
+            0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67,
+            0x67, 0x67, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF,
+        ]);
+
+        b.iter(|| black_box(black_box(lhs).overflowing_sub(black_box(rhs))))
+    });
+
+    c.bench_function("etk_saturating_sub", |b| {
+        let lhs = U256::new(20);
+        let rhs = U256::with_high_order(
+            0x67676767676767676767676767676767,
+            0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+        );
+
+        b.iter(|| black_box(black_box(lhs).saturating_sub(black_box(rhs))))
+    });
+
+    #[cfg(feature = "benches-comparison")]
+    c.bench_function("pt_saturating_sub", |b| {
+        use primitive_types::U256;
+
+        let lhs = U256::from(20);
+        let rhs = U256::from([
+            0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67,
+            0x67, 0x67, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF,
+        ]);
+
+        b.iter(|| black_box(black_box(lhs).saturating_sub(black_box(rhs))))
+    });
+
+    c.bench_function("etk_checked_sub", |b| {
+        let lhs = U256::new(20);
+        let rhs = U256::with_high_order(
+            0x67676767676767676767676767676767,
+            0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+        );
+
+        b.iter(|| black_box(black_box(lhs).checked_sub(black_box(rhs))))
+    });
+
+    #[cfg(feature = "benches-comparison")]
+    c.bench_function("pt_checked_sub", |b| {
+        use primitive_types::U256;
+
+        let lhs = U256::from(20);
+        let rhs = U256::from([
+            0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67, 0x67,
+            0x67, 0x67, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF,
+        ]);
+
+        b.iter(|| black_box(black_box(lhs).checked_sub(black_box(rhs))))
+    });
+}
+
 fn addition(c: &mut Criterion) {
     c.bench_function("etk_wrapping_add", |b| {
         let lhs = U256::new(20);
@@ -230,5 +304,5 @@ fn endian(c: &mut Criterion) {
 }
 
 criterion_group!(conversion, endian);
-criterion_group!(arithmetic, multiplication, addition);
+criterion_group!(arithmetic, multiplication, addition, subtraction);
 criterion_main!(conversion, arithmetic);
