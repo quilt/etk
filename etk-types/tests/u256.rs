@@ -389,6 +389,25 @@ fn to_be_bytes() {
 }
 
 #[test]
+fn to_be() {
+    let input = U256::with_high_order(
+        0x102030405060708090a0b0c0d0e0f01c,
+        0x112233445566778899aabbccddeeff1d,
+    );
+
+    #[cfg(target_endian = "big")]
+    let expected = input;
+
+    #[cfg(target_endian = "little")]
+    let expected = U256::with_high_order(
+        0x112233445566778899aabbccddeeff1du128.to_be(),
+        0x102030405060708090a0b0c0d0e0f01cu128.to_be(),
+    );
+
+    assert_eq!(U256::to_be(input), expected);
+}
+
+#[test]
 fn to_ne_bytes() {
     let input = U256::with_high_order(
         0x102030405060708090a0b0c0d0e0f01c,
@@ -437,22 +456,67 @@ fn to_ne_bytes_const() {
 }
 
 #[test]
-fn to_be() {
-    let input = U256::with_high_order(
+fn from_be_bytes() {
+    let input = [
+        0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0,
+        0x1c, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee,
+        0xff, 0x1d,
+    ];
+
+    let expected = U256::with_high_order(
         0x102030405060708090a0b0c0d0e0f01c,
         0x112233445566778899aabbccddeeff1d,
     );
 
-    #[cfg(target_endian = "big")]
-    let expected = input;
+    assert_eq!(U256::from_be_bytes(input), expected);
+}
 
-    #[cfg(target_endian = "little")]
+#[test]
+fn from_be_bytes_const() {
+    let input = [
+        0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0,
+        0x1c, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee,
+        0xff, 0x1d,
+    ];
+
     let expected = U256::with_high_order(
-        0x112233445566778899aabbccddeeff1du128.to_be(),
-        0x102030405060708090a0b0c0d0e0f01cu128.to_be(),
+        0x102030405060708090a0b0c0d0e0f01c,
+        0x112233445566778899aabbccddeeff1d,
     );
 
-    assert_eq!(U256::to_be(input), expected);
+    assert_eq!(U256::from_be_bytes_const(input), expected);
+}
+
+#[test]
+fn from_le_bytes() {
+    let input = [
+        0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0,
+        0x1c, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee,
+        0xff, 0x1d,
+    ];
+
+    let expected = U256::with_high_order(
+        0x1dffeeddccbbaa998877665544332211,
+        0x1cf0e0d0c0b0a0908070605040302010,
+    );
+
+    assert_eq!(U256::from_le_bytes(input), expected);
+}
+
+#[test]
+fn from_le_bytes_const() {
+    let input = [
+        0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0,
+        0x1c, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee,
+        0xff, 0x1d,
+    ];
+
+    let expected = U256::with_high_order(
+        0x1dffeeddccbbaa998877665544332211,
+        0x1cf0e0d0c0b0a0908070605040302010,
+    );
+
+    assert_eq!(U256::from_le_bytes_const(input), expected);
 }
 
 #[test]

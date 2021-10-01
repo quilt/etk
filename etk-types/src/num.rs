@@ -10,6 +10,14 @@ fn try_from_int_error() -> TryFromIntError {
     u8::try_from(256).unwrap_err()
 }
 
+union Transmute {
+    ints: [u128; 2],
+    bytes: [u8; 32],
+}
+
+static_assertions::assert_eq_size!(Transmute, [u128; 2], [u8; 32]);
+static_assertions::assert_eq_align!(Transmute, [u128; 2]);
+
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct U256 {
     high: u128,
@@ -487,20 +495,11 @@ impl U256 {
     #[inline]
     pub fn to_le_bytes(self) -> [u8; 32] {
         // TODO: Optimize further.
-        union Transmute {
-            from: [u128; 2],
-            to: [u8; 32],
-        }
+        let transmute = Transmute {
+            ints: [self.low.to_le(), self.high.to_le()],
+        };
 
-        static_assertions::assert_eq_size!(Transmute, [u128; 2], [u8; 32]);
-        static_assertions::assert_eq_align!(Transmute, [u128; 2]);
-
-        unsafe {
-            Transmute {
-                from: [self.low.to_le(), self.high.to_le()],
-            }
-            .to
-        }
+        unsafe { transmute.bytes }
     }
 
     #[inline]
@@ -550,20 +549,11 @@ impl U256 {
     #[inline]
     pub fn to_be_bytes(self) -> [u8; 32] {
         // TODO: Optimize further.
-        union Transmute {
-            from: [u128; 2],
-            to: [u8; 32],
-        }
+        let transmute = Transmute {
+            ints: [self.high.to_be(), self.low.to_be()],
+        };
 
-        static_assertions::assert_eq_size!(Transmute, [u128; 2], [u8; 32]);
-        static_assertions::assert_eq_align!(Transmute, [u128; 2]);
-
-        unsafe {
-            Transmute {
-                from: [self.high.to_be(), self.low.to_be()],
-            }
-            .to
-        }
+        unsafe { transmute.bytes }
     }
 
     #[inline]
@@ -631,21 +621,127 @@ impl U256 {
     }
 
     #[inline]
-    pub const fn from_be_bytes(_: [u8; 32]) -> Self {
-        // TODO
-        Self { high: 0, low: 0 }
+    pub fn from_be_bytes(bytes: [u8; 32]) -> Self {
+        // TODO: Optimize this further.
+        let transmute = Transmute { bytes };
+        let [high, low] = unsafe { transmute.ints };
+        Self {
+            high: u128::from_be(high),
+            low: u128::from_be(low),
+        }
     }
 
     #[inline]
-    pub const fn from_le_bytes(_: [u8; 32]) -> Self {
-        // TODO
-        Self { high: 0, low: 0 }
+    pub const fn from_be_bytes_const(bytes: [u8; 32]) -> Self {
+        // TODO: Deprecate this in a later Rust version, once `const_fn_union`
+        //       is stabilized: https://github.com/rust-lang/rust/issues/51909
+
+        let high = ((bytes[0] as u128) << 120)
+            + ((bytes[1] as u128) << 112)
+            + ((bytes[2] as u128) << 104)
+            + ((bytes[3] as u128) << 96)
+            + ((bytes[4] as u128) << 88)
+            + ((bytes[5] as u128) << 80)
+            + ((bytes[6] as u128) << 72)
+            + ((bytes[7] as u128) << 64)
+            + ((bytes[8] as u128) << 56)
+            + ((bytes[9] as u128) << 48)
+            + ((bytes[10] as u128) << 40)
+            + ((bytes[11] as u128) << 32)
+            + ((bytes[12] as u128) << 24)
+            + ((bytes[13] as u128) << 16)
+            + ((bytes[14] as u128) << 8)
+            + (bytes[15] as u128);
+
+        let low = ((bytes[16] as u128) << 120)
+            + ((bytes[17] as u128) << 112)
+            + ((bytes[18] as u128) << 104)
+            + ((bytes[19] as u128) << 96)
+            + ((bytes[20] as u128) << 88)
+            + ((bytes[21] as u128) << 80)
+            + ((bytes[22] as u128) << 72)
+            + ((bytes[23] as u128) << 64)
+            + ((bytes[24] as u128) << 56)
+            + ((bytes[25] as u128) << 48)
+            + ((bytes[26] as u128) << 40)
+            + ((bytes[27] as u128) << 32)
+            + ((bytes[28] as u128) << 24)
+            + ((bytes[29] as u128) << 16)
+            + ((bytes[30] as u128) << 8)
+            + (bytes[31] as u128);
+
+        Self { high, low }
     }
 
     #[inline]
-    pub const fn from_ne_bytes(_: [u8; 32]) -> Self {
-        // TODO
-        Self { high: 0, low: 0 }
+    pub fn from_le_bytes(bytes: [u8; 32]) -> Self {
+        // TODO: Optimize this further.
+        let transmute = Transmute { bytes };
+        let [low, high] = unsafe { transmute.ints };
+        Self {
+            high: u128::from_le(high),
+            low: u128::from_le(low),
+        }
+    }
+
+    #[inline]
+    pub const fn from_le_bytes_const(bytes: [u8; 32]) -> Self {
+        // TODO: Deprecate this in a later Rust version, once `const_fn_union`
+        //       is stabilized: https://github.com/rust-lang/rust/issues/51909
+
+        let low = ((bytes[15] as u128) << 120)
+            + ((bytes[14] as u128) << 112)
+            + ((bytes[13] as u128) << 104)
+            + ((bytes[12] as u128) << 96)
+            + ((bytes[11] as u128) << 88)
+            + ((bytes[10] as u128) << 80)
+            + ((bytes[9] as u128) << 72)
+            + ((bytes[8] as u128) << 64)
+            + ((bytes[7] as u128) << 56)
+            + ((bytes[6] as u128) << 48)
+            + ((bytes[5] as u128) << 40)
+            + ((bytes[4] as u128) << 32)
+            + ((bytes[3] as u128) << 24)
+            + ((bytes[2] as u128) << 16)
+            + ((bytes[1] as u128) << 8)
+            + (bytes[0] as u128);
+
+        let high = ((bytes[31] as u128) << 120)
+            + ((bytes[30] as u128) << 112)
+            + ((bytes[29] as u128) << 104)
+            + ((bytes[28] as u128) << 96)
+            + ((bytes[27] as u128) << 88)
+            + ((bytes[26] as u128) << 80)
+            + ((bytes[25] as u128) << 72)
+            + ((bytes[24] as u128) << 64)
+            + ((bytes[23] as u128) << 56)
+            + ((bytes[22] as u128) << 48)
+            + ((bytes[21] as u128) << 40)
+            + ((bytes[20] as u128) << 32)
+            + ((bytes[19] as u128) << 24)
+            + ((bytes[18] as u128) << 16)
+            + ((bytes[17] as u128) << 8)
+            + (bytes[16] as u128);
+
+        Self { high, low }
+    }
+
+    #[inline]
+    pub fn from_ne_bytes(bytes: [u8; 32]) -> Self {
+        #[cfg(target_endian = "big")]
+        return Self::from_be_bytes(bytes);
+
+        #[cfg(target_endian = "little")]
+        return Self::from_le_bytes(bytes);
+    }
+
+    #[inline]
+    pub const fn from_ne_bytes_const(bytes: [u8; 32]) -> Self {
+        #[cfg(target_endian = "big")]
+        return Self::from_be_bytes_const(bytes);
+
+        #[cfg(target_endian = "little")]
+        return Self::from_le_bytes_const(bytes);
     }
 }
 
