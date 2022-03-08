@@ -1,6 +1,8 @@
-# Labels & Pushes
+# Labels
 
 Manually counting out jump destination addresses would be a monumentally pointless task, so the assembler supports assigning names (or _labels_) to specific locations in code:
+
+## Labels
 
 ```rust
 # extern crate etk_asm;
