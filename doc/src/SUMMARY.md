@@ -12,5 +12,5 @@
     - [Macros](./ch02-lang/ch04-macros/README.md)
         - [Built-In](./ch02-lang/ch04-macros/ch01-builtins.md)
         - [Expression Macros](./ch02-lang/ch04-macros/ch02-expression.md)
-        - [Instruction Macros]()
+        - [Instruction Macros](./ch02-lang/ch04-macros/ch03-instruction.md)
     - [Examples]()
