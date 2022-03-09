@@ -7,7 +7,7 @@
     - [`disease`](./ch01-cli/ch02-disease.md)
 - [Language & Syntax](./ch02-lang/README.md)
     - [Instructions](./ch02-lang/ch01-instructions.md)
-    - [Expressions](./ch02-lang/ch02-push.md)
+    - [Expressions](./ch02-lang/ch02-expressions.md)
     - [Labels](./ch02-lang/ch03-labels.md)
     - [Macros](./ch02-lang/ch04-macros/README.md)
         - [Built-In](./ch02-lang/ch04-macros/ch01-builtins.md)
