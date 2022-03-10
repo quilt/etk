@@ -2,7 +2,7 @@
 
 ## `push` opcodes
 
-The `push` opcodes are the only EVM opcodes that have an immediate argument. This means that instead of taking an argument off the stack, the `push` opcodes reads the bytes from code which immedaitely succeed the op.
+The `push` opcodes are the only EVM opcodes that have an immediate argument. This means that instead of taking an argument off the stack, the opcode reads the bytes from code which immedaitely succeed the op.
 
 For example, `push2 258` would assemble to `0x610102`. `push2` notifies the EVM that it should use the next two bytes `0x01` and `0x02` as input for the op. That value is left-padded to 32 bytes and placed on the stack.
 
@@ -44,7 +44,7 @@ There is no limit for the length of integer literals.
 
 #### Labels
 
-A label may be used as a term in an expression.
+A [label](ch03-labels.md) may be used as a term in an expression.
 
 ```rust
 # extern crate etk_asm;
@@ -60,7 +60,7 @@ start:
 
 #### Macros
 
-Expression macros may be used as a term in an expression.
+[Expression macros](ch04-macros/ch02-expression.md) may be used as a term in an expression.
 
 ```rust
 # extern crate etk_asm;
