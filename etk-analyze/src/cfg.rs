@@ -57,15 +57,15 @@ impl fmt::Debug for ControlFlowGraph {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         #[derive(Debug)]
         struct ControlFlowGraph<'a> {
-            by_offset: &'a BTreeMap<usize, NodeIndex>,
-            node_count: usize,
-            edge_count: usize,
+            _by_offset: &'a BTreeMap<usize, NodeIndex>,
+            _node_count: usize,
+            _edge_count: usize,
         }
 
         let helper = ControlFlowGraph {
-            by_offset: &self.by_offset,
-            node_count: self.graph.node_count(),
-            edge_count: self.graph.edge_count(),
+            _by_offset: &self.by_offset,
+            _node_count: self.graph.node_count(),
+            _edge_count: self.graph.edge_count(),
         };
 
         helper.fmt(f)
