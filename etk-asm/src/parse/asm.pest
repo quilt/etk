@@ -35,7 +35,7 @@ half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
 // instruction macros //
 ////////////////////////
 instruction_macro_definition = { "%macro" ~ function_declaration ~ NEWLINE* ~ (instruction_macro_stmt ~ NEWLINE)* ~ "%end" }
-instruction_macro_stmt = _{ label_definition | builtin | instruction_macro | push | op }
+instruction_macro_stmt = _{ label_definition | "%" ~ push_macro | !builtin ~ (instruction_macro | push | op) }
 instruction_macro_variable = @{ "$" ~ function_parameter }
 instruction_macro = !{ "%" ~ function_invocation }
 
