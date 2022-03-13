@@ -447,6 +447,8 @@ mod tests {
                 gasprice
                 pop
                 push1 $foo + $bar
+                %push(0x42)
+                %another_macro()
             %end
             %my_macro(0x42, 10)
             "#,
@@ -466,6 +468,11 @@ mod tests {
                             )
                             .into()
                         )),
+                        AbstractOp::Push(0x42.into()),
+                        AbstractOp::Macro(InstructionMacroInvocation {
+                            name: "another_macro".into(),
+                            parameters: vec![]
+                        })
                     ]
                 }
                 .into()
