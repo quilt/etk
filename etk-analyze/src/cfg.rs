@@ -57,8 +57,11 @@ impl fmt::Debug for ControlFlowGraph {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         #[derive(Debug)]
         struct ControlFlowGraph<'a> {
+            #[allow(dead_code)]
             by_offset: &'a BTreeMap<usize, NodeIndex>,
+            #[allow(dead_code)]
             node_count: usize,
+            #[allow(dead_code)]
             edge_count: usize,
         }
 
