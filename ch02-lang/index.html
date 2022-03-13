@@ -239,11 +239,11 @@ half_word_size = @{ (&quot;1&quot; ~ '0'..'6') | '1'..'9' }
 // instruction macros //
 ////////////////////////
 instruction_macro_definition = { &quot;%macro&quot; ~ function_declaration ~ NEWLINE* ~ (instruction_macro_stmt ~ NEWLINE)* ~ &quot;%end&quot; }
-instruction_macro_stmt = _{ label_definition | &quot;%&quot; ~ push_macro | local_macro | push | op }
+instruction_macro_stmt = _{ label_definition | builtin | instruction_macro | push | op }
 instruction_macro_variable = @{ &quot;$&quot; ~ function_parameter }
 instruction_macro = !{ &quot;%&quot; ~ function_invocation }
 
-local_macro = { !builtin ~ (instruction_macro_definition | instruction_macro  | expression_macro_definition) }
+local_macro = { instruction_macro_definition | instruction_macro  | expression_macro_definition }
 builtin = ${ &quot;%&quot; ~ ( import | include | include_hex | push_macro ) }
 
 import = !{ &quot;import&quot; ~ arguments }
