@@ -2,9 +2,9 @@
 
 ## `push` opcodes
 
-The `push` opcodes are the only EVM opcodes that have an immediate argument. This means that instead of taking an argument off the stack, the opcode reads the bytes from code which immedaitely succeed the op.
+The `push` family of instructions require an immediate argument. Unlike most arguments (which come from the stack), immediate arguments are encoded in the bytes _immediately_ following the opcode.
 
-For example, `push2 258` would assemble to `0x610102`. `push2` notifies the EVM that it should use the next two bytes `0x01` and `0x02` as input for the op. That value is left-padded to 32 bytes and placed on the stack.
+For example, `push2 258` would assemble to `0x610102`. `0x61` is the instruction, and `0x0102` is the immediate argument. `push2` instructs the EVM to use the next two bytes `0x01` and `0x02` as input for the op. That value is left-padded with zeros to 32 bytes (so `0x0000...000102`) and placed on the stack.
 
 While an assembled `push` must have a concrete value, it is often useful when developing a program to have the ability to manipulate the operand at compile time. For this reason, `push` opcodes take a single **expression** as their operand.
 
@@ -21,7 +21,7 @@ push1 1+(2*3)/4
 
 ## Definition
 
-An **expression** is a standard infix mathematical expression that is evaluated during assembly. It's computed value *must* fit within the preceeding `push`'s size allowance. 
+An **expression** is a standard infix mathematical expression that is evaluated during assembly. Its computed value *must* fit within the preceding `push`'s size allowance (eg. less than 256 for `push8`). 
 
 ### Terms
 

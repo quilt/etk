@@ -1,6 +1,6 @@
 # Instruction Macros
 
-An **instruction macro** is a type of instruction that can expand to an arbitrary number of instructions. This is useful for defining routines that are executed many times or routines with expressions that are parameterized.
+An **instruction macro** is a type of macro that can expand to an arbitrary number of instructions. This is useful for defining routines that are repeated many times or routines with expressions that are parameterized.
 
 ## Defining an Instruction Macro
 
