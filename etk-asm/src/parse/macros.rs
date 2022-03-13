@@ -64,12 +64,7 @@ fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<AbstractOp, ParseErr
 
     let mut contents = Vec::<AbstractOp>::new();
     for pair in pairs {
-        if pair.as_rule() == Rule::push_macro {
-            let expr = expression::parse(pair.into_inner().next().unwrap())?;
-            contents.push(AbstractOp::Push(expr.into()));
-        } else {
-            contents.push(super::parse_abstract_op(pair)?);
-        }
+        contents.push(super::parse_abstract_op(pair)?);
     }
 
     let defn = InstructionMacroDefinition {
