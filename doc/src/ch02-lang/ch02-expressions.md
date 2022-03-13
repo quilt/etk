@@ -40,7 +40,9 @@ hex      = @{ "0x" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT+ }
 octal    = @{ "0o" ~ ASCII_OCT_DIGIT+ }
 ```
 
-There is no limit for the length of integer literals.
+There is no limit for the length of integer literals. While expressions support
+both signed and unsigned integers, the result of the expression must
+non-negative and fit within the width of the corresponding `push` instruction.
 
 #### Labels
 
