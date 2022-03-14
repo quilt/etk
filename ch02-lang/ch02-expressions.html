@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>eas - EVM Toolkit (ETK)</title>
+        <title>Expressions - EVM Toolkit (ETK)</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">EVM Toolkit</a></li><li class="chapter-item expanded "><a href="../ch01-cli/index.html"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch01-cli/ch01-eas.html" class="active"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="../ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="../ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch02-expressions.html"><strong aria-hidden="true">2.2.</strong> Expressions</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch03-labels.html"><strong aria-hidden="true">2.3.</strong> Labels</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch04-macros/index.html"><strong aria-hidden="true">2.4.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch04-macros/ch01-builtins.html"><strong aria-hidden="true">2.4.1.</strong> Built-In</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch04-macros/ch02-expression.html"><strong aria-hidden="true">2.4.2.</strong> Expression Macros</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch04-macros/ch03-instruction.html"><strong aria-hidden="true">2.4.3.</strong> Instruction Macros</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.5.</strong> Examples</div></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">EVM Toolkit</a></li><li class="chapter-item expanded "><a href="../ch01-cli/index.html"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch01-cli/ch01-eas.html"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="../ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="../ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch02-expressions.html" class="active"><strong aria-hidden="true">2.2.</strong> Expressions</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch03-labels.html"><strong aria-hidden="true">2.3.</strong> Labels</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch04-macros/index.html"><strong aria-hidden="true">2.4.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch04-macros/ch01-builtins.html"><strong aria-hidden="true">2.4.1.</strong> Built-In</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch04-macros/ch02-expression.html"><strong aria-hidden="true">2.4.2.</strong> Expression Macros</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch04-macros/ch03-instruction.html"><strong aria-hidden="true">2.4.3.</strong> Instruction Macros</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.5.</strong> Examples</div></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -167,27 +167,104 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="assembler-eas"><a class="header" href="#assembler-eas">Assembler: <code>eas</code></a></h1>
-<p>The assembler command converts human-readable mnemonics (ex. <code>push2</code>, <code>caller</code>) into the raw bytes the EVM interpreter expects, encoded in hexadecimal. In addition to this conversion, the assembler performs transformations on the source in the form of expression- and instruction- macros, which we'll get into later.</p>
-<p>Invoking the assembler is pretty simple:</p>
-<pre><code class="language-bash">eas input.etk output.hex
+                        <h1 id="expressions"><a class="header" href="#expressions">Expressions</a></h1>
+<h2 id="push-opcodes"><a class="header" href="#push-opcodes"><code>push</code> opcodes</a></h2>
+<p>The <code>push</code> family of instructions require an immediate argument. Unlike most arguments (which come from the stack), immediate arguments are encoded in the bytes <em>immediately</em> following the opcode.</p>
+<p>For example, <code>push2 258</code> would assemble to <code>0x610102</code>. <code>0x61</code> is the instruction, and <code>0x0102</code> is the immediate argument. <code>push2</code> instructs the EVM to use the next two bytes <code>0x01</code> and <code>0x02</code> as input for the op. That value is left-padded with zeros to 32 bytes (so <code>0x0000...000102</code>) and placed on the stack.</p>
+<p>While an assembled <code>push</code> must have a concrete value, it is often useful when developing a program to have the ability to manipulate the operand at compile time. For this reason, <code>push</code> opcodes take a single <strong>expression</strong> as their operand.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>push1 1+(2*3)/4
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x02]);
+</span><span class="boring">}
+</span></code></pre></pre>
+<h2 id="definition"><a class="header" href="#definition">Definition</a></h2>
+<p>An <strong>expression</strong> is a standard infix mathematical expression that is evaluated during assembly. Its computed value <em>must</em> fit within the preceding <code>push</code>'s size allowance (eg. less than 256 for <code>push8</code>). </p>
+<h3 id="terms"><a class="header" href="#terms">Terms</a></h3>
+<p>Many different types of values are allowed as a term in an expression:</p>
+<h4 id="integer-literals"><a class="header" href="#integer-literals">Integer Literals</a></h4>
+<p>Integer literals are described by the following Pest grammar:</p>
+<pre><code class="language-ignore">number   = _{ binary | octal | hex | decimal | negative }
+decimal  = @{ ASCII_DIGIT+ }
+negative = @{ &quot;-&quot; ~ ASCII_DIGIT+ }
+binary   = @{ &quot;0b&quot; ~ ASCII_BIN_DIGIT+ }
+hex      = @{ &quot;0x&quot; ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT+ }
+octal    = @{ &quot;0o&quot; ~ ASCII_OCT_DIGIT+ }
 </code></pre>
-<p>The input argument (<code>input.etk</code> here) is the path to an assembly file, and is required. <code>output.hex</code> is the path where the assembled instructions will be written, encoded in hex. If the output path is omitted, the assembled instructions are written to the standard output.</p>
-<h2 id="a-note-on-paths"><a class="header" href="#a-note-on-paths">A Note on Paths</a></h2>
-<p>The input argument determines the <em>root</em> of the project. If <code>/home/user/foobar/main.etk</code> is the input argument, the root would be <code>/home/user/foobar</code>. Only files within the root directory can be included or imported.</p>
+<p>There is no limit for the length of integer literals. While expressions support
+both signed and unsigned integers, the result of the expression must
+non-negative and fit within the width of the corresponding <code>push</code> instruction.</p>
+<h4 id="labels"><a class="header" href="#labels">Labels</a></h4>
+<p>A <a href="ch03-labels.html">label</a> may be used as a term in an expression.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>start:
+    push1 start + 1
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x01]);
+</span><span class="boring">}
+</span></code></pre></pre>
+<h4 id="macros"><a class="header" href="#macros">Macros</a></h4>
+<p><a href="ch04-macros/ch02-expression.html">Expression macros</a> may be used as a term in an expression.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>push4 selector(&quot;transfer(uint256,uint256)&quot;)
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x63, 12, 247, 158, 10]);
+</span><span class="boring">}
+</span></code></pre></pre>
+<h3 id="operators"><a class="header" href="#operators">Operators</a></h3>
+<h4 id="binary"><a class="header" href="#binary">Binary</a></h4>
+<p>Expressions support the following binary operators:</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>push1 1+2       # addition
+push1 1*2       # multiplication
+push1 2-1       # subtraction
+push1 2/2       # division
+
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x03, 0x60, 0x02, 0x60, 0x01, 0x60, 0x01]);
+</span><span class="boring">}
+</span></code></pre></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-                            <a rel="prev" href="../ch01-cli/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../ch02-lang/ch01-instructions.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
 
                         
-                            <a rel="next" href="../ch01-cli/ch02-disease.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../ch02-lang/ch03-labels.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -199,13 +276,13 @@
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a rel="prev" href="../ch01-cli/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../ch02-lang/ch01-instructions.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
                 
-                    <a rel="next" href="../ch01-cli/ch02-disease.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="../ch02-lang/ch03-labels.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 

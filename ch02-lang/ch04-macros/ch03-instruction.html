@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Labels &amp; Pushes - EVM Toolkit (ETK)</title>
+        <title>Instruction Macros - EVM Toolkit (ETK)</title>
         
         
 
@@ -18,28 +18,28 @@
         <meta name="theme-color" content="#ffffff" />
 
         
-        <link rel="icon" href="../favicon.svg">
+        <link rel="icon" href="../../favicon.svg">
         
         
-        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="shortcut icon" href="../../favicon.png">
         
-        <link rel="stylesheet" href="../css/variables.css">
-        <link rel="stylesheet" href="../css/general.css">
-        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../../css/variables.css">
+        <link rel="stylesheet" href="../../css/general.css">
+        <link rel="stylesheet" href="../../css/chrome.css">
         
-        <link rel="stylesheet" href="../css/print.css" media="print">
+        <link rel="stylesheet" href="../../css/print.css" media="print">
         
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../FontAwesome/css/font-awesome.css">
         
-        <link rel="stylesheet" href="../fonts/fonts.css">
+        <link rel="stylesheet" href="../../fonts/fonts.css">
         
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="../highlight.css">
-        <link rel="stylesheet" href="../tomorrow-night.css">
-        <link rel="stylesheet" href="../ayu-highlight.css">
+        <link rel="stylesheet" href="../../highlight.css">
+        <link rel="stylesheet" href="../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
         
@@ -49,7 +49,7 @@
     <body>
         <!-- Provide site root to javascript -->
         <script type="text/javascript">
-            var path_to_root = "../";
+            var path_to_root = "../../";
             var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
         </script>
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">EVM Toolkit</a></li><li class="chapter-item expanded "><a href="../ch01-cli/index.html"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch01-cli/ch01-eas.html"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="../ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="../ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch02-labels.html" class="active"><strong aria-hidden="true">2.2.</strong> Labels &amp; Pushes</a></li><li class="chapter-item expanded "><a href="../ch02-lang/ch03-macros/index.html"><strong aria-hidden="true">2.3.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../ch02-lang/ch03-macros/ch01-builtins.html"><strong aria-hidden="true">2.3.1.</strong> Built-In Macros</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.3.2.</strong> User Defined Macros</div></li></ol></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../../index.html">EVM Toolkit</a></li><li class="chapter-item expanded "><a href="../../ch01-cli/index.html"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../ch01-cli/ch01-eas.html"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="../../ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="../../ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch02-expressions.html"><strong aria-hidden="true">2.2.</strong> Expressions</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch03-labels.html"><strong aria-hidden="true">2.3.</strong> Labels</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch04-macros/index.html"><strong aria-hidden="true">2.4.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../ch02-lang/ch04-macros/ch01-builtins.html"><strong aria-hidden="true">2.4.1.</strong> Built-In</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch04-macros/ch02-expression.html"><strong aria-hidden="true">2.4.2.</strong> Expression Macros</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch04-macros/ch03-instruction.html" class="active"><strong aria-hidden="true">2.4.3.</strong> Instruction Macros</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.5.</strong> Examples</div></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -131,7 +131,7 @@
 
                     <div class="right-buttons">
                         
-                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
                         
@@ -167,70 +167,60 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="labels--pushes"><a class="header" href="#labels--pushes">Labels &amp; Pushes</a></h1>
-<p>Manually counting out jump destination addresses would be a monumentally pointless task, so the assembler supports assigning names (or <em>labels</em>) to specific locations in code:</p>
+                        <h1 id="instruction-macros"><a class="header" href="#instruction-macros">Instruction Macros</a></h1>
+<p>An <strong>instruction macro</strong> is a type of macro that can expand to an arbitrary number of instructions. This is useful for defining routines that are repeated many times or routines with expressions that are parameterized.</p>
+<h2 id="defining-an-instruction-macro"><a class="header" href="#defining-an-instruction-macro">Defining an Instruction Macro</a></h2>
+<p>Instruction macros can accept an arbitrary number of parameters. Parameters are referenced within the macro definition by prepending <code>$</code> to the parameter's name.</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>label0:             # &lt;- This is a label called &quot;label0&quot;,
-                    #    and it has the value 0, since it is
-                    #    before any instructions in scope.
+</span>%macro my_macro()
+    push1 42
+%end
 
-    jumpdest
-    push1 label0    # &lt;- Here we push the value of &quot;label0&quot;,
-                    #    which is zero, onto the stack.
-
-    jump            # Now we jump to zero, which is a
-                    # `jumpdest` instruction, looping forever.
+%macro sum(x, y, z)
+    push1 $x+$y+$z
+%end
 <span class="boring">&quot;#;
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
 </span><span class="boring">}
 </span></code></pre></pre>
-<h2 id="uses"><a class="header" href="#uses">Uses</a></h2>
-<p>The obvious (and only, currently) place to use a label is in a push instruction. That said, there are a couple interesting ways to use labels that might not be immediately obvious.</p>
-<h3 id="jump-address"><a class="header" href="#jump-address">Jump Address</a></h3>
-<p>You can push a label, then jump to it like in the above example.</p>
-<h3 id="length"><a class="header" href="#length">Length</a></h3>
-<p>That's not all! You can also use labels to calculate lengths:</p>
+<h2 id="using-a-instruction-macro"><a class="header" href="#using-a-instruction-macro">Using a Instruction Macro</a></h2>
+<p>Expression macros can be invoked anywhere an instruction is expected.</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>push1 start
-push1 end
-sub                 # &lt;- Will leave a 3 on the stack.
-stop
-
-start:
-    pc
-    pc
-    pc
-end:
+</span><span class="boring">%macro my_macro()
+</span><span class="boring">   push1 42
+</span><span class="boring">%end
+</span><span class="boring">%macro sum(x, y, z)
+</span><span class="boring">    push1 $x+$y+$z
+</span><span class="boring">%end
+</span>%my_macro()
+%sum(1, 2, 3)
 <span class="boring">&quot;#;
-</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x2a, 0x60, 0x06]);
 </span><span class="boring">}
 </span></code></pre></pre>
-<p>Calculating the length of a blob of instructions is <em>very</em> useful in contract initialization code (also known as constructors).</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-                            <a rel="prev" href="../ch02-lang/ch01-instructions.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../ch02-lang/ch04-macros/ch02-expression.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
 
-                        
-                            <a rel="next" href="../ch02-lang/ch03-macros/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
-                            </a>
                         
 
                         <div style="clear: both"></div>
@@ -240,15 +230,11 @@ end:
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a rel="prev" href="../ch02-lang/ch01-instructions.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../ch02-lang/ch04-macros/ch02-expression.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
-                
-                    <a rel="next" href="../ch02-lang/ch03-macros/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
-                    </a>
                 
             </nav>
 
@@ -269,14 +255,14 @@ end:
         
 
         
-        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../searcher.js" type="text/javascript" charset="utf-8"></script>
         
 
-        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../book.js" type="text/javascript" charset="utf-8"></script>
 
         <!-- Custom JS scripts -->
         

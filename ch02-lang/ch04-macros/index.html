@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Built-In Macros - EVM Toolkit (ETK)</title>
+        <title>Macros - EVM Toolkit (ETK)</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../../index.html">EVM Toolkit</a></li><li class="chapter-item expanded "><a href="../../ch01-cli/index.html"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../ch01-cli/ch01-eas.html"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="../../ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="../../ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch02-labels.html"><strong aria-hidden="true">2.2.</strong> Labels &amp; Pushes</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch03-macros/index.html"><strong aria-hidden="true">2.3.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../ch02-lang/ch03-macros/ch01-builtins.html" class="active"><strong aria-hidden="true">2.3.1.</strong> Built-In Macros</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.3.2.</strong> User Defined Macros</div></li></ol></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../../index.html">EVM Toolkit</a></li><li class="chapter-item expanded "><a href="../../ch01-cli/index.html"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../ch01-cli/ch01-eas.html"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="../../ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="../../ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch02-expressions.html"><strong aria-hidden="true">2.2.</strong> Expressions</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch03-labels.html"><strong aria-hidden="true">2.3.</strong> Labels</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch04-macros/index.html" class="active"><strong aria-hidden="true">2.4.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../ch02-lang/ch04-macros/ch01-builtins.html"><strong aria-hidden="true">2.4.1.</strong> Built-In</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch04-macros/ch02-expression.html"><strong aria-hidden="true">2.4.2.</strong> Expression Macros</a></li><li class="chapter-item expanded "><a href="../../ch02-lang/ch04-macros/ch03-instruction.html"><strong aria-hidden="true">2.4.3.</strong> Instruction Macros</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.5.</strong> Examples</div></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -167,94 +167,53 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="built-in-macros"><a class="header" href="#built-in-macros">Built-In Macros</a></h1>
-<p>Built-in macros are implemented by the assembler, and provide additional features beyond basic instructions, constants, or labels.</p>
-<h2 id="instruction-macros"><a class="header" href="#instruction-macros">Instruction Macros</a></h2>
-<h3 id="import"><a class="header" href="#import"><code>%import(&quot;...&quot;)</code></a></h3>
-<p>The <code>%import</code> macro expands to the instructions read from another file as if they had been typed here. The path is resolved relative to the current file.</p>
-<h4 id="source-mainetk"><a class="header" href="#source-mainetk">Source: <code>main.etk</code></a></h4>
-<pre><code class="language-ignore">push1 some_label
-jump
-
-%import(&quot;other.etk&quot;)
-</code></pre>
-<h4 id="source-otheretk"><a class="header" href="#source-otheretk">Source: <code>other.etk</code></a></h4>
-<pre><code class="language-ignore">some_label:
-    jumpdest
-    stop
-</code></pre>
-<h4 id="after-expansion"><a class="header" href="#after-expansion">After Expansion</a></h4>
-<pre><code class="language-ignore">push1 0x03
-jump
-
-jumpdest
-stop
-</code></pre>
-<h3 id="include"><a class="header" href="#include"><code>%include(&quot;...&quot;)</code></a></h3>
-<p>The <code>%include</code> macro expands to the instructions read from another file, but unlike <code>%import</code>, the included file is assembled independently from the current file:</p>
-<ul>
-<li>Labels from the included file are <em>not</em> available in the including file, and vise versa.</li>
-<li>The address of the first instruction in the included file will be zero.</li>
-</ul>
-<p>The path is resolved relative to the current file.</p>
-<h4 id="source-mainetk-1"><a class="header" href="#source-mainetk-1">Source: <code>main.etk</code></a></h4>
-<pre><code class="language-ignore">some_label:                 # &lt;- Not visible in `other.etk`.
-    push1 some_label        # &lt;- Pushes a zero on the stack.
-
-%include(&quot;other.etk&quot;)
-</code></pre>
-<h4 id="source-otheretk-1"><a class="header" href="#source-otheretk-1">Source: <code>other.etk</code></a></h4>
-<pre><code class="language-ignore">different_label:            # &lt;- Not visible in `main.etk`.
-    push1 different_label   # &lt;- ALSO pushes a zero on the stack.
-</code></pre>
-<h4 id="after-expansion-1"><a class="header" href="#after-expansion-1">After Expansion</a></h4>
-<pre><code class="language-ignore">push1 0x00
-push1 0x00
-</code></pre>
-<h3 id="include_hex"><a class="header" href="#include_hex"><code>%include_hex(&quot;...&quot;)</code></a></h3>
-<p>The <code>%include_hex</code> macro functions exactly like <code>%include</code>, except instead of assembling the given path, it includes the raw hexadecimal bytes.</p>
-<h3 id="push"><a class="header" href="#push"><code>%push(...)</code></a></h3>
-<p>The <code>%push</code> macro will expand to a reasonably sized <code>push</code> instruction for the given argument.</p>
-<p>For example:</p>
+                        <h1 id="macros"><a class="header" href="#macros">Macros</a></h1>
+<p>A macro is a rule or pattern that maps a given input to a replacement output. In other words, the assembler replaces a <em>macro invocation</em> with some other text (the <em>macro expansion</em>.)</p>
+<h2 id="types"><a class="header" href="#types">Types</a></h2>
+<p>Macros in ETK take one of two forms: instruction macros, and expression macros. Both types of macros are written as a name followed by arguments in parentheses.</p>
+<h3 id="instruction-macros"><a class="header" href="#instruction-macros">Instruction Macros</a></h3>
+<p>An instruction macro looks like this:</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>%push(hello)
+</span>%macro push_sum(a, b)
+    push1 $a + $b
+%end
 
-hello:
-    jumpdest
+%push_sum(4, 2)
 <span class="boring">&quot;#;
 </span><span class="boring">let mut output = Vec::new();
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
-</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x02, 0x5b]);
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x06]);
 </span><span class="boring">}
 </span></code></pre></pre>
-<p>Will look something like the following after expansion:</p>
-<pre><code class="language-ignore">push1 0x02
-jumpdest
+<p>Instruction macros always begin with <code>%</code>, and expand to one or more instructions. In this case, <code>%my_macro(4, 2)</code> would expand to:</p>
+<pre><code class="language-ignore">push1 0x06
 </code></pre>
-<h2 id="expression-macros"><a class="header" href="#expression-macros">Expression Macros</a></h2>
-<h3 id="selector"><a class="header" href="#selector"><code>selector(&quot;...&quot;)</code></a></h3>
-<p>The <code>selector</code> macro is useful when writing contracts that adhere to the <a href="https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector">Solidity ABI</a>. Specifically, the <code>selector</code> macro expands to the four byte selector of the given function signature.</p>
-<p>For example:</p>
+<h3 id="expression-macros"><a class="header" href="#expression-macros">Expression Macros</a></h3>
+<p>Expression macros <em>do not</em> begin with <code>%</code>, and cannot replace instructions. Instead, expression macros can be used in expressions. For example:</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>push4 selector(&quot;_burn(address,bytes32,uint256)&quot;)    # &lt;- expands to 0x63936327
+</span>%def add_one(num)
+    $num+1
+%end
+
+push1 add_one(41)
 <span class="boring">&quot;#;
 </span><span class="boring">let mut output = Vec::new();
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
-</span><span class="boring">assert_eq!(output, &amp;[0x63, 0x63, 0x93, 0x63, 0x27]);
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x2a]);
 </span><span class="boring">}
 </span></code></pre></pre>
-<p>The fully expanded source would look like:</p>
-<pre><code class="language-ignore">push4 0x63936327
+<p>Here, <code>add_one(...)</code> is an expression macro that returns the <code>num+1</code>. The fully expanded source would look like:</p>
+<pre><code class="language-ignore">push1 42
 </code></pre>
 
                     </main>
@@ -262,11 +221,15 @@ jumpdest
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-                            <a rel="prev" href="../../ch02-lang/ch03-macros/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../ch02-lang/ch03-labels.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
 
+                        
+                            <a rel="next" href="../../ch02-lang/ch04-macros/ch01-builtins.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
                         
 
                         <div style="clear: both"></div>
@@ -276,11 +239,15 @@ jumpdest
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a rel="prev" href="../../ch02-lang/ch03-macros/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../ch02-lang/ch03-labels.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
+                
+                    <a rel="next" href="../../ch02-lang/ch04-macros/ch01-builtins.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
                 
             </nav>
 

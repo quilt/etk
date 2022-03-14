@@ -97,7 +97,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">EVM Toolkit</a></li><li class="chapter-item expanded "><a href="ch01-cli/index.html"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="ch01-cli/ch01-eas.html"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="ch02-lang/ch02-labels.html"><strong aria-hidden="true">2.2.</strong> Labels &amp; Pushes</a></li><li class="chapter-item expanded "><a href="ch02-lang/ch03-macros/index.html"><strong aria-hidden="true">2.3.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="ch02-lang/ch03-macros/ch01-builtins.html"><strong aria-hidden="true">2.3.1.</strong> Built-In Macros</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.3.2.</strong> User Defined Macros</div></li></ol></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">EVM Toolkit</a></li><li class="chapter-item expanded "><a href="ch01-cli/index.html"><strong aria-hidden="true">1.</strong> Command-Line Tools</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="ch01-cli/ch01-eas.html"><strong aria-hidden="true">1.1.</strong> eas</a></li><li class="chapter-item expanded "><a href="ch01-cli/ch02-disease.html"><strong aria-hidden="true">1.2.</strong> disease</a></li></ol></li><li class="chapter-item expanded "><a href="ch02-lang/index.html"><strong aria-hidden="true">2.</strong> Language &amp; Syntax</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="ch02-lang/ch01-instructions.html"><strong aria-hidden="true">2.1.</strong> Instructions</a></li><li class="chapter-item expanded "><a href="ch02-lang/ch02-expressions.html"><strong aria-hidden="true">2.2.</strong> Expressions</a></li><li class="chapter-item expanded "><a href="ch02-lang/ch03-labels.html"><strong aria-hidden="true">2.3.</strong> Labels</a></li><li class="chapter-item expanded "><a href="ch02-lang/ch04-macros/index.html"><strong aria-hidden="true">2.4.</strong> Macros</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="ch02-lang/ch04-macros/ch01-builtins.html"><strong aria-hidden="true">2.4.1.</strong> Built-In</a></li><li class="chapter-item expanded "><a href="ch02-lang/ch04-macros/ch02-expression.html"><strong aria-hidden="true">2.4.2.</strong> Expression Macros</a></li><li class="chapter-item expanded "><a href="ch02-lang/ch04-macros/ch03-instruction.html"><strong aria-hidden="true">2.4.3.</strong> Instruction Macros</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.5.</strong> Examples</div></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -542,7 +542,92 @@ revert
 invalid
 selfdestruct
 </code></pre>
-<h1 id="labels--pushes"><a class="header" href="#labels--pushes">Labels &amp; Pushes</a></h1>
+<h1 id="expressions"><a class="header" href="#expressions">Expressions</a></h1>
+<h2 id="push-opcodes"><a class="header" href="#push-opcodes"><code>push</code> opcodes</a></h2>
+<p>The <code>push</code> family of instructions require an immediate argument. Unlike most arguments (which come from the stack), immediate arguments are encoded in the bytes <em>immediately</em> following the opcode.</p>
+<p>For example, <code>push2 258</code> would assemble to <code>0x610102</code>. <code>0x61</code> is the instruction, and <code>0x0102</code> is the immediate argument. <code>push2</code> instructs the EVM to use the next two bytes <code>0x01</code> and <code>0x02</code> as input for the op. That value is left-padded with zeros to 32 bytes (so <code>0x0000...000102</code>) and placed on the stack.</p>
+<p>While an assembled <code>push</code> must have a concrete value, it is often useful when developing a program to have the ability to manipulate the operand at compile time. For this reason, <code>push</code> opcodes take a single <strong>expression</strong> as their operand.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>push1 1+(2*3)/4
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x02]);
+</span><span class="boring">}
+</span></code></pre></pre>
+<h2 id="definition"><a class="header" href="#definition">Definition</a></h2>
+<p>An <strong>expression</strong> is a standard infix mathematical expression that is evaluated during assembly. Its computed value <em>must</em> fit within the preceding <code>push</code>'s size allowance (eg. less than 256 for <code>push8</code>). </p>
+<h3 id="terms"><a class="header" href="#terms">Terms</a></h3>
+<p>Many different types of values are allowed as a term in an expression:</p>
+<h4 id="integer-literals"><a class="header" href="#integer-literals">Integer Literals</a></h4>
+<p>Integer literals are described by the following Pest grammar:</p>
+<pre><code class="language-ignore">number   = _{ binary | octal | hex | decimal | negative }
+decimal  = @{ ASCII_DIGIT+ }
+negative = @{ &quot;-&quot; ~ ASCII_DIGIT+ }
+binary   = @{ &quot;0b&quot; ~ ASCII_BIN_DIGIT+ }
+hex      = @{ &quot;0x&quot; ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT+ }
+octal    = @{ &quot;0o&quot; ~ ASCII_OCT_DIGIT+ }
+</code></pre>
+<p>There is no limit for the length of integer literals. While expressions support
+both signed and unsigned integers, the result of the expression must
+non-negative and fit within the width of the corresponding <code>push</code> instruction.</p>
+<h4 id="labels"><a class="header" href="#labels">Labels</a></h4>
+<p>A <a href="ch02-lang/ch03-labels.html">label</a> may be used as a term in an expression.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>start:
+    push1 start + 1
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x01]);
+</span><span class="boring">}
+</span></code></pre></pre>
+<h4 id="macros"><a class="header" href="#macros">Macros</a></h4>
+<p><a href="ch02-lang/ch04-macros/ch02-expression.html">Expression macros</a> may be used as a term in an expression.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>push4 selector(&quot;transfer(uint256,uint256)&quot;)
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x63, 12, 247, 158, 10]);
+</span><span class="boring">}
+</span></code></pre></pre>
+<h3 id="operators"><a class="header" href="#operators">Operators</a></h3>
+<h4 id="binary"><a class="header" href="#binary">Binary</a></h4>
+<p>Expressions support the following binary operators:</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>push1 1+2       # addition
+push1 1*2       # multiplication
+push1 2-1       # subtraction
+push1 2/2       # division
+
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x03, 0x60, 0x02, 0x60, 0x01, 0x60, 0x01]);
+</span><span class="boring">}
+</span></code></pre></pre>
+<h1 id="labels-1"><a class="header" href="#labels-1">Labels</a></h1>
 <p>Manually counting out jump destination addresses would be a monumentally pointless task, so the assembler supports assigning names (or <em>labels</em>) to specific locations in code:</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
 <span class="boring">#![allow(unused)]
@@ -591,7 +676,7 @@ end:
 </span><span class="boring">}
 </span></code></pre></pre>
 <p>Calculating the length of a blob of instructions is <em>very</em> useful in contract initialization code (also known as constructors).</p>
-<h1 id="macros"><a class="header" href="#macros">Macros</a></h1>
+<h1 id="macros-1"><a class="header" href="#macros-1">Macros</a></h1>
 <p>A macro is a rule or pattern that maps a given input to a replacement output. In other words, the assembler replaces a <em>macro invocation</em> with some other text (the <em>macro expansion</em>.)</p>
 <h2 id="types"><a class="header" href="#types">Types</a></h2>
 <p>Macros in ETK take one of two forms: instruction macros, and expression macros. Both types of macros are written as a name followed by arguments in parentheses.</p>
@@ -602,40 +687,42 @@ end:
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>%push(hello)
+</span>%macro push_sum(a, b)
+    push1 $a + $b
+%end
 
-hello:
-    jumpdest
+%push_sum(4, 2)
 <span class="boring">&quot;#;
 </span><span class="boring">let mut output = Vec::new();
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
-</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x02, 0x5b]);
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x06]);
 </span><span class="boring">}
 </span></code></pre></pre>
-<p>Instruction macros always begin with <code>%</code>, and expand to one or more instructions. In this case, <code>%push(hello)</code> would expand to:</p>
-<pre><code class="language-ignore">push1 hello
-
-hello:
-    jumpdest
+<p>Instruction macros always begin with <code>%</code>, and expand to one or more instructions. In this case, <code>%my_macro(4, 2)</code> would expand to:</p>
+<pre><code class="language-ignore">push1 0x06
 </code></pre>
 <h3 id="expression-macros"><a class="header" href="#expression-macros">Expression Macros</a></h3>
-<p>Expression macros <em>do not</em> begin with <code>%</code>, and cannot replace instructions. Instead, expression macros can take the place of labels or numeric literals. For example:</p>
+<p>Expression macros <em>do not</em> begin with <code>%</code>, and cannot replace instructions. Instead, expression macros can be used in expressions. For example:</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>push4 selector(&quot;_burn(address,bytes32,uint256)&quot;)
+</span>%def add_one(num)
+    $num+1
+%end
+
+push1 add_one(41)
 <span class="boring">&quot;#;
 </span><span class="boring">let mut output = Vec::new();
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
-</span><span class="boring">assert_eq!(output, &amp;[0x63, 0x63, 0x93, 0x63, 0x27]);
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x2a]);
 </span><span class="boring">}
 </span></code></pre></pre>
-<p>Here, <code>selector(...)</code> is an expression macro that expands to <code>0x63936327</code>. The fully expanded source would look like:</p>
-<pre><code class="language-ignore">push4 0x63936327
+<p>Here, <code>add_one(...)</code> is an expression macro that returns the <code>num+1</code>. The fully expanded source would look like:</p>
+<pre><code class="language-ignore">push1 42
 </code></pre>
 <h1 id="built-in-macros"><a class="header" href="#built-in-macros">Built-In Macros</a></h1>
 <p>Built-in macros are implemented by the assembler, and provide additional features beyond basic instructions, constants, or labels.</p>
@@ -715,17 +802,122 @@ jumpdest
 </span><span class="boring">fn main() {
 </span><span class="boring">extern crate etk_asm;
 </span><span class="boring">let src = r#&quot;
-</span>push4 selector(&quot;_burn(address,bytes32,uint256)&quot;)    # &lt;- expands to 0x63936327
+</span>push4 selector(&quot;transfer(address,uint256)&quot;)    # &lt;- expands to 0x63a9059cbb
 <span class="boring">&quot;#;
 </span><span class="boring">let mut output = Vec::new();
 </span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
 </span><span class="boring">ingest.ingest(file!(), src).unwrap();
-</span><span class="boring">assert_eq!(output, &amp;[0x63, 0x63, 0x93, 0x63, 0x27]);
+</span><span class="boring">assert_eq!(output, &amp;[0x63, 0xa9, 0x05, 0x9c, 0xbb]);
 </span><span class="boring">}
 </span></code></pre></pre>
 <p>The fully expanded source would look like:</p>
-<pre><code class="language-ignore">push4 0x63936327
+<pre><code class="language-ignore">push4 0xa9059cbb
 </code></pre>
+<h3 id="topic"><a class="header" href="#topic"><code>topic(&quot;...&quot;)</code></a></h3>
+<p>The <code>topic</code> macro is operates similiarly to <code>selector</code>, except it returns the entire 32 byte hash digest. This is useful for the <code>log</code> opcodes.</p>
+<p>For example:</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>push32 topic(&quot;transfer(address,uint256)&quot;)
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x7f, 169, 5, 156, 187, 42, 176, 158, 178, 25, 88, 63, 74, 89, 165, 208, 98, 58, 222, 52, 109, 150, 43, 205, 78, 70, 177, 29, 160, 71, 201, 4, 155]);
+</span><span class="boring">}
+</span></code></pre></pre>
+<p>The fully expanded source would look like:</p>
+<pre><code class="language-ignore">push32 0xa9059cbb2ab09eb219583f4a59a5d0623ade346d962bcd4e46b11da047c9049b
+</code></pre>
+<h1 id="expression-macros-2"><a class="header" href="#expression-macros-2">Expression Macros</a></h1>
+<p>An <strong>expression macro</strong> is a type of expression which is resolved during assembly. This is useful for defining constant values or constant functions on values, such as defining getters on memory pointers.</p>
+<h2 id="defining-an-expression-macro"><a class="header" href="#defining-an-expression-macro">Defining an Expression Macro</a></h2>
+<p>Expression macros can accept an arbitrary number of parameters. Parameters are referenced within the macro definition by prepending <code>$</code> to the parameter's name.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>%def my_macro()
+    42
+%end
+
+%def sum(x, y, z)
+    $x+$y+$z
+%end
+<span class="boring">&quot;#;
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">}
+</span></code></pre></pre>
+<h2 id="using-an-expression-macro"><a class="header" href="#using-an-expression-macro">Using an Expression Macro</a></h2>
+<p>Expression macros can be invoked anywhere an expression is expected.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span><span class="boring">%def my_macro()
+</span><span class="boring">   42
+</span><span class="boring">%end
+</span><span class="boring">%def sum(x, y, z)
+</span><span class="boring">    $x+$y+$z
+</span><span class="boring">%end
+</span>push1 my_macro()
+push1 sum(1, 2, my_macro())
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x2a, 0x60, 0x2d]);
+</span><span class="boring">}
+</span></code></pre></pre>
+<h1 id="instruction-macros-2"><a class="header" href="#instruction-macros-2">Instruction Macros</a></h1>
+<p>An <strong>instruction macro</strong> is a type of macro that can expand to an arbitrary number of instructions. This is useful for defining routines that are repeated many times or routines with expressions that are parameterized.</p>
+<h2 id="defining-an-instruction-macro"><a class="header" href="#defining-an-instruction-macro">Defining an Instruction Macro</a></h2>
+<p>Instruction macros can accept an arbitrary number of parameters. Parameters are referenced within the macro definition by prepending <code>$</code> to the parameter's name.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span>%macro my_macro()
+    push1 42
+%end
+
+%macro sum(x, y, z)
+    push1 $x+$y+$z
+%end
+<span class="boring">&quot;#;
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">}
+</span></code></pre></pre>
+<h2 id="using-a-instruction-macro"><a class="header" href="#using-a-instruction-macro">Using a Instruction Macro</a></h2>
+<p>Expression macros can be invoked anywhere an instruction is expected.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate etk_asm;
+</span><span class="boring">let src = r#&quot;
+</span><span class="boring">%macro my_macro()
+</span><span class="boring">   push1 42
+</span><span class="boring">%end
+</span><span class="boring">%macro sum(x, y, z)
+</span><span class="boring">    push1 $x+$y+$z
+</span><span class="boring">%end
+</span>%my_macro()
+%sum(1, 2, 3)
+<span class="boring">&quot;#;
+</span><span class="boring">let mut output = Vec::new();
+</span><span class="boring">let mut ingest = etk_asm::ingest::Ingest::new(&amp;mut output);
+</span><span class="boring">ingest.ingest(file!(), src).unwrap();
+</span><span class="boring">assert_eq!(output, &amp;[0x60, 0x2a, 0x60, 0x06]);
+</span><span class="boring">}
+</span></code></pre></pre>
 
                     </main>
 
