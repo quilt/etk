@@ -13,44 +13,46 @@ An instruction macro looks like this:
 ```rust
 # extern crate etk_asm;
 # let src = r#"
-%push(hello)
+%macro push_sum(a, b)
+    push1 $a + $b
+%end
 
-hello:
-    jumpdest
+%push_sum(4, 2)
 # "#;
 # let mut output = Vec::new();
 # let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
 # ingest.ingest(file!(), src).unwrap();
-# assert_eq!(output, &[0x60, 0x02, 0x5b]);
+# assert_eq!(output, &[0x60, 0x06]);
 ```
 
-Instruction macros always begin with `%`, and expand to one or more instructions. In this case, `%push(hello)` would expand to:
+Instruction macros always begin with `%`, and expand to one or more instructions. In this case, `%my_macro(4, 2)` would expand to:
 
 ```ignore
-push1 hello
-
-hello:
-    jumpdest
+push1 0x06
 ```
 
 ### Expression Macros
 
-Expression macros _do not_ begin with `%`, and cannot replace instructions. Instead, expression macros can take the place of labels or numeric literals. For example:
+Expression macros _do not_ begin with `%`, and cannot replace instructions. Instead, expression macros can be used in expressions. For example:
 
 ```rust
 # extern crate etk_asm;
 # let src = r#"
-push4 selector("_burn(address,bytes32,uint256)")
+%def add_one(num)
+    $num+1
+%end
+
+push1 add_one(41)
 # "#;
 # let mut output = Vec::new();
 # let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
 # ingest.ingest(file!(), src).unwrap();
-# assert_eq!(output, &[0x63, 0x63, 0x93, 0x63, 0x27]);
+# assert_eq!(output, &[0x60, 0x2a]);
 ```
 
-Here, `selector(...)` is an expression macro that expands to `0x63936327`. The fully expanded source would look like:
+Here, `add_one(...)` is an expression macro that returns the `num+1`. The fully expanded source would look like:
 
 ```ignore
-push4 0x63936327
+push1 42
 ```
 
