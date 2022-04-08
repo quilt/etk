@@ -1,2 +1,6 @@
 [workspace]
 members = ["etk-types", "etk-asm", "etk-dasm", "etk-analyze", "etk-cli", "etk-4byte"]
+
+[profile.test]
+opt-level = 1
+codegen-units = 1
