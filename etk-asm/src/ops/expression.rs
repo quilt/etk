@@ -90,7 +90,7 @@ impl<'a> From<(&'a LabelsMap, &'a MacrosMap, &'a VariablesMap)> for Context<'a> 
     }
 }
 
-/// An mathematical expression.
+/// A mathematical expression.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Expression {
     /// A mathematical expression.
