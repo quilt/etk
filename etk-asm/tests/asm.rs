@@ -84,6 +84,20 @@ fn instruction_macro() -> Result<(), Error> {
 }
 
 #[test]
+fn instruction_macro_with_empty_lines() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["instruction-macro", "empty_lines.etk"]))?;
+
+    assert_eq!(
+        output,
+        hex!("6000600060006000600060006000")
+    );
+
+    Ok(())
+}
+
+#[test]
 fn every_op() -> Result<(), Error> {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);
