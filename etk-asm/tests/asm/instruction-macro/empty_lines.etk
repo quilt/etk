@@ -1,0 +1,42 @@
+%macro foo1()
+	push1 0
+
+	push1 0
+%end
+
+%macro foo2()
+
+	push1 0
+%end
+
+%macro foo3()
+	push1 0
+
+%end
+
+%macro foo4()
+
+	push1 0
+
+%end
+
+%macro foo5()
+
+
+
+
+
+
+	push1 0
+
+
+
+    push1 0
+
+%end
+
+%foo1()
+%foo2()
+%foo3()
+%foo4()
+%foo5()

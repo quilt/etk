@@ -1,0 +1,4 @@
+%macro foo()
+    push1 0 chainid
+%end
+%foo()
