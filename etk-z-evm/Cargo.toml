@@ -1,0 +1,22 @@
+[package]
+name = "etk-z-evm"
+version = "0.2.0-dev"
+authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
+license = "MIT OR Apache-2.0"
+edition = "2021"
+homepage = "https://quilt.github.io/etk"
+repository = "https://github.com/quilt/etk"
+readme = "README.md"
+keywords = ["etk", "ethereum"]
+categories = ["cryptography::cryptocurrencies"]
+
+[features]
+backtraces = [ "snafu/backtraces" ]
+
+[dependencies]
+z3 = "0.11.2"
+snafu = "0.7.1"
+etk-asm = { version = "0.3.0-dev", path = "../etk-asm" }
+smallvec = { version = "1.8.0", features = [ "union", "const_generics" ] }
+
+[dev-dependencies]
