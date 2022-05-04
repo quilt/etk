@@ -859,8 +859,8 @@ ops! {
 
     Pop(mnemonic="pop", pops=1),
     MLoad(mnemonic="mload", pops=1, pushes=1, memory=Access::Read),
-    MStore(mnemonic="mstore", pops=2, memory=Access::Read),
-    MStore8(mnemonic="mstore8", pops=2, memory=Access::Read),
+    MStore(mnemonic="mstore", pops=2, memory=Access::Write),
+    MStore8(mnemonic="mstore8", pops=2, memory=Access::Write),
     SLoad(mnemonic="sload", pops=1, pushes=1, storage=Access::Read),
     SStore(mnemonic="sstore", pops=2, storage=Access::Write),
     Jump(mnemonic="jump", pops=1, jump=true),
