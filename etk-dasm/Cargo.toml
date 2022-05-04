@@ -17,13 +17,13 @@ cli = ["structopt", "etk-cli", "snafu", "etk-4byte"]
 [dependencies]
 hex = "0.4.3"
 etk-asm = { path = "../etk-asm", version = "0.2.0-dev" }
-structopt = { optional = true, version = "0.3.21" }
+structopt = { optional = true, version = "0.3.26" }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.2.0-dev" }
 etk-4byte = { optional = true, path = "../etk-4byte", version = "0.2.0-dev" }
 snafu = { optional = true, version = "0.7.1" }
 
 [dev-dependencies]
-hex-literal = "0.3.1"
+hex-literal = "0.3.4"
 
 [[bin]]
 name = "disease"
