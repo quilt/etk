@@ -15,7 +15,7 @@ categories = ["cryptography::cryptocurrencies", "command-line-utilities", "devel
 cli = ["etk-cli", "etk-asm", "structopt", "snafu"]
 
 [dependencies]
-snafu = { optional = true, version = "0.6.10" }
+snafu = { optional = true, version = "0.7.1" }
 structopt = { optional = true, version = "0.3.21" }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.2.0-dev" }
 etk-asm = { optional = true, path = "../etk-asm", version = "0.2.0-dev" }
