@@ -24,7 +24,7 @@ pest_derive = "2.1"
 rand = "0.8.4"
 sha3 = "0.9.1"
 structopt = { optional = true, version = "0.3.21" }
-snafu = { version = "0.6.10", default-features = false, features = [ "std" ] }
+snafu = { version = "0.7.1", default-features = false, features = [ "std" ] }
 
 [dev-dependencies]
 assert_matches = "1.5.0"

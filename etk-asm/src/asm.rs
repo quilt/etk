@@ -12,7 +12,7 @@ mod error {
     /// Errors that can occur while assembling instructions.
     #[derive(Snafu, Debug)]
     #[non_exhaustive]
-    #[snafu(visibility = "pub(super)")]
+    #[snafu(context(suffix(false)), visibility(pub(super)))]
     pub enum Error {
         /// A label was declared multiple times.
         #[snafu(display("label `{}` declared multiple times", label))]

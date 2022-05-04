@@ -8,12 +8,14 @@ use std::marker::PhantomData;
 
 /// An error that arises when converting an integer into an immediate.
 #[derive(Snafu, Debug)]
+#[snafu(context(suffix(Context)))]
 pub struct TryFromIntError {
     backtrace: Backtrace,
 }
 
 /// An error that arises when converting a slice into an immediate.
 #[derive(Snafu, Debug)]
+#[snafu(context(suffix(Context)))]
 pub struct TryFromSliceError {
     backtrace: Backtrace,
 }

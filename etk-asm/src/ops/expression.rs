@@ -7,7 +7,7 @@ use std::fmt::{self, Debug};
 
 /// An error that arises when an expression cannot be evaluated.
 #[derive(Snafu, Debug)]
-#[snafu(visibility = "pub")]
+#[snafu(context(suffix(false)), visibility(pub))]
 pub enum Error {
     #[snafu(display("unknown label `{}`", label))]
     #[non_exhaustive]
