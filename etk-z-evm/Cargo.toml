@@ -16,7 +16,7 @@ backtraces = [ "snafu/backtraces" ]
 [dependencies]
 z3 = "0.11.2"
 snafu = "0.7.1"
-etk-asm = { version = "0.3.0-dev", path = "../etk-asm" }
+etk-ops = { version = "0.3.0-dev", path = "../etk-ops" }
 smallvec = { version = "1.8.0", features = [ "union", "const_generics" ] }
 
 [dev-dependencies]

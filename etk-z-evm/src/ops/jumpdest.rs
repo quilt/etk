@@ -6,8 +6,8 @@ use smallvec::SmallVec;
 use z3::ast::Int;
 use z3::SatResult;
 
-impl<'ctx> ZEvm<'ctx> {
-    pub(crate) fn jumpdest(self) -> Step<'ctx> {
+impl<'ctx, S> ZEvm<'ctx, S> {
+    pub(crate) fn jumpdest(self) -> Step<'ctx, S> {
         let execution = self.execution();
 
         let gas_cost = Int::from_u64(self.ctx, 1);
@@ -30,8 +30,8 @@ impl<'ctx> ZEvm<'ctx> {
     }
 }
 
-impl<'ctx> Step<'ctx> {
-    pub(crate) fn jumpdest(&self, run: Run, execution: &mut Execution<'ctx>) {
+impl<'ctx, S> Step<'ctx, S> {
+    pub(crate) fn jumpdest(&self, run: Run, execution: &mut Execution<'ctx, S>) {
         if run != Run::Advance {
             panic!("invalid run for jumpdest: {:?}", run);
         }
@@ -43,18 +43,23 @@ impl<'ctx> Step<'ctx> {
 
 #[cfg(test)]
 mod tests {
-    use etk_asm::ops::ConcreteOp;
-    use z3::ast::{Ast, BV};
+    use crate::storage::InMemory;
+    use crate::Builder;
+
+    use etk_ops::london::*;
 
     use super::*;
 
+    use z3::ast::{Ast, BV};
     use z3::{Config, Context};
 
     #[test]
     fn not_enough_gas() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::JumpDest], 0);
+        let evm = Builder::<'_, InMemory>::new(&ctx, vec![JumpDest.into()])
+            .set_gas(0)
+            .build();
 
         let step = evm.step();
         assert_eq!(step.len(), 1);
@@ -68,7 +73,9 @@ mod tests {
     fn advance() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::JumpDest], 1);
+        let evm = Builder::<'_, InMemory>::new(&ctx, vec![JumpDest.into()])
+            .set_gas(1)
+            .build();
 
         let step = evm.step();
         assert_eq!(step.len(), 1);
@@ -80,20 +87,16 @@ mod tests {
         let next = step.apply(Run::Advance).unwrap();
         assert_eq!(next.executions.len(), 2);
 
-        let result = next.solver.check_assumptions(&[
-            next.executions[1]
-                .gas_remaining
-                ._eq(&Int::from_u64(&ctx, 0)),
-        ]);
+        let result = next.solver.check_assumptions(&[next.executions[1]
+            .gas_remaining
+            ._eq(&Int::from_u64(&ctx, 0))]);
 
         assert_eq!(SatResult::Sat, result);
 
-        let result = next.solver.check_assumptions(&[
-            next.executions[1]
-                .gas_remaining
-                ._eq(&Int::from_u64(&ctx, 0))
-                .not(),
-        ]);
+        let result = next.solver.check_assumptions(&[next.executions[1]
+            .gas_remaining
+            ._eq(&Int::from_u64(&ctx, 0))
+            .not()]);
 
         assert_eq!(SatResult::Unsat, result);
     }

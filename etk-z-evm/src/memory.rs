@@ -1,14 +1,10 @@
+use crate::resolve::{resolve, Error};
+
 use std::collections::BTreeMap;
 use std::ops::RangeBounds;
 
 use z3::ast::{Ast, Int, BV};
 use z3::{SatResult, Solver};
-
-#[derive(Debug)]
-pub enum Error {
-    Unsat,
-    Ambiguous,
-}
 
 #[derive(Debug, Default, Clone)]
 pub struct Memory<'ctx> {
@@ -16,41 +12,6 @@ pub struct Memory<'ctx> {
 }
 
 impl<'ctx> Memory<'ctx> {
-    fn resolve(solver: &Solver<'ctx>, at: &BV<'ctx>) -> Result<[u8; 32], Error> {
-        let ctx = solver.get_context();
-
-        if SatResult::Sat != solver.check() {
-            return Err(Error::Unsat);
-        }
-
-        let model = solver.get_model().unwrap();
-        let resolved = model.eval(at, true).ok_or(Error::Ambiguous)?;
-
-        let mut store = [0u8; 32];
-
-        for ii in 0..4 {
-            let dest = &mut store[ii * 8..(ii + 1) * 8];
-            let shift = ((3 - ii) * 8 * 8).try_into().unwrap();
-
-            let fragment = resolved
-                .bvlshr(&BV::from_u64(ctx, shift, 256))
-                .bvand(&BV::from_u64(ctx, u64::MAX, 256))
-                .simplify()
-                .as_u64()
-                .ok_or(Error::Ambiguous)?
-                .to_be_bytes();
-
-            dest.copy_from_slice(&fragment);
-        }
-
-        if SatResult::Unsat != solver.check_assumptions(&[at._eq(&resolved).not()]) {
-            // If the given address `at` can resolve to multiple values, bail.
-            return Err(Error::Ambiguous);
-        }
-
-        Ok(store)
-    }
-
     fn range(&self, at: &[u8; 32]) -> impl RangeBounds<[u8; 32]> {
         let mut low = *at;
         low[31] &= 0xe0;
@@ -72,7 +33,7 @@ impl<'ctx> Memory<'ctx> {
     }
 
     fn memory_gas(solver: &Solver<'ctx>, len: &BV<'ctx>) -> Result<Int<'ctx>, Error> {
-        let len = Self::resolve(solver, len)?;
+        let len = resolve(solver, len)?;
         for v in &len[0..24] {
             if *v != 0 {
                 todo!("memory length larger than u64::MAX");
@@ -165,7 +126,7 @@ impl<'ctx> Memory<'ctx> {
         at: &BV<'ctx>,
         value: &BV<'ctx>,
     ) -> Result<(), Error> {
-        let at = Self::resolve(solver, at)?;
+        let at = resolve(solver, at)?;
         let range = self.range(&at);
         let items: Vec<_> = self.store.range_mut(range).collect();
 
@@ -180,7 +141,7 @@ impl<'ctx> Memory<'ctx> {
     }
 
     pub fn load(&mut self, solver: &Solver<'ctx>, at: &BV<'ctx>) -> Result<BV<'ctx>, Error> {
-        let at = Self::resolve(solver, at)?;
+        let at = resolve(solver, at)?;
         let range = self.range(&at);
         let items: Vec<_> = self.store.range_mut(range).collect();
 
@@ -234,7 +195,7 @@ mod tests {
         ];
 
         let input = to_bv(&ctx, &expected);
-        let actual = Memory::resolve(&solver, &input).unwrap();
+        let actual = resolve(&solver, &input).unwrap();
 
         assert_eq!(expected, actual);
     }
@@ -248,9 +209,9 @@ mod tests {
         let solver = Solver::new(&ctx);
 
         let input = BV::fresh_const(&ctx, "x", 256);
-        let actual = Memory::resolve(&solver, &input).unwrap_err();
+        let actual = resolve(&solver, &input).unwrap_err();
 
-        assert!(matches!(actual, Error::Ambiguous));
+        assert!(matches!(actual, Error::Ambiguous { .. }));
     }
 
     #[test]
@@ -264,9 +225,9 @@ mod tests {
         let input = BV::fresh_const(&ctx, "x", 256);
         solver.assert(&(input._eq(&to_bv(&ctx, &[1])) | input._eq(&to_bv(&ctx, &[2]))));
 
-        let actual = Memory::resolve(&solver, &input).unwrap_err();
+        let actual = resolve(&solver, &input).unwrap_err();
 
-        assert!(matches!(actual, Error::Ambiguous));
+        assert!(matches!(actual, Error::Ambiguous { .. }));
     }
 
     #[test]

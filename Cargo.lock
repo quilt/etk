@@ -478,7 +478,7 @@ dependencies = [
 name = "etk-z-evm"
 version = "0.2.0-dev"
 dependencies = [
- "etk-asm",
+ "etk-ops",
  "smallvec",
  "snafu",
  "z3",

@@ -1,13 +1,51 @@
 use crate::execution::Execution;
+use crate::storage::{Key, Storage};
 use crate::{Halt, Outcome, Run, Step, ZEvm};
 
 use smallvec::SmallVec;
 
-use z3::ast::{Int, BV};
+use z3::ast::{Ast, Bool, Int, BV};
 use z3::{SatResult, Solver};
 
-impl<'ctx, S> ZEvm<'ctx, S> {
-    pub(crate) fn mstore(self) -> Step<'ctx, S> {
+const SET_GAS: u64 = 20_000;
+const RESET_GAS: u64 = 5_000;
+const BASE_GAS: u64 = 100;
+const COLD_GAS: u64 = 2_100;
+
+fn gas_cost<'ctx, S>(
+    storage: &S,
+    key: Key<'_, 'ctx>,
+    new_value: &BV<'ctx>,
+    warm: Bool<'ctx>,
+) -> Result<Int<'ctx>, S::Error>
+where
+    S: Storage<'ctx>,
+{
+    let ctx = key.context();
+    let sload_gas = Int::from_u64(ctx, BASE_GAS);
+    let sstore_set_gas = Int::from_u64(ctx, SET_GAS);
+    let sstore_reset_gas = Int::from_u64(ctx, RESET_GAS);
+    let sstore_cold = Int::from_u64(ctx, COLD_GAS);
+    let zero = BV::from_u64(ctx, 0, 256);
+
+    let current_value = storage.get(key)?;
+    let original_value = storage.original(key)?;
+
+    let cost = (original_value._eq(&current_value) & current_value._eq(&new_value).not()).ite(
+        &original_value
+            ._eq(&zero)
+            .ite(&sstore_set_gas, &sstore_reset_gas),
+        &sload_gas,
+    ) + warm.ite(&Int::from_u64(ctx, 0), &sstore_cold);
+
+    Ok(cost.simplify())
+}
+
+impl<'ctx, S> ZEvm<'ctx, S>
+where
+    S: Storage<'ctx>,
+{
+    pub(crate) fn sstore(self) -> Step<'ctx, S> {
         let execution = self.execution();
 
         let mut outcomes = SmallVec::new();
@@ -22,14 +60,29 @@ impl<'ctx, S> ZEvm<'ctx, S> {
         }
 
         // Get the stack elements for this instruction.
-        let position = execution.stack.peek(0).unwrap();
+        let slot = execution.stack.peek(0).unwrap();
+        let new_value = execution.stack.peek(1).unwrap();
 
-        let mut gas_cost = Int::from_u64(self.ctx, 3);
-        gas_cost += execution.memory.expansion_gas(
-            &self.solver,
-            position,
-            &BV::from_u64(self.ctx, 32, 256),
-        );
+        // Calculate the gas cost.
+        let warm = execution.is_warm_slot(slot);
+
+        let key = Key::new(&self.solver, &execution.state_address, slot);
+
+        let gas_cost = gas_cost(&execution.storage, key, new_value, warm).unwrap_or_else(|_| {
+            // TODO: technically not a strict bound on what paths are possible.
+            let g = Int::fresh_const(self.ctx, "str-gas");
+
+            let one_of = &g._eq(&Int::from_u64(self.ctx, BASE_GAS))
+                | &g._eq(&Int::from_u64(self.ctx, SET_GAS))
+                | &g._eq(&Int::from_u64(self.ctx, RESET_GAS))
+                | &g._eq(&Int::from_u64(self.ctx, BASE_GAS + COLD_GAS))
+                | &g._eq(&Int::from_u64(self.ctx, SET_GAS + COLD_GAS))
+                | &g._eq(&Int::from_u64(self.ctx, RESET_GAS + COLD_GAS));
+
+            self.solver.assert(&one_of);
+
+            g
+        });
 
         let covers_cost = execution.gas_remaining.ge(&gas_cost);
 
@@ -50,38 +103,44 @@ impl<'ctx, S> ZEvm<'ctx, S> {
     }
 }
 
-impl<'ctx, S> Step<'ctx, S> {
-    pub(crate) fn mstore(
+impl<'ctx, S> Step<'ctx, S>
+where
+    S: Storage<'ctx>,
+{
+    pub(crate) fn sstore(
         &self,
         run: Run,
         solver: &Solver<'ctx>,
         execution: &mut Execution<'ctx, S>,
-    ) -> Result<(), crate::resolve::Error> {
+    ) -> Result<(), S::Error> {
         if Run::Advance != run {
-            panic!("invalid run for mstore: {:?}", run);
+            panic!("invalid run for sstore: {:?}", run);
         }
 
-        let ctx = self.previous.ctx;
+        let slot = execution.stack.pop().unwrap();
+        let new_value = execution.stack.pop().unwrap();
 
-        let position = execution.stack.pop().unwrap();
-        let value = execution.stack.pop().unwrap();
+        let key = Key::new(solver, &execution.state_address, &slot);
 
-        let mut gas_cost = Int::from_u64(ctx, 3);
-        gas_cost +=
-            execution
-                .memory
-                .try_expansion_gas(solver, &position, &BV::from_u64(ctx, 32, 256))?;
+        let warm = execution.is_warm_slot(&slot);
+        let gas_cost = gas_cost(&execution.storage, key, &new_value, warm)?;
 
         execution.gas_remaining -= gas_cost;
 
-        execution.memory.store(solver, &position, &value)
+        execution.storage.set(key, &new_value)?;
+
+        execution
+            .warm_slots
+            .push((execution.state_address.clone(), slot));
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::storage::InMemory;
-    use crate::{Builder, Offset};
+    use crate::{to_bv, Builder, Offset};
 
     use etk_ops::london::*;
 
@@ -94,7 +153,7 @@ mod tests {
     fn underflow() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MStore.into()])
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![SStore.into()])
             .set_gas(10)
             .build();
 
@@ -110,7 +169,7 @@ mod tests {
     fn not_enough_gas() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MStore.into()])
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![SStore.into()])
             .set_gas(5)
             .build();
 
@@ -135,8 +194,8 @@ mod tests {
     fn ambiguous_at() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MStore.into()])
-            .set_gas(100)
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![SStore.into()])
+            .set_gas(2200)
             .build();
 
         let at = BV::fresh_const(&ctx, "at", 256);
@@ -150,27 +209,52 @@ mod tests {
         evm.executions[0].stack.push(at).unwrap();
 
         let step = evm.step();
-        assert_eq!(step.len(), 2);
+        assert_eq!(step.len(), 1);
 
         let outcomes: Vec<_> = step.outcomes().collect();
 
-        assert_eq!(outcomes[0], Outcome::Halt(Halt::OutOfGas)); // This is technically incorrect.
-        assert_eq!(outcomes[1], Outcome::Run(Run::Advance));
+        assert_eq!(outcomes[0], Outcome::Run(Run::Advance));
 
         match step.apply(Run::Advance).unwrap_err() {
-            crate::Error::Memory {
+            crate::Error::Storage {
                 source: crate::resolve::Error::Ambiguous { .. },
+                ..
             } => (),
             _ => panic!("expected Ambiguous"),
         }
     }
 
     #[test]
+    fn cold_write_non_zero_not_enough_gas() {
+        let cfg = Config::new();
+        let ctx = Context::new(&cfg);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![SStore.into()])
+            .set_gas(22099)
+            .build();
+
+        evm.executions[0]
+            .stack
+            .push(BV::from_u64(&ctx, 6744, 256))
+            .unwrap();
+        evm.executions[0]
+            .stack
+            .push(BV::from_u64(&ctx, 0, 256))
+            .unwrap();
+
+        let step = evm.step();
+        assert_eq!(step.len(), 1);
+
+        let outcomes: Vec<_> = step.outcomes().collect();
+
+        assert_eq!(outcomes[0], Outcome::Halt(Halt::OutOfGas));
+    }
+
+    #[test]
     fn specific_at() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MStore.into()])
-            .set_gas(6)
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![SStore.into()])
+            .set_gas(22100)
             .build();
 
         evm.executions[0]
@@ -191,41 +275,13 @@ mod tests {
 
         let evm = step.apply(Run::Advance).unwrap();
 
-        let got = evm.execution().memory.get(&[0; 32]).unwrap();
-        assert_eq!(got, &BV::from_u64(&ctx, 6744, 256));
-    }
-
-    #[test]
-    fn specific_at_big() {
-        let cfg = Config::new();
-        let ctx = Context::new(&cfg);
-        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MStore.into()])
-            .set_gas(126)
-            .build();
-
-        evm.executions[0]
-            .stack
-            .push(BV::from_u64(&ctx, 6744, 256))
-            .unwrap();
-        evm.executions[0]
-            .stack
-            .push(BV::from_u64(&ctx, 1248, 256))
+        let slot = BV::from_u64(&ctx, 0, 256);
+        let got = evm
+            .execution()
+            .storage
+            .get(&evm.solver, &evm.executions[0].state_address, &slot)
             .unwrap();
 
-        let step = evm.step();
-        assert_eq!(step.len(), 1);
-
-        let outcomes: Vec<_> = step.outcomes().collect();
-
-        assert_eq!(outcomes[0], Outcome::Run(Run::Advance));
-
-        let evm = step.apply(Run::Advance).unwrap();
-
-        let mut key = [0u8; 32];
-        key[30] = 0x04;
-        key[31] = 0xe0;
-
-        let got = evm.execution().memory.get(&key).unwrap();
-        assert_eq!(got, &BV::from_u64(&ctx, 6744, 256));
+        assert_eq!(&got, &BV::from_u64(&ctx, 6744, 256));
     }
 }

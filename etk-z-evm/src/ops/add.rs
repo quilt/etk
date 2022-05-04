@@ -6,8 +6,8 @@ use smallvec::SmallVec;
 use z3::ast::Int;
 use z3::SatResult;
 
-impl<'ctx> ZEvm<'ctx> {
-    pub(crate) fn add(self) -> Step<'ctx> {
+impl<'ctx, S> ZEvm<'ctx, S> {
+    pub(crate) fn add(self) -> Step<'ctx, S> {
         let execution = self.execution();
 
         let gas_cost = Int::from_u64(self.ctx, 3);
@@ -38,8 +38,8 @@ impl<'ctx> ZEvm<'ctx> {
     }
 }
 
-impl<'ctx> Step<'ctx> {
-    pub(crate) fn add(&self, run: Run, execution: &mut Execution<'ctx>) {
+impl<'ctx, S> Step<'ctx, S> {
+    pub(crate) fn add(&self, run: Run, execution: &mut Execution<'ctx, S>) {
         if run != Run::Advance {
             panic!("invalid run for add: {:?}", run);
         }
@@ -55,18 +55,23 @@ impl<'ctx> Step<'ctx> {
 
 #[cfg(test)]
 mod tests {
-    use etk_asm::ops::ConcreteOp;
-    use z3::ast::{Ast, BV};
+    use crate::storage::InMemory;
+    use crate::Builder;
+
+    use etk_ops::london::*;
 
     use super::*;
 
+    use z3::ast::{Ast, BV};
     use z3::{Config, Context};
 
     #[test]
     fn underflow() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::Add], 3);
+        let evm = Builder::<'_, InMemory>::new(&ctx, vec![Add.into()])
+            .set_gas(3)
+            .build();
 
         let step = evm.step();
         assert_eq!(step.len(), 1);
@@ -80,7 +85,9 @@ mod tests {
     fn not_enough_gas() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::Add], 0);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![Add.into()])
+            .set_gas(0)
+            .build();
 
         evm.executions[0]
             .stack
@@ -103,7 +110,9 @@ mod tests {
     fn add_two() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::Add], 3);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![Add.into()])
+            .set_gas(3)
+            .build();
 
         evm.executions[0]
             .stack

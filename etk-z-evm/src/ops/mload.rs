@@ -6,8 +6,8 @@ use smallvec::SmallVec;
 use z3::ast::{Int, BV};
 use z3::{SatResult, Solver};
 
-impl<'ctx> ZEvm<'ctx> {
-    pub(crate) fn mload(self) -> Step<'ctx> {
+impl<'ctx, S> ZEvm<'ctx, S> {
+    pub(crate) fn mload(self) -> Step<'ctx, S> {
         let execution = self.execution();
 
         let mut outcomes = SmallVec::new();
@@ -50,13 +50,13 @@ impl<'ctx> ZEvm<'ctx> {
     }
 }
 
-impl<'ctx> Step<'ctx> {
+impl<'ctx, S> Step<'ctx, S> {
     pub(crate) fn mload(
         &self,
         run: Run,
         solver: &Solver<'ctx>,
-        execution: &mut Execution<'ctx>,
-    ) -> Result<(), crate::memory::Error> {
+        execution: &mut Execution<'ctx, S>,
+    ) -> Result<(), crate::resolve::Error> {
         if Run::Advance != run {
             panic!("invalid run for mload: {:?}", run);
         }
@@ -82,20 +82,23 @@ impl<'ctx> Step<'ctx> {
 
 #[cfg(test)]
 mod tests {
-    use etk_asm::ops::ConcreteOp;
-    use z3::ast::{Ast, BV};
+    use crate::storage::InMemory;
+    use crate::{Builder, Offset};
 
-    use crate::Offset;
+    use etk_ops::london::*;
 
     use super::*;
 
+    use z3::ast::{Ast, BV};
     use z3::{Config, Context};
 
     #[test]
     fn underflow() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::MLoad], 10);
+        let evm = Builder::<'_, InMemory>::new(&ctx, vec![MLoad.into()])
+            .set_gas(10)
+            .build();
 
         let step = evm.step();
         assert_eq!(step.len(), 1);
@@ -109,7 +112,9 @@ mod tests {
     fn not_enough_gas() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::MLoad], 5);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MLoad.into()])
+            .set_gas(5)
+            .build();
 
         evm.executions[0]
             .stack
@@ -128,7 +133,9 @@ mod tests {
     fn ambiguous_at() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::MLoad], 100);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MLoad.into()])
+            .set_gas(100)
+            .build();
 
         let at = BV::fresh_const(&ctx, "at", 256);
         evm.solver
@@ -145,7 +152,9 @@ mod tests {
         assert_eq!(outcomes[1], Outcome::Run(Run::Advance));
 
         match step.apply(Run::Advance).unwrap_err() {
-            crate::memory::Error::Ambiguous => (),
+            crate::Error::Memory {
+                source: crate::resolve::Error::Ambiguous { .. },
+            } => (),
             _ => panic!("expected Ambiguous"),
         }
     }
@@ -154,9 +163,13 @@ mod tests {
     fn specific_at() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::MLoad], 6);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MLoad.into()])
+            .set_gas(6)
+            .build();
 
-        evm.executions[0].memory.set([0; 32], BV::from_u64(&ctx, 0x1a58, 256));
+        evm.executions[0]
+            .memory
+            .set([0; 32], BV::from_u64(&ctx, 0x1a58, 256));
 
         evm.executions[0]
             .stack
@@ -180,13 +193,17 @@ mod tests {
     fn specific_at_big() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::MLoad], 126);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MLoad.into()])
+            .set_gas(126)
+            .build();
 
         let mut key = [0u8; 32];
         key[30] = 0x04;
         key[31] = 0xe0;
 
-        evm.executions[0].memory.set(key, BV::from_u64(&ctx, 0x1a58, 256));
+        evm.executions[0]
+            .memory
+            .set(key, BV::from_u64(&ctx, 0x1a58, 256));
 
         evm.executions[0]
             .stack

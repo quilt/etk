@@ -6,8 +6,8 @@ use smallvec::SmallVec;
 use z3::ast::Int;
 use z3::SatResult;
 
-impl<'ctx> ZEvm<'ctx> {
-    pub(crate) fn push(self) -> Step<'ctx> {
+impl<'ctx, S> ZEvm<'ctx, S> {
+    pub(crate) fn push(self) -> Step<'ctx, S> {
         let execution = self.execution();
 
         let gas_cost = Int::from_u64(self.ctx, 3);
@@ -34,8 +34,8 @@ impl<'ctx> ZEvm<'ctx> {
     }
 }
 
-impl<'ctx> Step<'ctx> {
-    pub(crate) fn push(&self, v: &[u8], run: Run, execution: &mut Execution<'ctx>) {
+impl<'ctx, S> Step<'ctx, S> {
+    pub(crate) fn push(&self, v: &[u8], run: Run, execution: &mut Execution<'ctx, S>) {
         if run != Run::Advance {
             panic!("invalid run for push: {:?}", run);
         }
@@ -47,7 +47,10 @@ impl<'ctx> Step<'ctx> {
 
 #[cfg(test)]
 mod tests {
-    use etk_asm::ops::ConcreteOp;
+    use crate::storage::InMemory;
+    use crate::Builder;
+
+    use etk_ops::london::*;
 
     use super::*;
 
@@ -58,7 +61,7 @@ mod tests {
     fn unrestricted() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let evm = ZEvm::new(&ctx, vec![ConcreteOp::Push1([5])]);
+        let evm = Builder::<'_, InMemory>::new(&ctx, vec![Push1([5]).into()]).build();
 
         let step = evm.step();
         assert_eq!(step.len(), 2);
@@ -73,7 +76,9 @@ mod tests {
     fn not_enough_gas() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::Push1([5])], 2);
+        let evm = Builder::<'_, InMemory>::new(&ctx, vec![Push1([5]).into()])
+            .set_gas(2)
+            .build();
 
         let step = evm.step();
         assert_eq!(step.len(), 1);
@@ -87,15 +92,17 @@ mod tests {
     fn just_enough_gas() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let evm = ZEvm::with_gas(
+        let evm = Builder::<'_, InMemory>::new(
             &ctx,
-            vec![ConcreteOp::Push32([
+            vec![Push32([
                 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
                 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x23, 0x45, 0x67, 0x89,
                 0xab, 0xcd, 0xef, 0xff,
-            ])],
-            3,
-        );
+            ])
+            .into()],
+        )
+        .set_gas(3)
+        .build();
 
         let step = evm.step();
         assert_eq!(step.len(), 1);

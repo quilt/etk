@@ -6,8 +6,8 @@ use smallvec::SmallVec;
 use z3::ast::{Ast, Bool, Int, BV};
 use z3::SatResult;
 
-impl<'ctx> ZEvm<'ctx> {
-    pub(crate) fn jumpi(self) -> Step<'ctx> {
+impl<'ctx, S> ZEvm<'ctx, S> {
+    pub(crate) fn jumpi(self) -> Step<'ctx, S> {
         let execution = self.execution();
 
         let gas_cost = Int::from_u64(self.ctx, 10);
@@ -47,7 +47,7 @@ impl<'ctx> ZEvm<'ctx> {
 
                 // Check if it's possible for `dest` to be each JUMPDEST offset.
                 for (offset, _) in self.constants.destinations() {
-                    let possible_dest = BV::from_u64(self.ctx, offset.0.into(), 256);
+                    let possible_dest = BV::from_u64(self.ctx, offset.0, 256);
                     let can_jump = possible_dest._eq(dest);
                     let cannot_jump = can_jump.not();
 
@@ -80,8 +80,8 @@ impl<'ctx> ZEvm<'ctx> {
     }
 }
 
-impl<'ctx> Step<'ctx> {
-    pub(crate) fn jumpi(&self, run: Run, execution: &mut Execution<'ctx>) {
+impl<'ctx, S> Step<'ctx, S> {
+    pub(crate) fn jumpi(&self, run: Run, execution: &mut Execution<'ctx, S>) {
         execution.gas_remaining -= Int::from_u64(self.previous.ctx, 10);
 
         let dest = execution.stack.pop().unwrap();
@@ -93,7 +93,7 @@ impl<'ctx> Step<'ctx> {
             Run::Jump(offset) => {
                 self.previous.solver.assert(&will_advance.not());
 
-                let offset = BV::from_u64(self.previous.ctx, offset.0.into(), 256);
+                let offset = BV::from_u64(self.previous.ctx, offset.0, 256);
                 self.previous.solver.assert(&dest._eq(&offset));
             }
             Run::Advance => {
@@ -105,20 +105,25 @@ impl<'ctx> Step<'ctx> {
 
 #[cfg(test)]
 mod tests {
-    use etk_asm::ops::ConcreteOp;
-    use z3::ast::{Ast, BV};
+    use crate::storage::InMemory;
+    use crate::Builder;
+
+    use etk_ops::london::*;
 
     use crate::Offset;
 
     use super::*;
 
+    use z3::ast::{Ast, BV};
     use z3::{Config, Context};
 
     #[test]
     fn underflow() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::JumpI], 10);
+        let evm = Builder::<'_, InMemory>::new(&ctx, vec![JumpI.into()])
+            .set_gas(10)
+            .build();
 
         let step = evm.step();
         assert_eq!(step.len(), 1);
@@ -132,7 +137,9 @@ mod tests {
     fn not_enough_gas() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::JumpI], 9);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![JumpI.into()])
+            .set_gas(9)
+            .build();
 
         evm.executions[0]
             .stack
@@ -155,7 +162,9 @@ mod tests {
     fn advance_only() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::JumpI], 10);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![JumpI.into()])
+            .set_gas(10)
+            .build();
 
         evm.executions[0]
             .stack
@@ -178,7 +187,9 @@ mod tests {
     fn invalid_jump_only() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::with_gas(&ctx, vec![ConcreteOp::JumpI], 10);
+        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![JumpI.into()])
+            .set_gas(10)
+            .build();
 
         evm.executions[0]
             .stack
@@ -201,14 +212,11 @@ mod tests {
     fn unrestricted() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::new(
+        let mut evm = Builder::<'_, InMemory>::new(
             &ctx,
-            vec![
-                ConcreteOp::JumpI,
-                ConcreteOp::JumpDest,
-                ConcreteOp::JumpDest,
-            ],
-        );
+            vec![JumpI.into(), JumpDest.into(), JumpDest.into()],
+        )
+        .build();
 
         evm.executions[0]
             .stack
@@ -235,10 +243,9 @@ mod tests {
     fn asserts_when_jump() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::new(
-            &ctx,
-            vec![ConcreteOp::JumpI, ConcreteOp::Stop, ConcreteOp::JumpDest],
-        );
+        let mut evm =
+            Builder::<'_, InMemory>::new(&ctx, vec![JumpI.into(), Stop.into(), JumpDest.into()])
+                .build();
 
         let condition = BV::fresh_const(&ctx, "condition", 256);
 
@@ -265,10 +272,9 @@ mod tests {
     fn asserts_when_advance() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = ZEvm::new(
-            &ctx,
-            vec![ConcreteOp::JumpI, ConcreteOp::Stop, ConcreteOp::JumpDest],
-        );
+        let mut evm =
+            Builder::<'_, InMemory>::new(&ctx, vec![JumpI.into(), Stop.into(), JumpDest.into()])
+                .build();
 
         let condition = BV::fresh_const(&ctx, "condition", 256);
 

@@ -1,33 +1,33 @@
 use crate::Offset;
 
-use etk_asm::ops::ConcreteOp;
+use etk_ops::london::{JumpDest, Op, Stop};
 
 use std::collections::BTreeMap;
 
 #[derive(Debug)]
 pub struct Constants {
     destinations: BTreeMap<Offset, usize>,
-    ops: Vec<ConcreteOp>,
+    ops: Vec<Op<[u8]>>,
 }
 
 impl Constants {
-    pub fn new(ops: Vec<ConcreteOp>) -> Self {
+    pub fn new(ops: Vec<Op<[u8]>>) -> Self {
         let mut offset = Offset(0);
         let mut destinations = BTreeMap::new();
 
         for (idx, op) in ops.iter().enumerate() {
-            if op == &ConcreteOp::JumpDest {
+            if op.code() == Op::JumpDest(JumpDest) {
                 destinations.insert(offset, idx);
             }
 
-            offset += op.size();
+            offset += op.size().try_into().unwrap();
         }
 
         Self { ops, destinations }
     }
 
-    pub fn op(&self, index: usize) -> ConcreteOp {
-        self.ops.get(index).unwrap_or(&ConcreteOp::Stop).clone()
+    pub fn op(&self, index: usize) -> Op<[u8]> {
+        self.ops.get(index).unwrap_or(&Op::Stop(Stop)).clone()
     }
 
     pub fn destination(&self, offset: Offset) -> Option<usize> {
@@ -41,15 +41,17 @@ impl Constants {
 
 #[cfg(test)]
 mod tests {
+    use etk_ops::london::*;
+
     use super::*;
 
     #[test]
     fn new() {
         let ops = vec![
-            ConcreteOp::Push32([0; 32]),
-            ConcreteOp::JumpDest,
-            ConcreteOp::Push2([0; 2]),
-            ConcreteOp::JumpDest,
+            Op::Push32(Push32([0; 32])),
+            Op::JumpDest(JumpDest),
+            Op::Push2(Push2([0; 2])),
+            Op::JumpDest(JumpDest),
         ];
 
         let constants = Constants::new(ops);
