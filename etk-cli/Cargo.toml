@@ -13,7 +13,7 @@ categories = ["cryptography::cryptocurrencies", "command-line-utilities", "devel
 
 [dependencies]
 hex = "0.4.3"
-structopt = "0.3.21"
+structopt = "0.3.26"
 snafu = { version = "0.7.1", default-features = false, features = [ "std" ] }
 
 [dev-dependencies]
