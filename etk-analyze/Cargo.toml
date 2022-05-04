@@ -16,20 +16,20 @@ cli = ["etk-cli", "etk-asm", "structopt", "snafu"]
 
 [dependencies]
 snafu = { optional = true, version = "0.7.1" }
-structopt = { optional = true, version = "0.3.21" }
+structopt = { optional = true, version = "0.3.26" }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.2.0-dev" }
 etk-asm = { optional = true, path = "../etk-asm", version = "0.2.0-dev" }
 etk-dasm = { path = "../etk-dasm", version = "0.2.0-dev" }
-z3 = "0.10.0"
+z3 = "0.11.2"
 
 [dependencies.petgraph]
-version = "0.5.1"
+version = "0.6.0"
 default-features = false
 
 [dev-dependencies]
 assert_matches = "1.5.0"
 etk-asm = { path = "../etk-asm", version = "0.2.0-dev" }
-hex-literal = "0.3.1"
+hex-literal = "0.3.4"
 
 [[bin]]
 name = "ecfg"
