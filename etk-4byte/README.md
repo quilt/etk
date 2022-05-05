@@ -9,7 +9,7 @@ Since `etk-4byte` is a purely offline database, it needs regular updates. To fet
 
 ```bash
 $ cargo run --features=generate --bin etk-4byte-generate > src/signatures.txt
-$ cargo run --features=generate --bin etk-4byte-phf
+$ cargo run --features=generate --bin etk-4byte-pack
 ```
 
 Then recompile.

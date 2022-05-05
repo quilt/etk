@@ -8,8 +8,10 @@ use std::fmt;
 pub struct DisplayOp(pub ConcreteOp);
 
 impl DisplayOp {
-    fn reverse_selector(&self) -> &'static [&'static str] {
-        self.selector().map(reverse_selector).unwrap_or(&[])
+    fn reverse_selector(&self) -> Vec<&'static str> {
+        self.selector()
+            .map(|s| reverse_selector(s).collect())
+            .unwrap_or_default()
     }
 
     fn selector(&self) -> Option<u32> {

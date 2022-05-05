@@ -15,7 +15,19 @@
 #![deny(unreachable_pub)]
 #![deny(missing_debug_implementations)]
 
-include!(concat!(env!("OUT_DIR"), "/codegen.rs.in"));
+use lazy_static::lazy_static;
+
+use std::collections::BTreeMap;
+use std::convert::TryFrom;
+
+const PACKED: &'static [u8] = include_bytes!("database.br");
+
+lazy_static! {
+    static ref SIGNATURES: (BTreeMap<u32, u32>, Vec<Vec<String>>) = {
+        let mut input = brotli::Decompressor::new(PACKED, 4096);
+        bincode::deserialize_from(&mut input).unwrap()
+    };
+}
 
 /// Attempt to retrieve the human-readable signature given a selector.
 ///
@@ -24,11 +36,17 @@ include!(concat!(env!("OUT_DIR"), "/codegen.rs.in"));
 /// ```
 /// use etk_4byte::reverse_selector;
 ///
-/// let signatures = reverse_selector(0x3bb2dead);
+/// let signatures: Vec<_> = reverse_selector(0x3bb2dead).collect();
 ///
 /// assert_eq!(signatures[0], "initialFundsReleaseNumerator()");
 /// assert_eq!(signatures[1], "resolveAddressLight(address)");
 /// ```
-pub fn reverse_selector(selector: u32) -> &'static [&'static str] {
-    SIGNATURES.get(&selector).unwrap_or(&(&[] as &[&str]))
+pub fn reverse_selector(selector: u32) -> impl Iterator<Item = &'static str> {
+    SIGNATURES
+        .0
+        .get(&selector)
+        .map(|v| usize::try_from(*v).unwrap())
+        .map(|v| SIGNATURES.1[v].iter())
+        .unwrap_or_else(|| [].iter())
+        .map(String::as_str)
 }
