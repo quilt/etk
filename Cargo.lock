@@ -284,7 +284,7 @@ dependencies = [
 
 [[package]]
 name = "etk-4byte"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "phf",
  "phf_codegen",
@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "etk-analyze"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "assert_matches",
  "etk-asm",
@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "etk-asm"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "assert_matches",
  "etk-cli",
@@ -328,7 +328,7 @@ dependencies = [
 
 [[package]]
 name = "etk-cli"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "hex",
  "hex-literal",
@@ -338,7 +338,7 @@ dependencies = [
 
 [[package]]
 name = "etk-dasm"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "etk-4byte",
  "etk-asm",

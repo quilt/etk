@@ -1,6 +1,6 @@
 [package]
 name = "etk-4byte"
-version = "0.2.0-dev"
+version = "0.2.0"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
