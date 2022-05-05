@@ -20,7 +20,7 @@ use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
-const PACKED: &'static [u8] = include_bytes!("database.br");
+const PACKED: &[u8] = include_bytes!("database.br");
 
 lazy_static! {
     static ref SIGNATURES: (BTreeMap<u32, u32>, Vec<Vec<String>>) = {
