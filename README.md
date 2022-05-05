@@ -21,7 +21,7 @@ There are also several examples in the [`etk-asm/tests/asm`](etk-asm/tests/asm) 
 
 ### Installation
 
-`etk` requires `rustc` version `1.51`.
+`etk` requires the latest `rustc` from the stable channel.
 
 ```console
 cargo install --features cli etk-asm etk-dasm
