@@ -10,7 +10,7 @@ mod error {
 
     /// Errors that may arise during disassembly.
     #[derive(Debug, Snafu)]
-    #[snafu(visibility = "pub(super)")]
+    #[snafu(context(suffix(false)), visibility(pub(super)))]
     #[non_exhaustive]
     pub enum Error {
         /// The input is incomplete.

@@ -6,7 +6,7 @@ mod error {
     use snafu::{Backtrace, Snafu};
 
     #[derive(Snafu, Debug)]
-    #[snafu(visibility = "pub(crate)")]
+    #[snafu(context(suffix(false)), visibility(pub(crate)))]
     pub(crate) enum Error {
         ContextIncomplete {
             #[snafu(backtrace)]
@@ -26,7 +26,7 @@ mod error {
     /// The error that can arise while parsing a specifier from a string.
     #[derive(Debug, Snafu)]
     #[snafu(display("unknown specifier: {}", text))]
-    #[snafu(visibility = "pub(super)")]
+    #[snafu(context(suffix(Context)), visibility(pub(super)))]
     #[non_exhaustive]
     pub struct UnknownSpecifierError {
         text: String,
@@ -859,8 +859,8 @@ ops! {
 
     Pop(mnemonic="pop", pops=1),
     MLoad(mnemonic="mload", pops=1, pushes=1, memory=Access::Read),
-    MStore(mnemonic="mstore", pops=2, memory=Access::Read),
-    MStore8(mnemonic="mstore8", pops=2, memory=Access::Read),
+    MStore(mnemonic="mstore", pops=2, memory=Access::Write),
+    MStore8(mnemonic="mstore8", pops=2, memory=Access::Write),
     SLoad(mnemonic="sload", pops=1, pushes=1, storage=Access::Read),
     SStore(mnemonic="sstore", pops=2, storage=Access::Write),
     Jump(mnemonic="jump", pops=1, jump=true),

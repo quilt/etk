@@ -6,7 +6,7 @@ use super::Rule;
 
 /// Type for errors that may arise while parsing assembly source code.
 #[derive(Snafu, Debug)]
-#[snafu(visibility = "pub(super)")]
+#[snafu(context(suffix(false)), visibility(pub(super)))]
 #[non_exhaustive]
 pub enum ParseError {
     /// An immediate value was too large for the given opcode.

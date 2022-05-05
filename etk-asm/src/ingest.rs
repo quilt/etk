@@ -12,7 +12,7 @@ mod error {
     /// Errors that may arise during the assembly process.
     #[derive(Debug, Snafu)]
     #[non_exhaustive]
-    #[snafu(visibility = "pub(super)")]
+    #[snafu(context(suffix(false)), visibility(pub(super)))]
     pub enum Error {
         /// An included/imported file was outside of the root directory.
         #[snafu(display(
@@ -107,7 +107,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
 fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, Error> {
-    let asm = read_to_string(path.as_ref()).with_context(|| error::Io {
+    let asm = read_to_string(path.as_ref()).with_context(|_| error::Io {
         message: "reading file before parsing",
         path: path.as_ref().to_owned(),
     })?;
@@ -162,7 +162,7 @@ impl Root {
             })?
             .join(file);
 
-        let metadata = file.metadata().with_context(|| error::Io {
+        let metadata = file.metadata().with_context(|_| error::Io {
             message: "getting metadata",
             path: file.clone(),
         })?;
@@ -176,7 +176,7 @@ impl Root {
             });
         }
 
-        let canonicalized = std::fs::canonicalize(&file).with_context(|| error::Io {
+        let canonicalized = std::fs::canonicalize(&file).with_context(|_| error::Io {
             message: "canonicalizing root",
             path: file.clone(),
         })?;
@@ -193,7 +193,7 @@ impl Root {
     {
         let path = path.as_ref();
 
-        let canonicalized = std::fs::canonicalize(path).with_context(|| error::Io {
+        let canonicalized = std::fs::canonicalize(path).with_context(|_| error::Io {
             message: "canonicalizing include/import",
             path: path.to_owned(),
         })?;
@@ -393,12 +393,12 @@ where
     {
         let path = path.into();
 
-        let mut file = File::open(&path).with_context(|| error::Io {
+        let mut file = File::open(&path).with_context(|_| error::Io {
             message: "opening source",
             path: path.clone(),
         })?;
         let mut text = String::new();
-        file.read_to_string(&mut text).with_context(|| error::Io {
+        file.read_to_string(&mut text).with_context(|_| error::Io {
             message: "reading source",
             path: path.clone(),
         })?;
@@ -446,7 +446,7 @@ where
                     let partial = self.sources.resolve(path, Scope::same())?;
 
                     let file =
-                        std::fs::read_to_string(partial.path()).with_context(|| error::Io {
+                        std::fs::read_to_string(partial.path()).with_context(|_| error::Io {
                             message: "reading hex include",
                             path: partial.path().to_owned(),
                         })?;
