@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
 
-use structopt::StructOpt;
+use clap::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "eas")]
@@ -36,7 +36,7 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
-    let opt = Opt::from_args();
+    let opt: Opt = clap::Parser::parse();
 
     let mut out: Box<dyn Write> = match opt.out {
         Some(o) => Box::new(create(o)),

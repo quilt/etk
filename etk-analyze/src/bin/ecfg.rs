@@ -17,8 +17,6 @@ use snafu::{Backtrace, Snafu};
 use std::fs::File;
 use std::io::Write;
 
-use structopt::StructOpt;
-
 #[derive(Debug, Snafu)]
 enum Error {
     #[snafu(context(false))]
@@ -41,7 +39,7 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
-    let opts = Opts::from_args();
+    let opts: Opts = clap::Parser::parse();
 
     let mut input = opts.src.open()?;
     let mut disasm = Disassembler::new();
