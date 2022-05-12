@@ -329,7 +329,7 @@ dependencies = [
 
 [[package]]
 name = "etk-4byte"
-version = "0.2.1"
+version = "0.3.0-dev"
 dependencies = [
  "bincode",
  "brotli",
@@ -341,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "etk-analyze"
-version = "0.2.1"
+version = "0.3.0-dev"
 dependencies = [
  "assert_matches",
  "etk-asm",
@@ -356,7 +356,7 @@ dependencies = [
 
 [[package]]
 name = "etk-asm"
-version = "0.2.1"
+version = "0.3.0-dev"
 dependencies = [
  "assert_matches",
  "etk-cli",
@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "etk-cli"
-version = "0.2.1"
+version = "0.3.0-dev"
 dependencies = [
  "hex",
  "hex-literal",
@@ -384,7 +384,7 @@ dependencies = [
 
 [[package]]
 name = "etk-dasm"
-version = "0.2.1"
+version = "0.3.0-dev"
 dependencies = [
  "etk-4byte",
  "etk-asm",

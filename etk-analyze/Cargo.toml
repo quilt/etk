@@ -1,6 +1,6 @@
 [package]
 name = "etk-analyze"
-version = "0.2.1"
+version = "0.3.0-dev"
 edition = "2018"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -17,9 +17,9 @@ cli = ["etk-cli", "etk-asm", "structopt", "snafu"]
 [dependencies]
 snafu = { optional = true, version = "0.7.1" }
 structopt = { optional = true, version = "0.3.26" }
-etk-cli = { optional = true, path = "../etk-cli", version = "0.2.1" }
-etk-asm = { optional = true, path = "../etk-asm", version = "0.2.1" }
-etk-dasm = { path = "../etk-dasm", version = "0.2.1" }
+etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0-dev" }
+etk-asm = { optional = true, path = "../etk-asm", version = "0.3.0-dev" }
+etk-dasm = { path = "../etk-dasm", version = "0.3.0-dev" }
 z3 = "0.11.2"
 
 [dependencies.petgraph]
@@ -28,7 +28,7 @@ default-features = false
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-etk-asm = { path = "../etk-asm", version = "0.2.1" }
+etk-asm = { path = "../etk-asm", version = "0.3.0-dev" }
 hex-literal = "0.3.4"
 
 [[bin]]

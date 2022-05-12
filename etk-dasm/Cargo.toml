@@ -1,6 +1,6 @@
 [package]
 name = "etk-dasm"
-version = "0.2.1"
+version = "0.3.0-dev"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
@@ -16,10 +16,10 @@ cli = ["structopt", "etk-cli", "snafu", "etk-4byte"]
 
 [dependencies]
 hex = "0.4.3"
-etk-asm = { path = "../etk-asm", version = "0.2.1" }
+etk-asm = { path = "../etk-asm", version = "0.3.0-dev" }
 structopt = { optional = true, version = "0.3.26" }
-etk-cli = { optional = true, path = "../etk-cli", version = "0.2.1" }
-etk-4byte = { optional = true, path = "../etk-4byte", version = "0.2.1" }
+etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0-dev" }
+etk-4byte = { optional = true, path = "../etk-4byte", version = "0.3.0-dev" }
 snafu = { optional = true, version = "0.7.1" }
 
 [dev-dependencies]
