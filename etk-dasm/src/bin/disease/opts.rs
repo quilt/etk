@@ -2,7 +2,7 @@ use etk_cli::io::InputSource;
 
 use std::path::PathBuf;
 
-use structopt::StructOpt;
+use clap::StructOpt;
 
 #[derive(Debug, StructOpt)]
 pub struct Opts {
@@ -10,7 +10,7 @@ pub struct Opts {
     pub src: InputSource,
 
     #[structopt(
-        short = "o",
+        short = 'o',
         long = "out-file",
         help = "path to output file (defaults to stdout)"
     )]

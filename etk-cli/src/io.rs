@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io;
 use std::path::PathBuf;
 
-use structopt::StructOpt;
+use clap::StructOpt;
 
 /// Command-line options describing an input source, either from a file or
 /// directly from the command line.
@@ -14,16 +14,16 @@ use structopt::StructOpt;
 pub struct InputSource {
     #[structopt(
         long = "bin-file",
-        short = "b",
+        short = 'b',
         help = "path to input data, as raw binary data",
         conflicts_with_all(&["hex-file", "code"]),
-        required_unless_one(&["hex-file", "code"]),
+        required_unless_present_any(&["hex-file", "code"]),
     )]
     bin_file: Option<PathBuf>,
 
     #[structopt(
         long = "hex-file",
-        short = "x",
+        short = 'x',
         help = "path to input data, encoded in hexadecimal format",
         conflicts_with = "code"
     )]
@@ -31,7 +31,7 @@ pub struct InputSource {
 
     #[structopt(
         long = "code",
-        short = "c",
+        short = 'c',
         help = "input data, encoded in hexadecimal format (with 0x prefix)"
     )]
     code: Option<Hex<Vec<u8>>>,
@@ -202,36 +202,36 @@ mod tests {
 
     use std::io::Read;
 
-    use structopt::clap::ErrorKind;
+    use clap::ErrorKind;
 
     use super::*;
 
     #[test]
     fn input_source_at_least_one() {
         let args: &[&str] = &[];
-        let err = InputSource::from_iter_safe(args).unwrap_err();
-        assert_eq!(err.kind, ErrorKind::MissingRequiredArgument);
+        let err = InputSource::try_parse_from(args).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::MissingRequiredArgument);
     }
 
     #[test]
     fn input_source_bin_file_conflicts_with_hex_file() {
         let args = &["exe", "--bin-file", "floop", "--hex-file", "whoop"];
-        let err = InputSource::from_iter_safe(args).unwrap_err();
-        assert_eq!(err.kind, ErrorKind::ArgumentConflict);
+        let err = InputSource::try_parse_from(args).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::ArgumentConflict);
     }
 
     #[test]
     fn input_source_bin_file_conflicts_with_code() {
         let args = &["exe", "--bin-file", "floop", "--code", "0x00"];
-        let err = InputSource::from_iter_safe(args).unwrap_err();
-        assert_eq!(err.kind, ErrorKind::ArgumentConflict);
+        let err = InputSource::try_parse_from(args).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::ArgumentConflict);
     }
 
     #[test]
     fn input_source_hex_file_conflicts_with_code() {
         let args = &["exe", "--hex-file", "floop", "--code", "0x00"];
-        let err = InputSource::from_iter_safe(args).unwrap_err();
-        assert_eq!(err.kind, ErrorKind::ArgumentConflict);
+        let err = InputSource::try_parse_from(args).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::ArgumentConflict);
     }
 
     #[test]
