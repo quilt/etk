@@ -1,0 +1,603 @@
+[Stop]
+code = 0x00
+mnemonic = "stop"
+
+[Add]
+code = 0x01
+mnemonic = "add"
+
+[Mul]
+code = 0x02
+mnemonic = "mul"
+
+[Sub]
+code = 0x03
+mnemonic = "sub"
+
+[Div]
+code = 0x04
+mnemonic = "div"
+
+[SDiv]
+code = 0x05
+mnemonic = "sdiv"
+
+[Mod]
+code = 0x06
+mnemonic = "mod"
+
+[SMod]
+code = 0x07
+mnemonic = "smod"
+
+[AddMod]
+code = 0x08
+mnemonic = "addmod"
+
+[MulMod]
+code = 0x09
+mnemonic = "mulmod"
+
+[Exp]
+code = 0x0a
+mnemonic = "exp"
+
+[SignExtend]
+code = 0x0b
+mnemonic = "signextend"
+
+[Lt]
+code = 0x10
+mnemonic = "lt"
+
+[Gt]
+code = 0x11
+mnemonic = "gt"
+
+[SLt]
+code = 0x12
+mnemonic = "slt"
+
+[SGt]
+code = 0x13
+mnemonic = "sgt"
+
+[Eq]
+code = 0x14
+mnemonic = "eq"
+
+[IsZero]
+code = 0x15
+mnemonic = "iszero"
+
+[And]
+code = 0x16
+mnemonic = "and"
+
+[Or]
+code = 0x17
+mnemonic = "or"
+
+[Xor]
+code = 0x18
+mnemonic = "xor"
+
+[Not]
+code = 0x19
+mnemonic = "not"
+
+[Byte]
+code = 0x1a
+mnemonic = "byte"
+
+[Shl]
+code = 0x1b
+mnemonic = "shl"
+
+[Shr]
+code = 0x1c
+mnemonic = "shr"
+
+[Sar]
+code = 0x1d
+mnemonic = "sar"
+
+[Keccak256]
+code = 0x20
+mnemonic = "keccak256"
+
+[Address]
+code = 0x30
+mnemonic = "address"
+
+[Balance]
+code = 0x31
+mnemonic = "balance"
+
+[Origin]
+code = 0x32
+mnemonic = "origin"
+
+[Caller]
+code = 0x33
+mnemonic = "caller"
+
+[CallValue]
+code = 0x34
+mnemonic = "callvalue"
+
+[CallDataLoad]
+code = 0x35
+mnemonic = "calldataload"
+
+[CallDataSize]
+code = 0x36
+mnemonic = "calldatasize"
+
+[CallDataCopy]
+code = 0x37
+mnemonic = "calldatacopy"
+
+[CodeSize]
+code = 0x38
+mnemonic = "codesize"
+
+[CodeCopy]
+code = 0x39
+mnemonic = "codecopy"
+
+[GasPrice]
+code = 0x3a
+mnemonic = "gasprice"
+
+[ExtCodeSize]
+code = 0x3b
+mnemonic = "extcodesize"
+
+[ExtCodeCopy]
+code = 0x3c
+mnemonic = "extcodecopy"
+
+[ReturnDataSize]
+code = 0x3d
+mnemonic = "returndatasize"
+
+[ReturnDataCopy]
+code = 0x3e
+mnemonic = "returndatacopy"
+
+[ExtCodeHash]
+code = 0x3f
+mnemonic = "extcodehash"
+
+[BlockHash]
+code = 0x40
+mnemonic = "blockhash"
+
+[Coinbase]
+code = 0x41
+mnemonic = "coinbase"
+
+[Timestamp]
+code = 0x42
+mnemonic = "timestamp"
+
+[Number]
+code = 0x43
+mnemonic = "number"
+
+[Difficulty]
+code = 0x44
+mnemonic = "difficulty"
+
+[GasLimit]
+code = 0x45
+mnemonic = "gaslimit"
+
+[ChainId]
+code = 0x46
+mnemonic = "chainid"
+
+[SelfBalance]
+code = 0x47
+mnemonic = "selfbalance"
+
+[BaseFee]
+code = 0x48
+mnemonic = "basefee"
+
+[Pop]
+code = 0x50
+mnemonic = "pop"
+
+[MLoad]
+code = 0x51
+mnemonic = "mload"
+
+[MStore]
+code = 0x52
+mnemonic = "mstore"
+
+[MStore8]
+code = 0x53
+mnemonic = "mstore8"
+
+[SLoad]
+code = 0x54
+mnemonic = "sload"
+
+[SStore]
+code = 0x55
+mnemonic = "sstore"
+
+[Jump]
+code = 0x56
+mnemonic = "jump"
+
+[JumpI]
+code = 0x57
+mnemonic = "jumpi"
+
+[GetPc]
+code = 0x58
+mnemonic = "pc"
+
+[MSize]
+code = 0x59
+mnemonic = "msize"
+
+[Gas]
+code = 0x5a
+mnemonic = "gas"
+
+[JumpDest]
+code = 0x5b
+mnemonic = "jumpdest"
+
+[Push1]
+code = 0x60
+mnemonic = "push1"
+extra_len = 1
+
+[Push2]
+code = 0x61
+mnemonic = "push2"
+extra_len = 2
+
+[Push3]
+code = 0x62
+mnemonic = "push3"
+extra_len = 3
+
+[Push4]
+code = 0x63
+mnemonic = "push4"
+extra_len = 4
+
+[Push5]
+code = 0x64
+mnemonic = "push5"
+extra_len = 5
+
+[Push6]
+code = 0x65
+mnemonic = "push6"
+extra_len = 6
+
+[Push7]
+code = 0x66
+mnemonic = "push7"
+extra_len = 7
+
+[Push8]
+code = 0x67
+mnemonic = "push8"
+extra_len = 8
+
+[Push9]
+code = 0x68
+mnemonic = "push9"
+extra_len = 9
+
+[Push10]
+code = 0x69
+mnemonic = "push10"
+extra_len = 10
+
+[Push11]
+code = 0x6a
+mnemonic = "push11"
+extra_len = 11
+
+[Push12]
+code = 0x6b
+mnemonic = "push12"
+extra_len = 12
+
+[Push13]
+code = 0x6c
+mnemonic = "push13"
+extra_len = 13
+
+[Push14]
+code = 0x6d
+mnemonic = "push14"
+extra_len = 14
+
+[Push15]
+code = 0x6e
+mnemonic = "push15"
+extra_len = 15
+
+[Push16]
+code = 0x6f
+mnemonic = "push16"
+extra_len = 16
+
+[Push17]
+code = 0x70
+mnemonic = "push17"
+extra_len = 17
+
+[Push18]
+code = 0x71
+mnemonic = "push18"
+extra_len = 18
+
+[Push19]
+code = 0x72
+mnemonic = "push19"
+extra_len = 19
+
+[Push20]
+code = 0x73
+mnemonic = "push20"
+extra_len = 20
+
+[Push21]
+code = 0x74
+mnemonic = "push21"
+extra_len = 21
+
+[Push22]
+code = 0x75
+mnemonic = "push22"
+extra_len = 22
+
+[Push23]
+code = 0x76
+mnemonic = "push23"
+extra_len = 23
+
+[Push24]
+code = 0x77
+mnemonic = "push24"
+extra_len = 24
+
+[Push25]
+code = 0x78
+mnemonic = "push25"
+extra_len = 25
+
+[Push26]
+code = 0x79
+mnemonic = "push26"
+extra_len = 26
+
+[Push27]
+code = 0x7a
+mnemonic = "push27"
+extra_len = 27
+
+[Push28]
+code = 0x7b
+mnemonic = "push28"
+extra_len = 28
+
+[Push29]
+code = 0x7c
+mnemonic = "push29"
+extra_len = 29
+
+[Push30]
+code = 0x7d
+mnemonic = "push30"
+extra_len = 30
+
+[Push31]
+code = 0x7e
+mnemonic = "push31"
+extra_len = 31
+
+[Push32]
+code = 0x7f
+mnemonic = "push32"
+extra_len = 32
+
+[Dup1]
+code = 0x80
+mnemonic = "dup1"
+
+[Dup2]
+code = 0x81
+mnemonic = "dup2"
+
+[Dup3]
+code = 0x82
+mnemonic = "dup3"
+
+[Dup4]
+code = 0x83
+mnemonic = "dup4"
+
+[Dup5]
+code = 0x84
+mnemonic = "dup5"
+
+[Dup6]
+code = 0x85
+mnemonic = "dup6"
+
+[Dup7]
+code = 0x86
+mnemonic = "dup7"
+
+[Dup8]
+code = 0x87
+mnemonic = "dup8"
+
+[Dup9]
+code = 0x88
+mnemonic = "dup9"
+
+[Dup10]
+code = 0x89
+mnemonic = "dup10"
+
+[Dup11]
+code = 0x8a
+mnemonic = "dup11"
+
+[Dup12]
+code = 0x8b
+mnemonic = "dup12"
+
+[Dup13]
+code = 0x8c
+mnemonic = "dup13"
+
+[Dup14]
+code = 0x8d
+mnemonic = "dup14"
+
+[Dup15]
+code = 0x8e
+mnemonic = "dup15"
+
+[Dup16]
+code = 0x8f
+mnemonic = "dup16"
+
+[Swap1]
+code = 0x90
+mnemonic = "swap1"
+
+[Swap2]
+code = 0x91
+mnemonic = "swap2"
+
+[Swap3]
+code = 0x92
+mnemonic = "swap3"
+
+[Swap4]
+code = 0x93
+mnemonic = "swap4"
+
+[Swap5]
+code = 0x94
+mnemonic = "swap5"
+
+[Swap6]
+code = 0x95
+mnemonic = "swap6"
+
+[Swap7]
+code = 0x96
+mnemonic = "swap7"
+
+[Swap8]
+code = 0x97
+mnemonic = "swap8"
+
+[Swap9]
+code = 0x98
+mnemonic = "swap9"
+
+[Swap10]
+code = 0x99
+mnemonic = "swap10"
+
+[Swap11]
+code = 0x9a
+mnemonic = "swap11"
+
+[Swap12]
+code = 0x9b
+mnemonic = "swap12"
+
+[Swap13]
+code = 0x9c
+mnemonic = "swap13"
+
+[Swap14]
+code = 0x9d
+mnemonic = "swap14"
+
+[Swap15]
+code = 0x9e
+mnemonic = "swap15"
+
+[Swap16]
+code = 0x9f
+mnemonic = "swap16"
+
+[Log0]
+code = 0xa0
+mnemonic = "log0"
+
+[Log1]
+code = 0xa1
+mnemonic = "log1"
+
+[Log2]
+code = 0xa2
+mnemonic = "log2"
+
+[Log3]
+code = 0xa3
+mnemonic = "log3"
+
+[Log4]
+code = 0xa4
+mnemonic = "log4"
+
+[Create]
+code = 0xf0
+mnemonic = "create"
+
+[Call]
+code = 0xf1
+mnemonic = "call"
+
+[CallCode]
+code = 0xf2
+mnemonic = "callcode"
+
+[Return]
+code = 0xf3
+mnemonic = "return"
+
+[DelegateCall]
+code = 0xf4
+mnemonic = "delegatecall"
+
+[Create2]
+code = 0xf5
+mnemonic = "create2"
+
+[StaticCall]
+code = 0xfa
+mnemonic = "staticcall"
+
+[Revert]
+code = 0xfd
+mnemonic = "revert"
+
+[Invalid]
+code = 0xfe
+mnemonic = "invalid"
+
+[SelfDestruct]
+code = 0xff
+mnemonic = "selfdestruct"

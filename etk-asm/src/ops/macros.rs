@@ -114,7 +114,7 @@ pub struct ExpressionMacroDefinition {
     /// The name identifiers for the macro's parameters.
     pub parameters: Vec<String>,
     /// The body of the macro.
-    pub content: Imm<Vec<u8>>,
+    pub content: Imm,
 }
 
 /// Expression macro invocation imm.

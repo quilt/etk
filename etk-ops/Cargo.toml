@@ -1,0 +1,28 @@
+[package]
+name = "etk-ops"
+version = "0.3.0-dev"
+authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
+license = "MIT OR Apache-2.0"
+edition = "2021"
+description = "EVM Toolkit Instructions"
+homepage = "https://quilt.github.io/etk"
+repository = "https://github.com/quilt/etk"
+readme = "README.md"
+keywords = ["etk", "ethereum", "assembler"]
+categories = ["cryptography::cryptocurrencies"]
+
+[features]
+backtraces = [ "snafu/backtraces" ]
+
+[dependencies]
+educe = "0.4.19"
+snafu = { version = "0.7.1", default-features = false, features = [ "std" ] }
+
+[build-dependencies]
+toml = "0.5.9"
+serde = { version = "1.0.137", features = [ "derive" ] }
+indexmap = { version = "1.8.1", features = [ "serde" ] }
+quote = "1.0.18"
+
+[dev-dependencies]
+

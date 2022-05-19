@@ -6,10 +6,6 @@
 //! The [`ingest`] module is high-level and similar to the command-line interface.
 //!
 //! The [`mod@asm`] module provides low-level access to the internals of the assembler.
-//!
-//! All of the instructions are defined in the [`mod@ops`] module, and simple
-//! disassembly functionality is available in the [`disasm`] module.
-#![recursion_limit = "512"]
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
 #![deny(unreachable_pub)]

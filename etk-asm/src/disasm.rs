@@ -1,6 +1,6 @@
 //! A simple disassembler from the EVM Toolkit.
 //!
-//! Converts a stream of bytes into an iterator of [`ConcreteOp'].
+//! Converts a stream of bytes into an iterator of [`Op<[u8]>'].
 //!
 //! See the documentation for [`Disassembler`] for more information.
 mod error {
@@ -25,7 +25,7 @@ mod error {
     }
 }
 
-use crate::ops::{ConcreteOp, Op, Specifier};
+use etk_ops::london::Op;
 
 pub use self::error::Error;
 
@@ -61,7 +61,7 @@ where
     }
 }
 
-/// A [`std::iter::Iterator`] over the [`ConcreteOp`] produced by disassembling
+/// A [`std::iter::Iterator`] over the [`Op<[u8]>`] produced by disassembling
 /// a stream of bytes.
 #[derive(Debug)]
 pub struct Iter<'a> {
@@ -69,12 +69,12 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = Offset<ConcreteOp>;
+    type Item = Offset<Op<[u8]>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let buffer = &mut self.disassembler.buffer;
         let front = *buffer.front()?;
-        let specifier = Specifier::from(front);
+        let specifier = Op::<()>::from(front);
         let len = specifier.size() as usize;
         if buffer.len() < len {
             return None;
@@ -84,7 +84,7 @@ impl<'a> Iterator for Iter<'a> {
         let mut instruction = std::mem::replace(&mut self.disassembler.buffer, remaining);
         let instruction = instruction.make_contiguous();
 
-        let item = Op::from_slice(instruction);
+        let item = Op::from_slice(instruction).ok()?;
         let offset = self.disassembler.offset;
         self.disassembler.offset += len;
         Some(Offset::new(offset, item))
@@ -92,11 +92,11 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 /// A simple disassembler that converts a stream of bytes into an iterator over
-/// the disassembled [`ConcreteOp`].
+/// the disassembled [`Op<[u8]>`].
 ///
 /// ## Example
 /// ```rust
-/// use etk_asm::ops::Op;
+/// use etk_ops::london::{Op, GetPc, Stop};
 /// use etk_asm::disasm::Disassembler;
 /// # use etk_asm::disasm::Offset;
 ///
@@ -111,7 +111,7 @@ impl<'a> Iterator for Iter<'a> {
 ///
 /// dasm.finish().unwrap();
 ///
-/// # let expected = [Offset::new(0, Op::GetPc), Offset::new(1, Op::Stop)];
+/// # let expected = [Offset::new(0, GetPc.into()), Offset::new(1, Stop.into())];
 /// # assert_eq!(expected, actual.as_slice());
 /// ```
 #[derive(Debug, Default)]
@@ -138,7 +138,7 @@ impl Disassembler {
         Default::default()
     }
 
-    /// Get an iterator over the disassembled [`ConcreteOp`].
+    /// Get an iterator over the disassembled [`Op<[u8]>`].
     pub fn ops(&mut self) -> Iter {
         Iter { disassembler: self }
     }
@@ -158,6 +158,8 @@ impl Disassembler {
 
 #[cfg(test)]
 mod tests {
+    use etk_ops::london::*;
+
     use hex_literal::hex;
 
     use super::*;
@@ -172,7 +174,7 @@ mod tests {
     #[test]
     fn stop() {
         let input = hex!("00");
-        let expected = [Offset::new(0, Op::Stop)];
+        let expected = [Offset::new(0, Op::from(Stop))];
 
         let mut dasm = Disassembler::new();
         dasm.write_all(&input).unwrap();
@@ -186,7 +188,7 @@ mod tests {
     #[test]
     fn partial_push5() {
         let input = hex!("6401020304");
-        let expected = [Offset::new(0, Op::Push5(hex!("0102030406").into()))];
+        let expected = [Offset::new(0, Op::from(Push5(hex!("0102030406"))))];
 
         let mut dasm = Disassembler::new();
         dasm.write_all(&input).unwrap();
@@ -203,7 +205,7 @@ mod tests {
     #[test]
     fn push5() {
         let input = hex!("640102030405");
-        let expected = [Offset::new(0, Op::Push5(hex!("0102030405").into()))];
+        let expected = [Offset::new(0, Op::from(Push5(hex!("0102030405"))))];
 
         let mut dasm = Disassembler::new();
         dasm.write_all(&input).unwrap();
