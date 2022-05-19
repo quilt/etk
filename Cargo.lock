@@ -456,6 +456,7 @@ dependencies = [
  "etk-4byte",
  "etk-asm",
  "etk-cli",
+ "etk-ops",
  "hex",
  "hex-literal",
  "snafu",

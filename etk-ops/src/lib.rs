@@ -28,7 +28,10 @@ pub struct FromStrError {
 
 /// Errors that can occur when parsing an operation from a byte slice.
 #[derive(Debug, Snafu)]
-pub enum FromSliceError<E> where E: 'static + std::fmt::Display + std::error::Error {
+pub enum FromSliceError<E>
+where
+    E: 'static + std::fmt::Display + std::error::Error,
+{
     /// Converting the byte slice into an immediate failed.
     ///
     /// Often means the slice was the wrong length.

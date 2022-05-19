@@ -31,9 +31,20 @@ impl From<toml::de::Error> for Error {
 struct Op {
     code: u8,
     mnemonic: String,
+    pushes: u8,
+    pops: u8,
 
     #[serde(default)]
     extra_len: u8,
+
+    #[serde(default)]
+    exits: bool,
+
+    #[serde(default)]
+    jump: bool,
+
+    #[serde(default)]
+    jump_target: bool,
 }
 
 fn read_fork(name: &str) -> Result<[(String, Op); 256], Error> {
@@ -56,6 +67,11 @@ fn read_fork(name: &str) -> Result<[(String, Op); 256], Error> {
                 code,
                 mnemonic: format!("invalid_{:02x}", code),
                 extra_len: 0,
+                pushes: 0,
+                pops: 0,
+                exits: true,
+                jump: false,
+                jump_target: false,
             };
             (name, op)
         })
@@ -119,6 +135,23 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
 
             /// Human-readable name for this operation.
             fn mnemonic(&self) -> &str;
+
+            /// Returns true if the current instruction changes the program counter (other
+            /// than incrementing it.)
+            fn is_jump(&self) -> bool;
+
+            /// Returns true if the current instruction is a valid destination for jumps.
+            fn is_jump_target(&self) -> bool;
+
+            /// Returns true if the current instruction causes the EVM to stop executing
+            /// the contract.
+            fn is_exit(&self) -> bool;
+
+            /// How many stack elements this instruction pops.
+            fn pops(&self) -> usize;
+
+            /// How many stack elements this instruction pushes.
+            fn pushes(&self) -> usize;
         }
     };
 
@@ -140,6 +173,11 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         let mnemonic = &op.mnemonic;
         let code = op.code;
         let extra_len = op.extra_len as usize;
+        let jump = op.jump;
+        let jump_target = op.jump_target;
+        let pops = op.pops;
+        let pushes = op.pushes;
+        let exit = op.exits;
 
         let generics;
         let variant_generics;
@@ -305,6 +343,12 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
                 fn extra_len(&self) -> usize { #extra_len }
 
                 fn mnemonic(&self) -> &str { #mnemonic }
+
+                fn is_jump(&self) -> bool { #jump }
+                fn is_jump_target(&self) -> bool { #jump_target }
+                fn is_exit(&self) -> bool { #exit }
+                fn pops(&self) -> usize { #pops as usize }
+                fn pushes(&self) -> usize { #pushes as usize}
             }
 
             impl From<#name #code_generics> for u8 {
@@ -440,6 +484,46 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
                 match self {
                     #(
                     Self::#names(n) => Op::#names(n.code()),
+                    )*
+                }
+            }
+
+            fn is_jump(&self) -> bool {
+                match self {
+                    #(
+                    Self::#names(n) => n.is_jump(),
+                    )*
+                }
+            }
+
+            fn is_jump_target(&self) -> bool {
+                match self {
+                    #(
+                    Self::#names(n) => n.is_jump_target(),
+                    )*
+                }
+            }
+
+            fn is_exit(&self) -> bool {
+                match self {
+                    #(
+                    Self::#names(n) => n.is_exit(),
+                    )*
+                }
+            }
+
+            fn pops(&self) -> usize {
+                match self {
+                    #(
+                    Self::#names(n) => n.pops(),
+                    )*
+                }
+            }
+
+            fn pushes(&self) -> usize {
+                match self {
+                    #(
+                    Self::#names(n) => n.pushes(),
                     )*
                 }
             }
