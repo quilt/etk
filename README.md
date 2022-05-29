@@ -27,6 +27,9 @@ There are also several examples in the [`etk-asm/tests/asm`](etk-asm/tests/asm) 
 cargo install --features cli etk-asm etk-dasm
 ```
 
+#### Project Templates
+* [`etk`-Foundry Template](https://github.com/quilt/etk-foundry-template)
+
 #### Syntax Highlighting
 * [`vim-etk`](https://github.com/quilt/vim-etk)
 
