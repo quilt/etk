@@ -13,9 +13,10 @@ categories = ["cryptography::cryptocurrencies", "command-line-utilities", "devel
 
 [features]
 cli = ["clap", "etk-cli"]
-backtraces = [ "snafu/backtraces" ]
+backtraces = [ "snafu/backtraces", "etk-ops/backtraces" ]
 
 [dependencies]
+etk-ops = { path = "../etk-ops", version = "0.3.0-dev" }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0-dev" }
 hex = "0.4.3"
 num-bigint = "0.4"

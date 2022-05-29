@@ -16,6 +16,7 @@ cli = ["clap", "etk-cli", "snafu", "etk-4byte"]
 
 [dependencies]
 hex = "0.4.3"
+etk-ops = { path = "../etk-ops", version = "0.3.0-dev" }
 etk-asm = { path = "../etk-asm", version = "0.3.0-dev" }
 clap = { optional = true, version = "3.1", features = ["derive"] }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0-dev" }

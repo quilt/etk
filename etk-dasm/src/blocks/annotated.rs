@@ -2,7 +2,7 @@
 //! (ie. stack/memory/storage).
 use crate::sym::{Expr, Var};
 
-use etk_asm::ops::{ConcreteOp, Metadata};
+use etk_ops::london::*;
 
 use std::collections::VecDeque;
 
@@ -128,7 +128,7 @@ impl AnnotatedBlock {
         let jump_target = basic
             .ops
             .get(0)
-            .map(Metadata::is_jump_target)
+            .map(Operation::is_jump_target)
             .unwrap_or_default();
 
         let mut annotator = Annotator::new(basic);
@@ -175,7 +175,7 @@ impl<'s> Drop for StackWindow<'s> {
 }
 
 impl<'s> StackWindow<'s> {
-    fn new(vars: &'s mut u16, stacks: &'s mut Vec<VecDeque<Expr>>, op: &ConcreteOp) -> Self {
+    fn new(vars: &'s mut u16, stacks: &'s mut Vec<VecDeque<Expr>>, op: &Op<[u8]>) -> Self {
         Self {
             vars,
             stacks,
@@ -282,368 +282,368 @@ impl<'a> Annotator<'a> {
         self.stacks.push(last);
     }
 
-    fn annotate_one<'s>(pc: usize, stack: &mut StackWindow<'s>, op: &ConcreteOp) -> Option<Exit> {
+    fn annotate_one<'s>(pc: usize, stack: &mut StackWindow<'s>, op: &Op<[u8]>) -> Option<Exit> {
         match op {
-            ConcreteOp::Stop => {
+            Op::Stop(_) => {
                 return Some(Exit::Terminate);
             }
 
-            ConcreteOp::Add => {
+            Op::Add(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.add(&rhs));
             }
 
-            ConcreteOp::Mul => {
+            Op::Mul(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.mul(&rhs));
             }
 
-            ConcreteOp::Sub => {
+            Op::Sub(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.sub(&rhs));
             }
 
-            ConcreteOp::Div => {
+            Op::Div(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.div(&rhs));
             }
-            ConcreteOp::SDiv => {
+            Op::SDiv(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.s_div(&rhs));
             }
-            ConcreteOp::Mod => {
+            Op::Mod(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.modulo(&rhs));
             }
-            ConcreteOp::SMod => {
+            Op::SMod(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.s_modulo(&rhs));
             }
-            ConcreteOp::AddMod => {
+            Op::AddMod(_) => {
                 let add0 = stack.pop();
                 let add1 = stack.pop();
                 let mod_ = stack.pop();
                 stack.push(add0.add_mod(&add1, &mod_))
             }
-            ConcreteOp::MulMod => {
+            Op::MulMod(_) => {
                 let add0 = stack.pop();
                 let add1 = stack.pop();
                 let mod_ = stack.pop();
                 stack.push(add0.mul_mod(&add1, &mod_))
             }
-            ConcreteOp::Exp => {
+            Op::Exp(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.exp(&rhs));
             }
-            ConcreteOp::SignExtend => {
+            Op::SignExtend(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.sign_extend(&rhs));
             }
 
-            ConcreteOp::Lt => {
+            Op::Lt(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.lt(&rhs));
             }
-            ConcreteOp::Gt => {
+            Op::Gt(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.gt(&rhs));
             }
-            ConcreteOp::SLt => {
+            Op::SLt(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.s_lt(&rhs));
             }
-            ConcreteOp::SGt => {
+            Op::SGt(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.s_gt(&rhs));
             }
-            ConcreteOp::Eq => {
+            Op::Eq(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.is_eq(&rhs));
             }
-            ConcreteOp::IsZero => {
+            Op::IsZero(_) => {
                 let arg = stack.pop().is_zero();
                 stack.push(arg);
             }
-            ConcreteOp::And => {
+            Op::And(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.and(&rhs));
             }
-            ConcreteOp::Or => {
+            Op::Or(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.or(&rhs));
             }
-            ConcreteOp::Xor => {
+            Op::Xor(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.xor(&rhs));
             }
-            ConcreteOp::Not => {
+            Op::Not(_) => {
                 let arg = stack.pop().not();
                 stack.push(arg);
             }
-            ConcreteOp::Byte => {
+            Op::Byte(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.byte(&rhs));
             }
-            ConcreteOp::Shl => {
+            Op::Shl(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.shl(&rhs));
             }
-            ConcreteOp::Shr => {
+            Op::Shr(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.shr(&rhs));
             }
-            ConcreteOp::Sar => {
+            Op::Sar(_) => {
                 let lhs = stack.pop();
                 let rhs = stack.pop();
                 stack.push(lhs.sar(&rhs));
             }
-            ConcreteOp::Keccak256 => {
+            Op::Keccak256(_) => {
                 let offset = stack.pop();
                 let length = stack.pop();
                 stack.push(Expr::keccak256(&offset, &length));
             }
 
-            ConcreteOp::Address => stack.push(Expr::address()),
-            ConcreteOp::Balance => {
+            Op::Address(_) => stack.push(Expr::address()),
+            Op::Balance(_) => {
                 let address = stack.pop();
                 stack.push(Expr::balance(&address));
             }
-            ConcreteOp::Origin => stack.push(Expr::origin()),
-            ConcreteOp::Caller => stack.push(Expr::caller()),
-            ConcreteOp::CallValue => stack.push(Expr::call_value()),
-            ConcreteOp::CallDataLoad => {
+            Op::Origin(_) => stack.push(Expr::origin()),
+            Op::Caller(_) => stack.push(Expr::caller()),
+            Op::CallValue(_) => stack.push(Expr::call_value()),
+            Op::CallDataLoad(_) => {
                 let offset = stack.pop();
                 stack.push(Expr::call_data_load(&offset));
             }
-            ConcreteOp::CodeSize => stack.push(Expr::code_size()),
-            ConcreteOp::GasPrice => stack.push(Expr::gas_price()),
-            ConcreteOp::ExtCodeSize => {
+            Op::CodeSize(_) => stack.push(Expr::code_size()),
+            Op::GasPrice(_) => stack.push(Expr::gas_price()),
+            Op::ExtCodeSize(_) => {
                 let address = stack.pop();
                 stack.push(Expr::ext_code_size(&address));
             }
-            ConcreteOp::BlockHash => {
+            Op::BlockHash(_) => {
                 let address = stack.pop();
                 stack.push(Expr::block_hash(&address));
             }
-            ConcreteOp::Coinbase => stack.push(Expr::coinbase()),
-            ConcreteOp::Timestamp => stack.push(Expr::timestamp()),
-            ConcreteOp::Number => stack.push(Expr::number()),
-            ConcreteOp::Difficulty => stack.push(Expr::difficulty()),
-            ConcreteOp::GasLimit => stack.push(Expr::gas_limit()),
-            ConcreteOp::ChainId => stack.push(Expr::chain_id()),
-            ConcreteOp::SelfBalance => stack.push(Expr::self_balance()),
-            ConcreteOp::BaseFee => stack.push(Expr::base_fee()),
+            Op::Coinbase(_) => stack.push(Expr::coinbase()),
+            Op::Timestamp(_) => stack.push(Expr::timestamp()),
+            Op::Number(_) => stack.push(Expr::number()),
+            Op::Difficulty(_) => stack.push(Expr::difficulty()),
+            Op::GasLimit(_) => stack.push(Expr::gas_limit()),
+            Op::ChainId(_) => stack.push(Expr::chain_id()),
+            Op::SelfBalance(_) => stack.push(Expr::self_balance()),
+            Op::BaseFee(_) => stack.push(Expr::base_fee()),
 
-            ConcreteOp::MSize => stack.push(Expr::m_size()),
-            ConcreteOp::Gas => stack.push(Expr::gas()),
+            Op::MSize(_) => stack.push(Expr::m_size()),
+            Op::Gas(_) => stack.push(Expr::gas()),
 
-            ConcreteOp::Pop => {
+            Op::Pop(_) => {
                 stack.pop();
             }
 
-            ConcreteOp::CallDataSize => stack.push(Expr::call_data_size()),
-            ConcreteOp::CallDataCopy => {
+            Op::CallDataSize(_) => stack.push(Expr::call_data_size()),
+            Op::CallDataCopy(_) => {
                 let _dest_offset = stack.pop();
                 let _offset = stack.pop();
                 let _len = stack.pop();
                 // TODO: Set memory
             }
 
-            ConcreteOp::CodeCopy => {
+            Op::CodeCopy(_) => {
                 let _dest_offset = stack.pop();
                 let _offset = stack.pop();
                 let _len = stack.pop();
                 // TODO: Set memory
             }
 
-            ConcreteOp::ExtCodeCopy => {
+            Op::ExtCodeCopy(_) => {
                 let _addr = stack.pop();
                 let _dest_offset = stack.pop();
                 let _offset = stack.pop();
                 let _len = stack.pop();
                 // TODO: Set memory
             }
-            ConcreteOp::ReturnDataSize => stack.push(Expr::return_data_size()),
-            ConcreteOp::ReturnDataCopy => {
+            Op::ReturnDataSize(_) => stack.push(Expr::return_data_size()),
+            Op::ReturnDataCopy(_) => {
                 let _dest_offset = stack.pop();
                 let _offset = stack.pop();
                 let _len = stack.pop();
                 // TODO: Set memory
             }
-            ConcreteOp::ExtCodeHash => {
+            Op::ExtCodeHash(_) => {
                 let addr = stack.pop();
                 stack.push(Expr::ext_code_hash(&addr));
             }
-            ConcreteOp::MLoad => {
+            Op::MLoad(_) => {
                 let addr = stack.pop();
                 stack.push(addr.m_load());
             }
-            ConcreteOp::MStore => {
+            Op::MStore(_) => {
                 let _addr = stack.pop();
                 let _value = stack.pop();
                 // TODO: set memory
             }
-            ConcreteOp::MStore8 => {
+            Op::MStore8(_) => {
                 let _addr = stack.pop();
                 let _value = stack.pop();
                 // TODO: set memory
             }
-            ConcreteOp::SLoad => {
+            Op::SLoad(_) => {
                 let addr = stack.pop();
                 stack.push(addr.s_load());
             }
-            ConcreteOp::SStore => {
+            Op::SStore(_) => {
                 let _key = stack.pop();
                 let _value = stack.pop();
                 // TODO: set storage
             }
-            ConcreteOp::GetPc => stack.push(Expr::pc(pc as u16)),
+            Op::GetPc(_) => stack.push(Expr::pc(pc as u16)),
 
-            ConcreteOp::JumpDest => {
+            Op::JumpDest(_) => {
                 // No-op
             }
 
-            ConcreteOp::Push1(imm) => stack.push_const(imm),
-            ConcreteOp::Push2(imm) => stack.push_const(imm),
-            ConcreteOp::Push3(imm) => stack.push_const(imm),
-            ConcreteOp::Push4(imm) => stack.push_const(imm),
-            ConcreteOp::Push5(imm) => stack.push_const(imm),
-            ConcreteOp::Push6(imm) => stack.push_const(imm),
-            ConcreteOp::Push7(imm) => stack.push_const(imm),
-            ConcreteOp::Push8(imm) => stack.push_const(imm),
-            ConcreteOp::Push9(imm) => stack.push_const(imm),
-            ConcreteOp::Push10(imm) => stack.push_const(imm),
-            ConcreteOp::Push11(imm) => stack.push_const(imm),
-            ConcreteOp::Push12(imm) => stack.push_const(imm),
-            ConcreteOp::Push13(imm) => stack.push_const(imm),
-            ConcreteOp::Push14(imm) => stack.push_const(imm),
-            ConcreteOp::Push15(imm) => stack.push_const(imm),
-            ConcreteOp::Push16(imm) => stack.push_const(imm),
-            ConcreteOp::Push17(imm) => stack.push_const(imm),
-            ConcreteOp::Push18(imm) => stack.push_const(imm),
-            ConcreteOp::Push19(imm) => stack.push_const(imm),
-            ConcreteOp::Push20(imm) => stack.push_const(imm),
-            ConcreteOp::Push21(imm) => stack.push_const(imm),
-            ConcreteOp::Push22(imm) => stack.push_const(imm),
-            ConcreteOp::Push23(imm) => stack.push_const(imm),
-            ConcreteOp::Push24(imm) => stack.push_const(imm),
-            ConcreteOp::Push25(imm) => stack.push_const(imm),
-            ConcreteOp::Push26(imm) => stack.push_const(imm),
-            ConcreteOp::Push27(imm) => stack.push_const(imm),
-            ConcreteOp::Push28(imm) => stack.push_const(imm),
-            ConcreteOp::Push29(imm) => stack.push_const(imm),
-            ConcreteOp::Push30(imm) => stack.push_const(imm),
-            ConcreteOp::Push31(imm) => stack.push_const(imm),
-            ConcreteOp::Push32(imm) => stack.push_const(imm),
+            Op::Push1(Push1(imm)) => stack.push_const(imm),
+            Op::Push2(Push2(imm)) => stack.push_const(imm),
+            Op::Push3(Push3(imm)) => stack.push_const(imm),
+            Op::Push4(Push4(imm)) => stack.push_const(imm),
+            Op::Push5(Push5(imm)) => stack.push_const(imm),
+            Op::Push6(Push6(imm)) => stack.push_const(imm),
+            Op::Push7(Push7(imm)) => stack.push_const(imm),
+            Op::Push8(Push8(imm)) => stack.push_const(imm),
+            Op::Push9(Push9(imm)) => stack.push_const(imm),
+            Op::Push10(Push10(imm)) => stack.push_const(imm),
+            Op::Push11(Push11(imm)) => stack.push_const(imm),
+            Op::Push12(Push12(imm)) => stack.push_const(imm),
+            Op::Push13(Push13(imm)) => stack.push_const(imm),
+            Op::Push14(Push14(imm)) => stack.push_const(imm),
+            Op::Push15(Push15(imm)) => stack.push_const(imm),
+            Op::Push16(Push16(imm)) => stack.push_const(imm),
+            Op::Push17(Push17(imm)) => stack.push_const(imm),
+            Op::Push18(Push18(imm)) => stack.push_const(imm),
+            Op::Push19(Push19(imm)) => stack.push_const(imm),
+            Op::Push20(Push20(imm)) => stack.push_const(imm),
+            Op::Push21(Push21(imm)) => stack.push_const(imm),
+            Op::Push22(Push22(imm)) => stack.push_const(imm),
+            Op::Push23(Push23(imm)) => stack.push_const(imm),
+            Op::Push24(Push24(imm)) => stack.push_const(imm),
+            Op::Push25(Push25(imm)) => stack.push_const(imm),
+            Op::Push26(Push26(imm)) => stack.push_const(imm),
+            Op::Push27(Push27(imm)) => stack.push_const(imm),
+            Op::Push28(Push28(imm)) => stack.push_const(imm),
+            Op::Push29(Push29(imm)) => stack.push_const(imm),
+            Op::Push30(Push30(imm)) => stack.push_const(imm),
+            Op::Push31(Push31(imm)) => stack.push_const(imm),
+            Op::Push32(Push32(imm)) => stack.push_const(imm),
 
-            ConcreteOp::Dup1 => {
+            Op::Dup1(_) => {
                 let arg = stack.peek(0).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup2 => {
+            Op::Dup2(_) => {
                 let arg = stack.peek(1).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup3 => {
+            Op::Dup3(_) => {
                 let arg = stack.peek(2).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup4 => {
+            Op::Dup4(_) => {
                 let arg = stack.peek(3).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup5 => {
+            Op::Dup5(_) => {
                 let arg = stack.peek(4).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup6 => {
+            Op::Dup6(_) => {
                 let arg = stack.peek(5).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup7 => {
+            Op::Dup7(_) => {
                 let arg = stack.peek(6).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup8 => {
+            Op::Dup8(_) => {
                 let arg = stack.peek(7).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup9 => {
+            Op::Dup9(_) => {
                 let arg = stack.peek(8).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup10 => {
+            Op::Dup10(_) => {
                 let arg = stack.peek(9).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup11 => {
+            Op::Dup11(_) => {
                 let arg = stack.peek(10).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup12 => {
+            Op::Dup12(_) => {
                 let arg = stack.peek(11).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup13 => {
+            Op::Dup13(_) => {
                 let arg = stack.peek(12).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup14 => {
+            Op::Dup14(_) => {
                 let arg = stack.peek(13).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup15 => {
+            Op::Dup15(_) => {
                 let arg = stack.peek(14).clone();
                 stack.push(arg)
             }
-            ConcreteOp::Dup16 => {
+            Op::Dup16(_) => {
                 let arg = stack.peek(15).clone();
                 stack.push(arg)
             }
 
-            ConcreteOp::Log0 => {
+            Op::Log0(_) => {
                 let _offset = stack.pop();
                 let _length = stack.pop();
             }
-            ConcreteOp::Log1 => {
+            Op::Log1(_) => {
                 let _offset = stack.pop();
                 let _length = stack.pop();
                 let _topic0 = stack.pop();
             }
-            ConcreteOp::Log2 => {
+            Op::Log2(_) => {
                 let _offset = stack.pop();
                 let _length = stack.pop();
                 let _topic0 = stack.pop();
                 let _topic1 = stack.pop();
             }
-            ConcreteOp::Log3 => {
+            Op::Log3(_) => {
                 let _offset = stack.pop();
                 let _length = stack.pop();
                 let _topic0 = stack.pop();
                 let _topic1 = stack.pop();
                 let _topic2 = stack.pop();
             }
-            ConcreteOp::Log4 => {
+            Op::Log4(_) => {
                 let _offset = stack.pop();
                 let _length = stack.pop();
                 let _topic0 = stack.pop();
@@ -652,40 +652,40 @@ impl<'a> Annotator<'a> {
                 let _topic3 = stack.pop();
             }
 
-            ConcreteOp::Swap1 => stack.swap(1),
-            ConcreteOp::Swap2 => stack.swap(2),
-            ConcreteOp::Swap3 => stack.swap(3),
-            ConcreteOp::Swap4 => stack.swap(4),
-            ConcreteOp::Swap5 => stack.swap(5),
-            ConcreteOp::Swap6 => stack.swap(6),
-            ConcreteOp::Swap7 => stack.swap(7),
-            ConcreteOp::Swap8 => stack.swap(8),
-            ConcreteOp::Swap9 => stack.swap(9),
-            ConcreteOp::Swap10 => stack.swap(10),
-            ConcreteOp::Swap11 => stack.swap(11),
-            ConcreteOp::Swap12 => stack.swap(12),
-            ConcreteOp::Swap13 => stack.swap(13),
-            ConcreteOp::Swap14 => stack.swap(14),
-            ConcreteOp::Swap15 => stack.swap(15),
-            ConcreteOp::Swap16 => stack.swap(16),
+            Op::Swap1(_) => stack.swap(1),
+            Op::Swap2(_) => stack.swap(2),
+            Op::Swap3(_) => stack.swap(3),
+            Op::Swap4(_) => stack.swap(4),
+            Op::Swap5(_) => stack.swap(5),
+            Op::Swap6(_) => stack.swap(6),
+            Op::Swap7(_) => stack.swap(7),
+            Op::Swap8(_) => stack.swap(8),
+            Op::Swap9(_) => stack.swap(9),
+            Op::Swap10(_) => stack.swap(10),
+            Op::Swap11(_) => stack.swap(11),
+            Op::Swap12(_) => stack.swap(12),
+            Op::Swap13(_) => stack.swap(13),
+            Op::Swap14(_) => stack.swap(14),
+            Op::Swap15(_) => stack.swap(15),
+            Op::Swap16(_) => stack.swap(16),
 
-            ConcreteOp::Revert | ConcreteOp::Return => {
+            Op::Revert(_) | Op::Return(_) => {
                 let _offset = stack.pop();
                 let _length = stack.pop();
                 return Some(Exit::Terminate);
             }
 
-            ConcreteOp::SelfDestruct => {
+            Op::SelfDestruct(_) => {
                 let _addr = stack.pop();
                 return Some(Exit::Terminate);
             }
 
-            ConcreteOp::Jump => {
+            Op::Jump(_) => {
                 let dest = stack.pop();
                 return Some(Exit::Unconditional(dest));
             }
 
-            ConcreteOp::JumpI => {
+            Op::JumpI(_) => {
                 let when_false = pc + 1;
                 let when_true = stack.pop();
                 let condition = stack.pop();
@@ -696,14 +696,14 @@ impl<'a> Annotator<'a> {
                 });
             }
 
-            ConcreteOp::Create => {
+            Op::Create(_) => {
                 let value = stack.pop();
                 let offset = stack.pop();
                 let length = stack.pop();
                 stack.push(Expr::create(&value, &offset, &length))
             }
 
-            ConcreteOp::Call => {
+            Op::Call(_) => {
                 let gas = stack.pop();
                 let addr = stack.pop();
                 let value = stack.pop();
@@ -722,7 +722,7 @@ impl<'a> Annotator<'a> {
                 ))
             }
 
-            ConcreteOp::CallCode => {
+            Op::CallCode(_) => {
                 let gas = stack.pop();
                 let addr = stack.pop();
                 let value = stack.pop();
@@ -741,7 +741,7 @@ impl<'a> Annotator<'a> {
                 ))
             }
 
-            ConcreteOp::DelegateCall => {
+            Op::DelegateCall(_) => {
                 let gas = stack.pop();
                 let addr = stack.pop();
                 let args_offset = stack.pop();
@@ -758,7 +758,7 @@ impl<'a> Annotator<'a> {
                 ))
             }
 
-            ConcreteOp::Create2 => {
+            Op::Create2(_) => {
                 let value = stack.pop();
                 let offset = stack.pop();
                 let length = stack.pop();
@@ -766,7 +766,7 @@ impl<'a> Annotator<'a> {
                 stack.push(Expr::create2(&value, &offset, &length, &salt))
             }
 
-            ConcreteOp::StaticCall => {
+            Op::StaticCall(_) => {
                 let gas = stack.pop();
                 let addr = stack.pop();
                 let args_offset = stack.pop();
@@ -783,120 +783,120 @@ impl<'a> Annotator<'a> {
                 ))
             }
 
-            ConcreteOp::Invalid
-            | ConcreteOp::Invalid0c
-            | ConcreteOp::Invalid0d
-            | ConcreteOp::Invalid0e
-            | ConcreteOp::Invalid0f
-            | ConcreteOp::Invalid1e
-            | ConcreteOp::Invalid1f
-            | ConcreteOp::Invalid21
-            | ConcreteOp::Invalid22
-            | ConcreteOp::Invalid23
-            | ConcreteOp::Invalid24
-            | ConcreteOp::Invalid25
-            | ConcreteOp::Invalid26
-            | ConcreteOp::Invalid27
-            | ConcreteOp::Invalid28
-            | ConcreteOp::Invalid29
-            | ConcreteOp::Invalid2a
-            | ConcreteOp::Invalid2b
-            | ConcreteOp::Invalid2c
-            | ConcreteOp::Invalid2d
-            | ConcreteOp::Invalid2e
-            | ConcreteOp::Invalid2f
-            | ConcreteOp::Invalid49
-            | ConcreteOp::Invalid4a
-            | ConcreteOp::Invalid4b
-            | ConcreteOp::Invalid4c
-            | ConcreteOp::Invalid4d
-            | ConcreteOp::Invalid4e
-            | ConcreteOp::Invalid4f
-            | ConcreteOp::Invalid5c
-            | ConcreteOp::Invalid5d
-            | ConcreteOp::Invalid5e
-            | ConcreteOp::Invalid5f
-            | ConcreteOp::InvalidA5
-            | ConcreteOp::InvalidA6
-            | ConcreteOp::InvalidA7
-            | ConcreteOp::InvalidA8
-            | ConcreteOp::InvalidA9
-            | ConcreteOp::InvalidAa
-            | ConcreteOp::InvalidAb
-            | ConcreteOp::InvalidAc
-            | ConcreteOp::InvalidAd
-            | ConcreteOp::InvalidAe
-            | ConcreteOp::InvalidAf
-            | ConcreteOp::InvalidB0
-            | ConcreteOp::InvalidB1
-            | ConcreteOp::InvalidB2
-            | ConcreteOp::InvalidB3
-            | ConcreteOp::InvalidB4
-            | ConcreteOp::InvalidB5
-            | ConcreteOp::InvalidB6
-            | ConcreteOp::InvalidB7
-            | ConcreteOp::InvalidB8
-            | ConcreteOp::InvalidB9
-            | ConcreteOp::InvalidBa
-            | ConcreteOp::InvalidBb
-            | ConcreteOp::InvalidBc
-            | ConcreteOp::InvalidBd
-            | ConcreteOp::InvalidBe
-            | ConcreteOp::InvalidBf
-            | ConcreteOp::InvalidC0
-            | ConcreteOp::InvalidC1
-            | ConcreteOp::InvalidC2
-            | ConcreteOp::InvalidC3
-            | ConcreteOp::InvalidC4
-            | ConcreteOp::InvalidC5
-            | ConcreteOp::InvalidC6
-            | ConcreteOp::InvalidC7
-            | ConcreteOp::InvalidC8
-            | ConcreteOp::InvalidC9
-            | ConcreteOp::InvalidCa
-            | ConcreteOp::InvalidCb
-            | ConcreteOp::InvalidCc
-            | ConcreteOp::InvalidCd
-            | ConcreteOp::InvalidCe
-            | ConcreteOp::InvalidCf
-            | ConcreteOp::InvalidD0
-            | ConcreteOp::InvalidD1
-            | ConcreteOp::InvalidD2
-            | ConcreteOp::InvalidD3
-            | ConcreteOp::InvalidD4
-            | ConcreteOp::InvalidD5
-            | ConcreteOp::InvalidD6
-            | ConcreteOp::InvalidD7
-            | ConcreteOp::InvalidD8
-            | ConcreteOp::InvalidD9
-            | ConcreteOp::InvalidDa
-            | ConcreteOp::InvalidDb
-            | ConcreteOp::InvalidDc
-            | ConcreteOp::InvalidDd
-            | ConcreteOp::InvalidDe
-            | ConcreteOp::InvalidDf
-            | ConcreteOp::InvalidE0
-            | ConcreteOp::InvalidE1
-            | ConcreteOp::InvalidE2
-            | ConcreteOp::InvalidE3
-            | ConcreteOp::InvalidE4
-            | ConcreteOp::InvalidE5
-            | ConcreteOp::InvalidE6
-            | ConcreteOp::InvalidE7
-            | ConcreteOp::InvalidE8
-            | ConcreteOp::InvalidE9
-            | ConcreteOp::InvalidEa
-            | ConcreteOp::InvalidEb
-            | ConcreteOp::InvalidEc
-            | ConcreteOp::InvalidEd
-            | ConcreteOp::InvalidEe
-            | ConcreteOp::InvalidEf
-            | ConcreteOp::InvalidF6
-            | ConcreteOp::InvalidF7
-            | ConcreteOp::InvalidF8
-            | ConcreteOp::InvalidF9
-            | ConcreteOp::InvalidFb
-            | ConcreteOp::InvalidFc => {
+            Op::Invalid(_)
+            | Op::Invalid0c(_)
+            | Op::Invalid0d(_)
+            | Op::Invalid0e(_)
+            | Op::Invalid0f(_)
+            | Op::Invalid1e(_)
+            | Op::Invalid1f(_)
+            | Op::Invalid21(_)
+            | Op::Invalid22(_)
+            | Op::Invalid23(_)
+            | Op::Invalid24(_)
+            | Op::Invalid25(_)
+            | Op::Invalid26(_)
+            | Op::Invalid27(_)
+            | Op::Invalid28(_)
+            | Op::Invalid29(_)
+            | Op::Invalid2a(_)
+            | Op::Invalid2b(_)
+            | Op::Invalid2c(_)
+            | Op::Invalid2d(_)
+            | Op::Invalid2e(_)
+            | Op::Invalid2f(_)
+            | Op::Invalid49(_)
+            | Op::Invalid4a(_)
+            | Op::Invalid4b(_)
+            | Op::Invalid4c(_)
+            | Op::Invalid4d(_)
+            | Op::Invalid4e(_)
+            | Op::Invalid4f(_)
+            | Op::Invalid5c(_)
+            | Op::Invalid5d(_)
+            | Op::Invalid5e(_)
+            | Op::Invalid5f(_)
+            | Op::InvalidA5(_)
+            | Op::InvalidA6(_)
+            | Op::InvalidA7(_)
+            | Op::InvalidA8(_)
+            | Op::InvalidA9(_)
+            | Op::InvalidAa(_)
+            | Op::InvalidAb(_)
+            | Op::InvalidAc(_)
+            | Op::InvalidAd(_)
+            | Op::InvalidAe(_)
+            | Op::InvalidAf(_)
+            | Op::InvalidB0(_)
+            | Op::InvalidB1(_)
+            | Op::InvalidB2(_)
+            | Op::InvalidB3(_)
+            | Op::InvalidB4(_)
+            | Op::InvalidB5(_)
+            | Op::InvalidB6(_)
+            | Op::InvalidB7(_)
+            | Op::InvalidB8(_)
+            | Op::InvalidB9(_)
+            | Op::InvalidBa(_)
+            | Op::InvalidBb(_)
+            | Op::InvalidBc(_)
+            | Op::InvalidBd(_)
+            | Op::InvalidBe(_)
+            | Op::InvalidBf(_)
+            | Op::InvalidC0(_)
+            | Op::InvalidC1(_)
+            | Op::InvalidC2(_)
+            | Op::InvalidC3(_)
+            | Op::InvalidC4(_)
+            | Op::InvalidC5(_)
+            | Op::InvalidC6(_)
+            | Op::InvalidC7(_)
+            | Op::InvalidC8(_)
+            | Op::InvalidC9(_)
+            | Op::InvalidCa(_)
+            | Op::InvalidCb(_)
+            | Op::InvalidCc(_)
+            | Op::InvalidCd(_)
+            | Op::InvalidCe(_)
+            | Op::InvalidCf(_)
+            | Op::InvalidD0(_)
+            | Op::InvalidD1(_)
+            | Op::InvalidD2(_)
+            | Op::InvalidD3(_)
+            | Op::InvalidD4(_)
+            | Op::InvalidD5(_)
+            | Op::InvalidD6(_)
+            | Op::InvalidD7(_)
+            | Op::InvalidD8(_)
+            | Op::InvalidD9(_)
+            | Op::InvalidDa(_)
+            | Op::InvalidDb(_)
+            | Op::InvalidDc(_)
+            | Op::InvalidDd(_)
+            | Op::InvalidDe(_)
+            | Op::InvalidDf(_)
+            | Op::InvalidE0(_)
+            | Op::InvalidE1(_)
+            | Op::InvalidE2(_)
+            | Op::InvalidE3(_)
+            | Op::InvalidE4(_)
+            | Op::InvalidE5(_)
+            | Op::InvalidE6(_)
+            | Op::InvalidE7(_)
+            | Op::InvalidE8(_)
+            | Op::InvalidE9(_)
+            | Op::InvalidEa(_)
+            | Op::InvalidEb(_)
+            | Op::InvalidEc(_)
+            | Op::InvalidEd(_)
+            | Op::InvalidEe(_)
+            | Op::InvalidEf(_)
+            | Op::InvalidF6(_)
+            | Op::InvalidF7(_)
+            | Op::InvalidF8(_)
+            | Op::InvalidF9(_)
+            | Op::InvalidFb(_)
+            | Op::InvalidFc(_) => {
                 return Some(Exit::Terminate);
             }
         }
@@ -996,7 +996,7 @@ mod tests {
     impl<O, Oi, E, I, Ii, P, Pi> AnnotateTest<O, E, I, P>
     where
         O: IntoIterator<Item = Oi>,
-        Oi: Into<ConcreteOp>,
+        Oi: Into<Op<[u8]>>,
         E: CheckExit,
         I: IntoIterator<Item = Ii>,
         Ii: Into<Expr>,
@@ -1037,7 +1037,7 @@ mod tests {
     #[test]
     fn annotate_stop() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Stop],
+            ops: vec![Stop],
             expected_exit: ExitTerminate,
             expected_input_stack: Vec::<Expr>::new(),
             expected_output_stack: Vec::<Expr>::new(),
@@ -1048,7 +1048,7 @@ mod tests {
     #[test]
     fn annotate_add() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Add],
+            ops: vec![Add],
             expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Expr::add(
@@ -1062,7 +1062,7 @@ mod tests {
     #[test]
     fn annotate_mul() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Mul],
+            ops: vec![Mul],
             expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Expr::mul(
@@ -1076,7 +1076,7 @@ mod tests {
     #[test]
     fn annotate_sub() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Sub],
+            ops: vec![Sub],
             expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Expr::sub(
@@ -1092,7 +1092,7 @@ mod tests {
     #[test]
     fn annotate_swap1() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Swap1],
+            ops: vec![Swap1],
             expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Var::with_id(2), Var::with_id(1)],
@@ -1103,7 +1103,7 @@ mod tests {
     #[test]
     fn annotate_swap2() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Swap2],
+            ops: vec![Swap2],
             expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2), Var::with_id(3)],
             expected_output_stack: vec![Var::with_id(3), Var::with_id(2), Var::with_id(1)],
@@ -1114,7 +1114,7 @@ mod tests {
     #[test]
     fn annotate_swap3() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Swap3],
+            ops: vec![Swap3],
             expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: (1..5).map(Var::with_id),
             expected_output_stack: vec![
@@ -1130,7 +1130,7 @@ mod tests {
     #[test]
     fn annotate_dup1() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Dup1],
+            ops: vec![Dup1],
             expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1)],
             expected_output_stack: vec![Var::with_id(1), Var::with_id(1)],
@@ -1141,7 +1141,7 @@ mod tests {
     #[test]
     fn annotate_dup2() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Dup2],
+            ops: vec![Dup2],
             expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2)],
             expected_output_stack: vec![Var::with_id(2), Var::with_id(1), Var::with_id(2)],
@@ -1152,7 +1152,7 @@ mod tests {
     #[test]
     fn annotate_dup3() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Dup3],
+            ops: vec![Dup3],
             expected_exit: ExitFallThrough(0x1235),
             expected_input_stack: vec![Var::with_id(1), Var::with_id(2), Var::with_id(3)],
             expected_output_stack: vec![
@@ -1168,7 +1168,7 @@ mod tests {
     #[test]
     fn annotate_push1() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Push1([77].into())],
+            ops: vec![Push1([77])],
             expected_exit: ExitFallThrough(0x1236),
             expected_input_stack: Vec::<Expr>::new(),
             expected_output_stack: vec![Expr::constant_offset(77u8)],
@@ -1179,7 +1179,7 @@ mod tests {
     #[test]
     fn annotate_push2() {
         AnnotateTest {
-            ops: vec![ConcreteOp::Push2([0x12, 0x34].into())],
+            ops: vec![Push2([0x12, 0x34])],
             expected_exit: ExitFallThrough(0x1237),
             expected_input_stack: Vec::<Expr>::new(),
             expected_output_stack: vec![Expr::constant_offset(0x1234u64)],
@@ -1191,9 +1191,9 @@ mod tests {
     fn annotate_jump() {
         AnnotateTest {
             ops: vec![
-                ConcreteOp::Push1([0xbb].into()),
-                ConcreteOp::Push1([0xaa].into()),
-                ConcreteOp::Jump,
+                Op::from(Push1([0xbb])),
+                Op::from(Push1([0xaa])),
+                Op::from(Jump),
             ],
             expected_exit: ExitUnconditional(Expr::constant_offset(0xaau64)),
             expected_input_stack: Vec::<Expr>::new(),

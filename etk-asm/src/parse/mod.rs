@@ -13,12 +13,15 @@ mod parser {
     pub(super) struct AsmParser;
 }
 
+use std::convert::TryInto;
+
 use self::{
     error::ParseError,
     parser::{AsmParser, Rule},
 };
 use crate::ast::Node;
-use crate::ops::{AbstractOp, Op, Specifier};
+use crate::ops::AbstractOp;
+use etk_ops::london::Op;
 use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
 
@@ -46,7 +49,7 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
         }
         Rule::push => parse_push(pair)?,
         Rule::op => {
-            let spec: Specifier = pair.as_str().parse().unwrap();
+            let spec: Op<()> = pair.as_str().parse().unwrap();
             let op = Op::new(spec).unwrap();
             AbstractOp::Op(op)
         }
@@ -59,20 +62,20 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
 fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     let mut pair = pair.into_inner();
     let size = pair.next().unwrap();
-    let size: u32 = size.as_str().parse().unwrap();
+    let size: usize = size.as_str().parse().unwrap();
     let operand = pair.next().unwrap();
 
-    let spec = Specifier::push(size).unwrap();
+    let spec = Op::<()>::push(size).unwrap();
     let expr = expression::parse(operand)?;
 
     if let Ok(val) = expr.eval() {
-        let max = BigInt::pow(&BigInt::from(2), 8 * size);
+        let max = BigInt::pow(&BigInt::from(2u32), (8 * size).try_into().unwrap());
         if val >= max {
             return error::ImmediateTooLarge.fail();
         }
     }
 
-    Ok(AbstractOp::with_expression(spec, expr))
+    Ok(AbstractOp::Op(spec.with(expr).unwrap()))
 }
 
 #[cfg(test)]
@@ -83,6 +86,7 @@ mod tests {
         InstructionMacroDefinition, InstructionMacroInvocation, Terminal,
     };
     use assert_matches::assert_matches;
+    use etk_ops::london::*;
     use hex_literal::hex;
     use num_bigint::Sign;
     use std::path::PathBuf;
@@ -101,7 +105,12 @@ mod tests {
             gas
             xor
         "#;
-        let expected = nodes![Op::Stop, Op::GetPc, Op::Gas, Op::Xor];
+        let expected = nodes![
+            Op::from(Stop),
+            Op::from(GetPc),
+            Op::from(Gas),
+            Op::from(Xor)
+        ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -110,7 +119,10 @@ mod tests {
         let asm = r#"
             push1 0b0; push1 0b1
         "#;
-        let expected = nodes![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
+        let expected = nodes![
+            Op::from(Push1(Imm::from([0]))),
+            Op::from(Push1(Imm::from([1])))
+        ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -121,9 +133,9 @@ mod tests {
             push1 0b1
         "#;
         let expected = nodes![
-            Op::Push1(Imm::from([0])),
-            Op::Push1(Imm::from([1])),
-            Op::Push1(Imm::from([1]))
+            Op::from(Push1(Imm::from([0]))),
+            Op::from(Push1(Imm::from([1]))),
+            Op::from(Push1(Imm::from([1])))
         ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
@@ -135,7 +147,10 @@ mod tests {
             push1 0b0
             push1 0b1
         "#;
-        let expected = nodes![Op::Push1(Imm::from([0])), Op::Push1(Imm::from([1]))];
+        let expected = nodes![
+            Op::from(Push1(Imm::from([0]))),
+            Op::from(Push1(Imm::from([1])))
+        ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -148,9 +163,9 @@ mod tests {
             push2 0o400
         "#;
         let expected = nodes![
-            Op::Push1(Imm::from([0])),
-            Op::Push1(Imm::from([7])),
-            Op::Push2(Imm::from([1, 0])),
+            Op::from(Push1(Imm::from([0]))),
+            Op::from(Push1(Imm::from([7]))),
+            Op::from(Push2(Imm::from([1, 0]))),
         ];
         println!("{:?}\n\n{:?}", parse_asm(asm), expected);
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
@@ -173,11 +188,11 @@ mod tests {
             push4 4294967295
         "#;
         let expected = nodes![
-            Op::Push1(0.into()),
-            Op::Push1(Imm::from([1])),
-            Op::Push2(Imm::from([0, 42])),
-            Op::Push2(Imm::from(hex!("0100"))),
-            Op::Push4(Imm::from(hex!("ffffffff"))),
+            Op::from(Push1(0u8.into())),
+            Op::from(Push1(Imm::from([1]))),
+            Op::from(Push2(Imm::from([0, 42]))),
+            Op::from(Push2(Imm::from(hex!("0100")))),
+            Op::from(Push4(Imm::from(hex!("ffffffff")))),
         ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
 
@@ -198,18 +213,18 @@ mod tests {
             push32 0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
         "#;
         let expected = nodes![
-            Op::Push1(Imm::from(hex!("01"))),
-            Op::Push1(Imm::from(hex!("42"))),
-            Op::Push2(Imm::from(hex!("0102"))),
-            Op::Push4(Imm::from(hex!("01020304"))),
-            Op::Push8(Imm::from(hex!("0102030405060708"))),
-            Op::Push16(Imm::from(hex!("0102030405060708090a0b0c0d0e0f10"))),
-            Op::Push24(Imm::from(hex!(
+            Op::from(Push1(Imm::from(hex!("01")))),
+            Op::from(Push1(Imm::from(hex!("42")))),
+            Op::from(Push2(Imm::from(hex!("0102")))),
+            Op::from(Push4(Imm::from(hex!("01020304")))),
+            Op::from(Push8(Imm::from(hex!("0102030405060708")))),
+            Op::from(Push16(Imm::from(hex!("0102030405060708090a0b0c0d0e0f10")))),
+            Op::from(Push24(Imm::from(hex!(
                 "0102030405060708090a0b0c0d0e0f101112131415161718"
-            ))),
-            Op::Push32(Imm::from(hex!(
+            )))),
+            Op::from(Push32(Imm::from(hex!(
                 "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
-            ))),
+            )))),
         ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
 
@@ -230,14 +245,14 @@ mod tests {
             log4
         "#;
         let expected = nodes![
-            Op::Swap1,
-            Op::Swap4,
-            Op::Swap16,
-            Op::Dup1,
-            Op::Dup4,
-            Op::Dup16,
-            Op::Log0,
-            Op::Log4,
+            Op::from(Swap1),
+            Op::from(Swap4),
+            Op::from(Swap16),
+            Op::from(Dup1),
+            Op::from(Dup4),
+            Op::from(Dup16),
+            Op::from(Log0),
+            Op::from(Log4),
         ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
@@ -245,14 +260,14 @@ mod tests {
     #[test]
     fn parse_jumpdest_no_label() {
         let asm = "jumpdest";
-        let expected = nodes![Op::JumpDest];
+        let expected = nodes![Op::from(JumpDest)];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
     #[test]
     fn parse_jumpdest_label() {
         let asm = "start:\njumpdest";
-        let expected = nodes![AbstractOp::Label("start".into()), Op::JumpDest,];
+        let expected = nodes![AbstractOp::Label("start".into()), Op::from(JumpDest),];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -262,7 +277,10 @@ mod tests {
             push2 snake_case
             jumpi
         "#;
-        let expected = nodes![Op::Push2(Imm::with_label("snake_case")), Op::JumpI];
+        let expected = nodes![
+            Op::from(Push2(Imm::with_label("snake_case"))),
+            Op::from(JumpI)
+        ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 
@@ -275,8 +293,8 @@ mod tests {
         "#;
         let expected = nodes![
             AbstractOp::Label("push1".into()),
-            Op::Push1(Imm::with_label("push1")),
-            Op::JumpI
+            Op::from(Push1(Imm::with_label("push1"))),
+            Op::from(JumpI),
         ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
@@ -291,13 +309,13 @@ mod tests {
             push32 topic("transfer(address,uint256)")
         "#;
         let expected = nodes![
-            Op::Push4(Imm::from(hex!("06fdde03"))),
-            Op::Push4(Imm::from(hex!("70a08231"))),
-            Op::Push4(Imm::from(hex!("a9059cbb"))),
-            Op::Push4(Imm::from(hex!("095ea7b3"))),
-            Op::Push32(Imm::from(hex!(
+            Op::from(Push4(Imm::from(hex!("06fdde03")))),
+            Op::from(Push4(Imm::from(hex!("70a08231")))),
+            Op::from(Push4(Imm::from(hex!("a9059cbb")))),
+            Op::from(Push4(Imm::from(hex!("095ea7b3")))),
+            Op::from(Push32(Imm::from(hex!(
                 "a9059cbb2ab09eb219583f4a59a5d0623ade346d962bcd4e46b11da047c9049b"
-            ))),
+            )))),
         ];
         println!("{:?}\n\n{:?}", parse_asm(asm), expected);
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
@@ -321,9 +339,9 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            Op::Push1(Imm::from(1)),
+            Op::from(Push1(Imm::from(1u8))),
             Node::Include(PathBuf::from("foo.asm")),
-            Op::Push1(Imm::from(2)),
+            Op::from(Push1(Imm::from(2u8))),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
@@ -338,9 +356,9 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            Op::Push1(Imm::from(1)),
+            Op::from(Push1(Imm::from(1u8))),
             Node::IncludeHex(PathBuf::from("foo.hex")),
-            Op::Push1(Imm::from(2)),
+            Op::from(Push1(Imm::from(2u8))),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
@@ -355,9 +373,9 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            Op::Push1(Imm::from(1)),
+            Op::from(Push1(Imm::from(1u8))),
             Node::Import(PathBuf::from("foo.asm")),
-            Op::Push1(Imm::from(2)),
+            Op::from(Push1(Imm::from(2u8))),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
@@ -415,9 +433,9 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            Op::Push1(Imm::from(1)),
+            Op::from(Push1(Imm::from(1u8))),
             Node::Import(PathBuf::from("hello.asm")),
-            Op::Push1(Imm::from(2)),
+            Op::from(Push1(Imm::from(2u8))),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
@@ -432,9 +450,9 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            Op::Push1(Imm::from(1)),
+            Op::from(Push1(Imm::from(1u8))),
             AbstractOp::Push(Imm::with_label("hello")),
-            Op::Push1(Imm::from(2)),
+            Op::from(Push1(Imm::from(2u8))),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
@@ -459,16 +477,16 @@ mod tests {
                     name: "my_macro".into(),
                     parameters: vec!["foo".into(), "bar".into()],
                     contents: vec![
-                        Op::GasPrice.into(),
-                        Op::Pop.into(),
-                        AbstractOp::Op(Op::Push1(
+                        AbstractOp::new(GasPrice),
+                        AbstractOp::new(Pop),
+                        AbstractOp::new(Push1(
                             Expression::Plus(
                                 Terminal::Variable("foo".to_string()).into(),
                                 Terminal::Variable("bar".to_string()).into()
                             )
                             .into()
                         )),
-                        AbstractOp::Push(0x42.into()),
+                        AbstractOp::Push(0x42u8.into()),
                         AbstractOp::Macro(InstructionMacroInvocation {
                             name: "another_macro".into(),
                             parameters: vec![]
@@ -504,15 +522,15 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            Op::Push1(Imm::with_expression(Expression::Plus(
+            Op::from(Push1(Imm::with_expression(Expression::Plus(
                 1.into(),
                 BigInt::from(-1).into(),
-            ))),
-            Op::Push1(Imm::with_expression(Expression::Times(
+            )))),
+            Op::from(Push1(Imm::with_expression(Expression::Times(
                 2.into(),
                 Terminal::Label("foo".into()).into()
-            ))),
-            Op::Push1(Imm::with_expression(Expression::Minus(
+            )))),
+            Op::from(Push1(Imm::with_expression(Expression::Minus(
                 Box::new(Expression::Plus(
                     1.into(),
                     Box::new(Expression::Times(
@@ -524,14 +542,14 @@ mod tests {
                     Terminal::Label("bar".into()).into(),
                     42.into()
                 ))
-            ))),
-            Op::Push1(Imm::with_expression(Expression::Plus(
+            )))),
+            Op::from(Push1(Imm::with_expression(Expression::Plus(
                 Box::new(Expression::Plus(
                     Terminal::Number(0x20.into()).into(),
                     1.into()
                 )),
                 2.into()
-            )))
+            ))))
         ];
         assert_eq!(parse_asm(&asm).unwrap(), expected)
     }
@@ -546,9 +564,9 @@ mod tests {
             "#,
         );
         let expected = nodes![
-            Op::Push1(Imm::from(1)),
+            Op::from(Push1(Imm::from(1u8))),
             AbstractOp::Push(Imm::with_expression(Expression::Plus(1.into(), 1.into()))),
-            Op::Push1(Imm::from(2)),
+            Op::from(Push1(Imm::from(2u8))),
         ];
         assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
     }
@@ -569,10 +587,10 @@ mod tests {
                 parameters: vec![],
                 content: Imm::with_expression(Expression::Plus(1.into(), 2.into())),
             },
-            Op::Push1(Imm::with_macro(ExpressionMacroInvocation {
+            Op::from(Push1(Imm::with_macro(ExpressionMacroInvocation {
                 name: "foobar".into(),
                 parameters: vec![]
-            })),
+            }))),
         ];
         assert_eq!(parse_asm(&asm).unwrap(), expected);
     }

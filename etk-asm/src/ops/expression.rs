@@ -22,7 +22,7 @@ pub enum Error {
     UndefinedVariable { name: String, backtrace: Backtrace },
 }
 
-type LabelsMap = HashMap<String, Option<u32>>;
+type LabelsMap = HashMap<String, Option<usize>>;
 type VariablesMap = HashMap<String, Expression>;
 type MacrosMap = HashMap<String, MacroDefinition>;
 
@@ -36,7 +36,7 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
     /// Looks up a label in the current context.
-    pub fn get_label(&self, key: &str) -> Option<&Option<u32>> {
+    pub fn get_label(&self, key: &str) -> Option<&Option<usize>> {
         match self.labels {
             Some(labels) => labels.get(key),
             None => None,
