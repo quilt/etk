@@ -27,6 +27,9 @@ There are also several examples in the [`etk-asm/tests/asm`](etk-asm/tests/asm) 
 cargo install --features cli etk-asm etk-dasm
 ```
 
+#### Project Templates
+* [`etk`-Foundry Template](https://github.com/quilt/etk-foundry-template)
+
 #### Syntax Highlighting
 * [`vim-etk`](https://github.com/quilt/vim-etk)
 
@@ -41,10 +44,10 @@ pop
 ```console
 $ eas contract.etk out.hex
 $ disease --hex-file out.hex
-   0:   PUSH1 0x2a
-   2:   PUSH1 0x0d
-   4:   ADD
-   5:   POP
+   0:   push1 0x2a
+   2:   push1 0x0d
+   4:   add
+   5:   pop
 ```
 ### Dependencies
 `ecfg` requires z3 to build
