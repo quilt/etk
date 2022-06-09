@@ -10,11 +10,10 @@ pub mod storage;
 use crate::constants::Constants;
 use crate::error::Error;
 use crate::execution::Execution;
+use crate::ops::SymbolicOp;
 use crate::storage::Storage;
 
 use etk_ops::london::*;
-
-use snafu::ResultExt;
 
 use std::ops::{Add, AddAssign};
 
@@ -134,58 +133,12 @@ where
             }
         }
 
-        match self.previous.next_op() {
-            Op::Stop(_) => self.stop(run, &mut execution),
-            Op::Add(_) => self.add(run, &mut execution),
-            // ...
-            Op::MLoad(_) => self
-                .mload(run, &self.previous.solver, &mut execution)
-                .context(error::MemorySnafu)?,
-            Op::MStore(_) => self
-                .mstore(run, &self.previous.solver, &mut execution)
-                .context(error::MemorySnafu)?,
-            // ...
-            Op::SStore(_) => self
-                .sstore(run, &self.previous.solver, &mut execution)
-                .context(error::StorageSnafu)?,
-            // ...
-            Op::JumpI(_) => self.jumpi(run, &mut execution),
-            // ...
-            Op::JumpDest(_) => self.jumpdest(run, &mut execution),
-            Op::Push1(v) => self.push(&v.0, run, &mut execution),
-            Op::Push2(v) => self.push(&v.0, run, &mut execution),
-            Op::Push3(v) => self.push(&v.0, run, &mut execution),
-            Op::Push4(v) => self.push(&v.0, run, &mut execution),
-            Op::Push5(v) => self.push(&v.0, run, &mut execution),
-            Op::Push6(v) => self.push(&v.0, run, &mut execution),
-            Op::Push7(v) => self.push(&v.0, run, &mut execution),
-            Op::Push8(v) => self.push(&v.0, run, &mut execution),
-            Op::Push9(v) => self.push(&v.0, run, &mut execution),
-            Op::Push10(v) => self.push(&v.0, run, &mut execution),
-            Op::Push11(v) => self.push(&v.0, run, &mut execution),
-            Op::Push12(v) => self.push(&v.0, run, &mut execution),
-            Op::Push13(v) => self.push(&v.0, run, &mut execution),
-            Op::Push14(v) => self.push(&v.0, run, &mut execution),
-            Op::Push15(v) => self.push(&v.0, run, &mut execution),
-            Op::Push16(v) => self.push(&v.0, run, &mut execution),
-            Op::Push17(v) => self.push(&v.0, run, &mut execution),
-            Op::Push18(v) => self.push(&v.0, run, &mut execution),
-            Op::Push19(v) => self.push(&v.0, run, &mut execution),
-            Op::Push20(v) => self.push(&v.0, run, &mut execution),
-            Op::Push21(v) => self.push(&v.0, run, &mut execution),
-            Op::Push22(v) => self.push(&v.0, run, &mut execution),
-            Op::Push23(v) => self.push(&v.0, run, &mut execution),
-            Op::Push24(v) => self.push(&v.0, run, &mut execution),
-            Op::Push25(v) => self.push(&v.0, run, &mut execution),
-            Op::Push26(v) => self.push(&v.0, run, &mut execution),
-            Op::Push27(v) => self.push(&v.0, run, &mut execution),
-            Op::Push28(v) => self.push(&v.0, run, &mut execution),
-            Op::Push29(v) => self.push(&v.0, run, &mut execution),
-            Op::Push30(v) => self.push(&v.0, run, &mut execution),
-            Op::Push31(v) => self.push(&v.0, run, &mut execution),
-            Op::Push32(v) => self.push(&v.0, run, &mut execution),
-            _ => unimplemented!(),
-        }
+        self.previous.next_op().execute(
+            self.previous.ctx,
+            &self.previous.solver,
+            run,
+            &mut execution,
+        )?;
 
         let mut executions = self.previous.executions;
         executions.push(execution);
@@ -281,55 +234,13 @@ where
     S: Storage<'ctx>,
 {
     pub fn step(self) -> Step<'ctx, S> {
-        let mut step = match self.next_op() {
-            Op::Stop(_) => self.stop(),
-            Op::Add(_) => self.add(),
-            // ...
-            Op::MLoad(_) => self.mload(),
-            Op::MStore(_) => self.mstore(),
-            // ...
-            Op::SStore(_) => self.sstore(),
-            // ...
-            Op::JumpI(_) => self.jumpi(),
-            // ...
-            Op::JumpDest(_) => self.jumpdest(),
-            Op::Push1(_) => self.push(),
-            Op::Push2(_) => self.push(),
-            Op::Push3(_) => self.push(),
-            Op::Push4(_) => self.push(),
-            Op::Push5(_) => self.push(),
-            Op::Push6(_) => self.push(),
-            Op::Push7(_) => self.push(),
-            Op::Push8(_) => self.push(),
-            Op::Push9(_) => self.push(),
-            Op::Push10(_) => self.push(),
-            Op::Push11(_) => self.push(),
-            Op::Push12(_) => self.push(),
-            Op::Push13(_) => self.push(),
-            Op::Push14(_) => self.push(),
-            Op::Push15(_) => self.push(),
-            Op::Push16(_) => self.push(),
-            Op::Push17(_) => self.push(),
-            Op::Push18(_) => self.push(),
-            Op::Push19(_) => self.push(),
-            Op::Push20(_) => self.push(),
-            Op::Push21(_) => self.push(),
-            Op::Push22(_) => self.push(),
-            Op::Push23(_) => self.push(),
-            Op::Push24(_) => self.push(),
-            Op::Push25(_) => self.push(),
-            Op::Push26(_) => self.push(),
-            Op::Push27(_) => self.push(),
-            Op::Push28(_) => self.push(),
-            Op::Push29(_) => self.push(),
-            Op::Push30(_) => self.push(),
-            Op::Push31(_) => self.push(),
-            Op::Push32(_) => self.push(),
-            _ => unimplemented!(),
-        };
+        let mut outcomes = self.next_op().outcomes(&self);
 
-        step.outcomes.sort();
+        outcomes.sort();
 
-        step
+        Step {
+            outcomes,
+            previous: self,
+        }
     }
 }

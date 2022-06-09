@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::ops::RangeBounds;
 
 use z3::ast::{Ast, Int, BV};
-use z3::{SatResult, Solver};
+use z3::Solver;
 
 #[derive(Debug, Default, Clone)]
 pub struct Memory<'ctx> {

@@ -7,7 +7,7 @@ use crate::storage::Delta;
 use crate::{to_bv, Offset};
 
 use z3::ast::{Ast, Bool, Int, BV};
-use z3::{Context, Solver};
+use z3::Context;
 
 #[derive(Debug)]
 pub(crate) struct Execution<'ctx, S> {

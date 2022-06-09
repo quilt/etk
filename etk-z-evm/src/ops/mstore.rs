@@ -1,80 +1,86 @@
 use crate::execution::Execution;
-use crate::{Halt, Outcome, Run, Step, ZEvm};
+use crate::storage::Storage;
+use crate::{error, Halt, Outcome, Run, ZEvm};
+
+use etk_ops::london::MStore;
 
 use smallvec::SmallVec;
+
+use snafu::ResultExt;
+
+use super::SymbolicOp;
 
 use z3::ast::{Int, BV};
 use z3::{SatResult, Solver};
 
-impl<'ctx, S> ZEvm<'ctx, S> {
-    pub(crate) fn mstore(self) -> Step<'ctx, S> {
-        let execution = self.execution();
+impl SymbolicOp for MStore {
+    fn outcomes<'ctx, S>(&self, evm: &ZEvm<'ctx, S>) -> SmallVec<[Outcome; 2]>
+    where
+        S: Storage<'ctx>,
+    {
+        let execution = evm.execution();
 
         let mut outcomes = SmallVec::new();
 
         // Are there enough stack elements?
         if execution.stack.len() < 2 {
             outcomes.push(Outcome::Halt(Halt::StackUnderflow));
-            return Step {
-                outcomes,
-                previous: self,
-            };
+            return outcomes;
         }
 
         // Get the stack elements for this instruction.
         let position = execution.stack.peek(0).unwrap();
 
-        let mut gas_cost = Int::from_u64(self.ctx, 3);
-        gas_cost += execution.memory.expansion_gas(
-            &self.solver,
-            position,
-            &BV::from_u64(self.ctx, 32, 256),
-        );
+        let mut gas_cost = Int::from_u64(evm.ctx, 3);
+        gas_cost +=
+            execution
+                .memory
+                .expansion_gas(&evm.solver, position, &BV::from_u64(evm.ctx, 32, 256));
 
         let covers_cost = execution.gas_remaining.ge(&gas_cost);
 
         // Is out of gas possible?
-        if SatResult::Sat == self.solver.check_assumptions(&[covers_cost.not()]) {
+        if SatResult::Sat == evm.solver.check_assumptions(&[covers_cost.not()]) {
             outcomes.push(Outcome::Halt(Halt::OutOfGas));
         }
 
         // Is it possible to have enough gas?
-        if SatResult::Sat == self.solver.check_assumptions(&[covers_cost]) {
+        if SatResult::Sat == evm.solver.check_assumptions(&[covers_cost]) {
             outcomes.push(Outcome::Run(Run::Advance));
         }
 
-        Step {
-            previous: self,
-            outcomes,
-        }
+        outcomes
     }
-}
 
-impl<'ctx, S> Step<'ctx, S> {
-    pub(crate) fn mstore(
+    fn execute<'ctx, S>(
         &self,
-        run: Run,
+        context: &'ctx z3::Context,
         solver: &Solver<'ctx>,
+        run: Run,
         execution: &mut Execution<'ctx, S>,
-    ) -> Result<(), crate::resolve::Error> {
+    ) -> Result<(), crate::error::Error<S::Error>>
+    where
+        S: crate::storage::Storage<'ctx>,
+    {
         if Run::Advance != run {
             panic!("invalid run for mstore: {:?}", run);
         }
 
-        let ctx = self.previous.ctx;
-
         let position = execution.stack.pop().unwrap();
         let value = execution.stack.pop().unwrap();
 
-        let mut gas_cost = Int::from_u64(ctx, 3);
-        gas_cost +=
-            execution
-                .memory
-                .try_expansion_gas(solver, &position, &BV::from_u64(ctx, 32, 256))?;
+        let mut gas_cost = Int::from_u64(context, 3);
+        gas_cost += execution
+            .memory
+            .try_expansion_gas(solver, &position, &BV::from_u64(context, 32, 256))
+            .context(error::MemorySnafu)?;
 
         execution.gas_remaining -= gas_cost;
 
-        execution.memory.store(solver, &position, &value)
+        execution
+            .memory
+            .store(solver, &position, &value)
+            .context(error::MemorySnafu)
     }
 }
 
@@ -94,7 +100,7 @@ mod tests {
     fn underflow() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![MStore.into()])
+        let evm = Builder::<'_, InMemory>::new(&ctx, vec![MStore.into()])
             .set_gas(10)
             .build();
 

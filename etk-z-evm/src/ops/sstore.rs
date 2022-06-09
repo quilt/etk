@@ -1,8 +1,15 @@
+use crate::error::{self, Error};
 use crate::execution::Execution;
 use crate::storage::{Key, Storage};
-use crate::{Halt, Outcome, Run, Step, ZEvm};
+use crate::{Halt, Outcome, Run, ZEvm};
+
+use etk_ops::london::SStore;
 
 use smallvec::SmallVec;
+
+use snafu::ResultExt;
+
+use super::SymbolicOp;
 
 use z3::ast::{Ast, Bool, Int, BV};
 use z3::{SatResult, Solver};
@@ -31,7 +38,7 @@ where
     let current_value = storage.get(key)?;
     let original_value = storage.original(key)?;
 
-    let cost = (original_value._eq(&current_value) & current_value._eq(&new_value).not()).ite(
+    let cost = (original_value._eq(&current_value) & current_value._eq(new_value).not()).ite(
         &original_value
             ._eq(&zero)
             .ite(&sstore_set_gas, &sstore_reset_gas),
@@ -41,22 +48,19 @@ where
     Ok(cost.simplify())
 }
 
-impl<'ctx, S> ZEvm<'ctx, S>
-where
-    S: Storage<'ctx>,
-{
-    pub(crate) fn sstore(self) -> Step<'ctx, S> {
-        let execution = self.execution();
+impl SymbolicOp for SStore {
+    fn outcomes<'ctx, S>(&self, evm: &ZEvm<'ctx, S>) -> SmallVec<[Outcome; 2]>
+    where
+        S: Storage<'ctx>,
+    {
+        let execution = evm.execution();
 
         let mut outcomes = SmallVec::new();
 
         // Are there enough stack elements?
         if execution.stack.len() < 2 {
             outcomes.push(Outcome::Halt(Halt::StackUnderflow));
-            return Step {
-                outcomes,
-                previous: self,
-            };
+            return outcomes;
         }
 
         // Get the stack elements for this instruction.
@@ -66,20 +70,20 @@ where
         // Calculate the gas cost.
         let warm = execution.is_warm_slot(slot);
 
-        let key = Key::new(&self.solver, &execution.state_address, slot);
+        let key = Key::new(&evm.solver, &execution.state_address, slot);
 
         let gas_cost = gas_cost(&execution.storage, key, new_value, warm).unwrap_or_else(|_| {
             // TODO: technically not a strict bound on what paths are possible.
-            let g = Int::fresh_const(self.ctx, "str-gas");
+            let g = Int::fresh_const(evm.ctx, "str-gas");
 
-            let one_of = &g._eq(&Int::from_u64(self.ctx, BASE_GAS))
-                | &g._eq(&Int::from_u64(self.ctx, SET_GAS))
-                | &g._eq(&Int::from_u64(self.ctx, RESET_GAS))
-                | &g._eq(&Int::from_u64(self.ctx, BASE_GAS + COLD_GAS))
-                | &g._eq(&Int::from_u64(self.ctx, SET_GAS + COLD_GAS))
-                | &g._eq(&Int::from_u64(self.ctx, RESET_GAS + COLD_GAS));
+            let one_of = &g._eq(&Int::from_u64(evm.ctx, BASE_GAS))
+                | &g._eq(&Int::from_u64(evm.ctx, SET_GAS))
+                | &g._eq(&Int::from_u64(evm.ctx, RESET_GAS))
+                | &g._eq(&Int::from_u64(evm.ctx, BASE_GAS + COLD_GAS))
+                | &g._eq(&Int::from_u64(evm.ctx, SET_GAS + COLD_GAS))
+                | &g._eq(&Int::from_u64(evm.ctx, RESET_GAS + COLD_GAS));
 
-            self.solver.assert(&one_of);
+            evm.solver.assert(&one_of);
 
             g
         });
@@ -87,32 +91,28 @@ where
         let covers_cost = execution.gas_remaining.ge(&gas_cost);
 
         // Is out of gas possible?
-        if SatResult::Sat == self.solver.check_assumptions(&[covers_cost.not()]) {
+        if SatResult::Sat == evm.solver.check_assumptions(&[covers_cost.not()]) {
             outcomes.push(Outcome::Halt(Halt::OutOfGas));
         }
 
         // Is it possible to have enough gas?
-        if SatResult::Sat == self.solver.check_assumptions(&[covers_cost]) {
+        if SatResult::Sat == evm.solver.check_assumptions(&[covers_cost]) {
             outcomes.push(Outcome::Run(Run::Advance));
         }
 
-        Step {
-            previous: self,
-            outcomes,
-        }
+        outcomes
     }
-}
 
-impl<'ctx, S> Step<'ctx, S>
-where
-    S: Storage<'ctx>,
-{
-    pub(crate) fn sstore(
+    fn execute<'ctx, S>(
         &self,
-        run: Run,
+        _: &'ctx z3::Context,
         solver: &Solver<'ctx>,
+        run: Run,
         execution: &mut Execution<'ctx, S>,
-    ) -> Result<(), S::Error> {
+    ) -> Result<(), Error<S::Error>>
+    where
+        S: Storage<'ctx>,
+    {
         if Run::Advance != run {
             panic!("invalid run for sstore: {:?}", run);
         }
@@ -123,11 +123,15 @@ where
         let key = Key::new(solver, &execution.state_address, &slot);
 
         let warm = execution.is_warm_slot(&slot);
-        let gas_cost = gas_cost(&execution.storage, key, &new_value, warm)?;
+        let gas_cost =
+            gas_cost(&execution.storage, key, &new_value, warm).context(error::StorageSnafu)?;
 
         execution.gas_remaining -= gas_cost;
 
-        execution.storage.set(key, &new_value)?;
+        execution
+            .storage
+            .set(key, &new_value)
+            .context(error::StorageSnafu)?;
 
         execution
             .warm_slots
@@ -153,7 +157,7 @@ mod tests {
     fn underflow() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let mut evm = Builder::<'_, InMemory>::new(&ctx, vec![SStore.into()])
+        let evm = Builder::<'_, InMemory>::new(&ctx, vec![SStore.into()])
             .set_gas(10)
             .build();
 

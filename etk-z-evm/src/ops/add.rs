@@ -1,45 +1,55 @@
+use crate::error::Error;
 use crate::execution::Execution;
-use crate::{Halt, Outcome, Run, Step, ZEvm};
+use crate::storage::Storage;
+use crate::{Halt, Outcome, Run, ZEvm};
+
+use etk_ops::london::Add;
 
 use smallvec::SmallVec;
 
+use super::SymbolicOp;
+
 use z3::ast::Int;
-use z3::SatResult;
+use z3::{Context, SatResult, Solver};
 
-impl<'ctx, S> ZEvm<'ctx, S> {
-    pub(crate) fn add(self) -> Step<'ctx, S> {
-        let execution = self.execution();
+impl SymbolicOp for Add {
+    fn outcomes<'ctx, S>(&self, evm: &ZEvm<'ctx, S>) -> SmallVec<[Outcome; 2]>
+    where
+        S: Storage<'ctx>,
+    {
+        let execution = evm.execution();
 
-        let gas_cost = Int::from_u64(self.ctx, 3);
+        let gas_cost = Int::from_u64(evm.ctx, 3);
         let covers_cost = execution.gas_remaining.ge(&gas_cost);
 
         let mut outcomes = SmallVec::new();
 
         if execution.stack.len() < 2 {
             outcomes.push(Outcome::Halt(Halt::StackUnderflow));
-            return Step {
-                outcomes,
-                previous: self,
-            };
+            return outcomes;
         }
 
-        if SatResult::Sat == self.solver.check_assumptions(&[covers_cost.not()]) {
+        if SatResult::Sat == evm.solver.check_assumptions(&[covers_cost.not()]) {
             outcomes.push(Outcome::Halt(Halt::OutOfGas));
         }
 
-        if SatResult::Sat == self.solver.check_assumptions(&[covers_cost]) {
+        if SatResult::Sat == evm.solver.check_assumptions(&[covers_cost]) {
             outcomes.push(Outcome::Run(Run::Advance));
         }
 
-        Step {
-            previous: self,
-            outcomes,
-        }
+        outcomes
     }
-}
 
-impl<'ctx, S> Step<'ctx, S> {
-    pub(crate) fn add(&self, run: Run, execution: &mut Execution<'ctx, S>) {
+    fn execute<'ctx, S>(
+        &self,
+        context: &'ctx Context,
+        _: &Solver<'ctx>,
+        run: Run,
+        execution: &mut Execution<'ctx, S>,
+    ) -> Result<(), Error<S::Error>>
+    where
+        S: Storage<'ctx>,
+    {
         if run != Run::Advance {
             panic!("invalid run for add: {:?}", run);
         }
@@ -48,8 +58,10 @@ impl<'ctx, S> Step<'ctx, S> {
         let rhs = execution.stack.pop().unwrap();
         execution.stack.push(lhs + rhs).unwrap();
 
-        let gas_cost = Int::from_u64(self.previous.ctx, 3);
+        let gas_cost = Int::from_u64(context, 3);
         execution.gas_remaining -= gas_cost;
+
+        Ok(())
     }
 }
 

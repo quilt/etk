@@ -27,7 +27,7 @@ impl Constants {
     }
 
     pub fn op(&self, index: usize) -> Op<[u8]> {
-        self.ops.get(index).unwrap_or(&Op::Stop(Stop)).clone()
+        self.ops.get(index).copied().unwrap_or(Op::Stop(Stop))
     }
 
     pub fn destination(&self, offset: Offset) -> Option<usize> {
