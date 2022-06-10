@@ -87,7 +87,7 @@ impl SymbolicOp for MStore {
 #[cfg(test)]
 mod tests {
     use crate::storage::InMemory;
-    use crate::{Builder, Offset};
+    use crate::Builder;
 
     use etk_ops::london::*;
 

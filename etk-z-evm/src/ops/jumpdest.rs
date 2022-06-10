@@ -64,7 +64,7 @@ mod tests {
 
     use super::*;
 
-    use z3::ast::{Ast, BV};
+    use z3::ast::Ast;
     use z3::{Config, Context};
 
     #[test]

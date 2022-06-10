@@ -144,7 +144,7 @@ impl SymbolicOp for SStore {
 #[cfg(test)]
 mod tests {
     use crate::storage::InMemory;
-    use crate::{to_bv, Builder, Offset};
+    use crate::Builder;
 
     use etk_ops::london::*;
 
