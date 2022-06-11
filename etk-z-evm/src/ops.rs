@@ -4,6 +4,7 @@ pub mod jumpi;
 pub mod mload;
 pub mod mstore;
 pub mod push;
+pub mod sload;
 pub mod sstore;
 pub mod stop;
 
@@ -48,6 +49,7 @@ where
             Self::MLoad(o) => o.outcomes(evm),
             Self::MStore(o) => o.outcomes(evm),
             // ...
+            Self::SLoad(o) => o.outcomes(evm),
             Self::SStore(o) => o.outcomes(evm),
             // ...
             Self::JumpI(o) => o.outcomes(evm),
@@ -107,6 +109,7 @@ where
             Self::MLoad(o) => o.execute(context, solver, run, execution),
             Self::MStore(o) => o.execute(context, solver, run, execution),
             // ...
+            Self::SLoad(o) => o.execute(context, solver, run, execution),
             Self::SStore(o) => o.execute(context, solver, run, execution),
             // ...
             Self::JumpI(o) => o.execute(context, solver, run, execution),

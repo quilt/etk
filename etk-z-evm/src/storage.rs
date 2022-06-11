@@ -172,17 +172,7 @@ impl<'ctx, S> Delta<'ctx, S>
 where
     S: Storage<'ctx>,
 {
-    pub fn get(
-        &self,
-        solver: &Solver<'ctx>,
-        address: &BV<'ctx>,
-        slot: &BV<'ctx>,
-    ) -> Result<BV<'ctx>, S::Error> {
-        let key = Key {
-            address,
-            slot,
-            solver,
-        };
+    pub fn get(&self, key: Key<'_, 'ctx>) -> Result<BV<'ctx>, S::Error> {
         self.storage.borrow_mut().get(key)
     }
 
