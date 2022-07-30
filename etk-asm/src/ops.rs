@@ -204,7 +204,7 @@ impl AbstractOp {
                     .tree
                     .eval_with_context(ctx)
                     .context(error::ContextIncomplete)?;
-                let size = (res.bits() + 8 - 1) / 8;
+                let size = std::cmp::max(1, (res.bits() + 8 - 1) / 8);
                 let spec = Op::<()>::push(size.try_into().unwrap()).unwrap();
                 let bytes = res.to_bytes_be().1;
                 let start = bytes.len() + 1 - spec.size();
