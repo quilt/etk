@@ -788,6 +788,17 @@ mod tests {
     }
 
     #[test]
+    fn assemble_variable_push_const0() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let sz = asm.push_all(vec![AbstractOp::Push(
+            Terminal::Number((0x00 as u128).into()).into(),
+        )])?;
+        assert_eq!(2, sz);
+        assert_eq!(asm.take(), hex!("6000"));
+        Ok(())
+    }
+
+    #[test]
     fn assemble_variable_push1_known() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![
