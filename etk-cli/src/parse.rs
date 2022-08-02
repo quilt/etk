@@ -50,7 +50,11 @@ where
     type Err = FromHexError<<T as FromHex>::Error>;
 
     fn from_str(txt: &str) -> Result<Self, Self::Err> {
-        let rest = txt.strip_prefix("0x").ok_or(FromHexError::Prefix)?;
+        let rest = if txt.starts_with("0x") {
+            txt.strip_prefix("0x").unwrap()
+        } else {
+            txt
+        };
         let item = T::from_hex(rest).map_err(FromHexError::Hex)?;
         Ok(Self(item))
     }
