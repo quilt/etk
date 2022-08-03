@@ -43,7 +43,7 @@ mod types;
 
 pub(crate) use self::error::Error;
 
-use etk_ops::london::{Op, Operation};
+use etk_ops::london::{Op, Operation, Push32};
 
 pub use self::error::UnknownSpecifierError;
 pub use self::expression::{Context, Expression, Terminal};
@@ -56,7 +56,7 @@ pub use self::macros::{
 pub use self::types::Abstract;
 
 use std::cmp::{Eq, PartialEq};
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 use snafu::{ensure, ResultExt};
@@ -200,13 +200,32 @@ impl AbstractOp {
         match self {
             Self::Op(op) => op.concretize(ctx),
             Self::Push(imm) => {
-                let res = imm
+                let value = imm
                     .tree
                     .eval_with_context(ctx)
                     .context(error::ContextIncomplete)?;
-                let size = std::cmp::max(1, (res.bits() + 8 - 1) / 8);
+
+                let (sign, bytes) = value.to_bytes_be();
+
+                ensure!(
+                    sign != num_bigint::Sign::Minus,
+                    error::ExpressionNegative { value }
+                );
+
+                if bytes.len() > 32 {
+                    // TODO: Fix hack to get a TryFromSliceError.
+                    let err = <[u8; 32]>::try_from(bytes.as_slice())
+                        .context(error::ExpressionTooLarge {
+                            value,
+                            spec: Push32(()),
+                        })
+                        .unwrap_err();
+                    return Err(err);
+                }
+
+                let size = std::cmp::max(1, (value.bits() + 8 - 1) / 8);
                 let spec = Op::<()>::push(size.try_into().unwrap()).unwrap();
-                let bytes = res.to_bytes_be().1;
+
                 let start = bytes.len() + 1 - spec.size();
                 AbstractOp::new(spec.with(&bytes[start..]).unwrap()).concretize(ctx)
             }
