@@ -788,6 +788,28 @@ mod tests {
     }
 
     #[test]
+    fn assemble_variable_push_too_large() {
+        let v = BigInt::from_bytes_be(Sign::Plus, &[1u8; 33]);
+
+        let mut asm = Assembler::new();
+        let err = asm
+            .push_all(vec![AbstractOp::Push(Terminal::Number(v).into())])
+            .unwrap_err();
+
+        assert_matches!(err, Error::ExpressionTooLarge { .. });
+    }
+
+    #[test]
+    fn assemble_variable_push_negative() {
+        let mut asm = Assembler::new();
+        let err = asm
+            .push_all(vec![AbstractOp::Push(Terminal::Number((-1).into()).into())])
+            .unwrap_err();
+
+        assert_matches!(err, Error::ExpressionNegative { .. });
+    }
+
+    #[test]
     fn assemble_variable_push_const0() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![AbstractOp::Push(
