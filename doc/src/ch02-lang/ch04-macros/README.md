@@ -25,7 +25,7 @@ An instruction macro looks like this:
 # assert_eq!(output, &[0x60, 0x06]);
 ```
 
-Instruction macros always begin with `%`, and expand to one or more instructions. In this case, `%my_macro(4, 2)` would expand to:
+Instruction macros always begin with `%`, and expand to one or more instructions. In this case, `%push_sum(4, 2)` would expand to:
 
 ```ignore
 push1 0x06
