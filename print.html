@@ -699,7 +699,7 @@ end:
 </span><span class="boring">assert_eq!(output, &amp;[0x60, 0x06]);
 </span><span class="boring">}
 </span></code></pre></pre>
-<p>Instruction macros always begin with <code>%</code>, and expand to one or more instructions. In this case, <code>%my_macro(4, 2)</code> would expand to:</p>
+<p>Instruction macros always begin with <code>%</code>, and expand to one or more instructions. In this case, <code>%push_sum(4, 2)</code> would expand to:</p>
 <pre><code class="language-ignore">push1 0x06
 </code></pre>
 <h3 id="expression-macros"><a class="header" href="#expression-macros">Expression Macros</a></h3>
