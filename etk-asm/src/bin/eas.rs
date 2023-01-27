@@ -3,9 +3,9 @@ use etk_cli::io::HexWrite;
 
 use etk_asm::ingest::{Error, Ingest};
 
-use std::fs::File;
+use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::StructOpt;
 
@@ -19,6 +19,11 @@ struct Opt {
 }
 
 fn create(path: PathBuf) -> File {
+    match create_dir_all(path.parent().unwrap()) {
+        Ok(_) => (),
+        Err(why) => panic!("couldn't create parent directories: {}", why),
+    }
+
     match File::create(&path) {
         Err(why) => panic!("couldn't create `{}`: {}", path.display(), why),
         Ok(file) => file,
@@ -38,15 +43,41 @@ fn main() {
 fn run() -> Result<(), Error> {
     let opt: Opt = clap::Parser::parse();
 
+    let mut out_file_exists = false;
+    let mut out_file_content = vec![];
+    if let Some(o) = &opt.out {
+        if Path::new(o).exists() {
+            out_file_exists = true;
+            match std::fs::read(o) {
+                Ok(content) => out_file_content = content,
+                Err(e) => panic!("couldn't backup existing file: {}", e),
+            }            
+        }
+    }
+
     let mut out: Box<dyn Write> = match opt.out {
-        Some(o) => Box::new(create(o)),
+        Some(ref o) => Box::new(create(o.to_path_buf())),
         None => Box::new(std::io::stdout()),
     };
 
     let hex_out = HexWrite::new(&mut out);
 
     let mut ingest = Ingest::new(hex_out);
-    ingest.ingest_file(opt.input)?;
+
+    if let Err(e) = ingest.ingest_file(opt.input) {
+        if out_file_exists {
+            match std::fs::write(&opt.out.unwrap(), &out_file_content) {
+                Ok(_) => (),
+                Err(e) => panic!("couldn't restore existing file.\n{}", e),
+            };
+        } else if let Some(o) = &opt.out {
+            match std::fs::remove_file(o) {
+                Ok(_) => (),
+                Err(e) => panic!("couldn't clean up.\n{}", e),
+            }
+        }
+        return Err(e);
+    }
 
     out.write_all(b"\n").unwrap();
 
