@@ -51,7 +51,7 @@ fn run() -> Result<(), Error> {
             match std::fs::read(o) {
                 Ok(content) => out_file_content = content,
                 Err(e) => panic!("couldn't backup existing file: {}", e),
-            }            
+            }
         }
     }
 
