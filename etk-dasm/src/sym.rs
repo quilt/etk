@@ -514,16 +514,16 @@ impl<'a, 'b> Visit for DisplayVisit<'a, 'b> {
             _ => ", ",
         };
 
-        write!(self.0, "{}", txt)
+        write!(self.0, "{txt}")
     }
 
     fn enter(&mut self, op: &Sym) -> fmt::Result {
         match op {
             Sym::Const(v) => {
                 // TODO: Technically this should be in decimal, not hex.
-                write!(self.0, "0x{}", hex::encode(&**v))
+                write!(self.0, "0x{}", hex::encode(**v))
             }
-            Sym::Var(v) => write!(self.0, "{}", v),
+            Sym::Var(v) => write!(self.0, "{v}"),
             Sym::AddMod => write!(self.0, "(("),
             Sym::MulMod => write!(self.0, "(("),
             Sym::Keccak256 => write!(self.0, "keccak256("),
@@ -553,7 +553,7 @@ impl<'a, 'b> Visit for DisplayVisit<'a, 'b> {
             Sym::ChainId => write!(self.0, "chainid("),
             Sym::SelfBalance => write!(self.0, "selfbalance("),
             Sym::BaseFee => write!(self.0, "basefee("),
-            Sym::GetPc(pc) => write!(self.0, "pc({}", pc),
+            Sym::GetPc(pc) => write!(self.0, "pc({pc}"),
             Sym::MSize => write!(self.0, "msize("),
             Sym::Gas => write!(self.0, "gas("),
             Sym::Create => write!(self.0, "create("),

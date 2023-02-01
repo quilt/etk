@@ -489,7 +489,7 @@ mod tests {
         let mut f = NamedTempFile::new().unwrap();
         let root = f.path().parent().unwrap().join("root.asm");
 
-        write!(f, "{}", s).unwrap();
+        write!(f, "{s}").unwrap();
         (f, root)
     }
 
@@ -759,13 +759,12 @@ mod tests {
     fn ingest_recursive() {
         let (mut f, root) = new_file("");
         let path = f.path().display().to_string();
-        write!(f, r#"%import("{}")"#, path).unwrap();
+        write!(f, r#"%import("{path}")"#).unwrap();
 
         let text = format!(
             r#"
-                %import("{}")
+                %import("{path}")
             "#,
-            path,
         );
 
         let mut output = Vec::new();

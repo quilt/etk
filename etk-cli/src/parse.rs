@@ -38,7 +38,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             FromHexError::Prefix => write!(f, "missing 0x prefix"),
-            FromHexError::Hex(e) => write!(f, "{}", e),
+            FromHexError::Hex(e) => write!(f, "{e}"),
         }
     }
 }

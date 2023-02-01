@@ -118,14 +118,14 @@ pub enum Expression {
 impl Debug for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expression::Expression(s) => write!(f, r#"({:?})"#, s),
+            Expression::Expression(s) => write!(f, r#"({s:?})"#),
             Expression::Macro(m) => write!(f, r#"Expression::Macro("{}")"#, m.name),
-            Expression::Terminal(t) => write!(f, r#"Expression::Terminal({:?})"#, t),
-            Expression::Plus(lhs, rhs) => write!(f, r#"Expression::Plus({:?}, {:?})"#, lhs, rhs),
-            Expression::Minus(lhs, rhs) => write!(f, r#"Expression::Minus({:?}, {:?})"#, lhs, rhs),
-            Expression::Times(lhs, rhs) => write!(f, r#"Expression::Times({:?}, {:?})"#, lhs, rhs),
+            Expression::Terminal(t) => write!(f, r#"Expression::Terminal({t:?})"#),
+            Expression::Plus(lhs, rhs) => write!(f, r#"Expression::Plus({lhs:?}, {rhs:?})"#),
+            Expression::Minus(lhs, rhs) => write!(f, r#"Expression::Minus({lhs:?}, {rhs:?})"#),
+            Expression::Times(lhs, rhs) => write!(f, r#"Expression::Times({lhs:?}, {rhs:?})"#),
             Expression::Divide(lhs, rhs) => {
-                write!(f, r#"Expression::Divide({:?}, {:?})"#, lhs, rhs)
+                write!(f, r#"Expression::Divide({lhs:?}, {rhs:?})"#)
             }
         }
     }
@@ -134,13 +134,13 @@ impl Debug for Expression {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expression::Expression(s) => write!(f, r#"({})"#, s),
-            Expression::Macro(m) => write!(f, r#"{}"#, m),
-            Expression::Terminal(t) => write!(f, r#"{}"#, t),
-            Expression::Plus(lhs, rhs) => write!(f, r#"{}+{}"#, lhs, rhs),
-            Expression::Minus(lhs, rhs) => write!(f, r#"{}-{}"#, lhs, rhs),
-            Expression::Times(lhs, rhs) => write!(f, r#"{}*{}"#, lhs, rhs),
-            Expression::Divide(lhs, rhs) => write!(f, r#"{}/{}"#, lhs, rhs),
+            Expression::Expression(s) => write!(f, r#"({s})"#),
+            Expression::Macro(m) => write!(f, r#"{m}"#),
+            Expression::Terminal(t) => write!(f, r#"{t}"#),
+            Expression::Plus(lhs, rhs) => write!(f, r#"{lhs}+{rhs}"#),
+            Expression::Minus(lhs, rhs) => write!(f, r#"{lhs}-{rhs}"#),
+            Expression::Times(lhs, rhs) => write!(f, r#"{lhs}*{rhs}"#),
+            Expression::Divide(lhs, rhs) => write!(f, r#"{lhs}/{rhs}"#),
         }
     }
 }
@@ -309,9 +309,9 @@ impl Expression {
 impl Debug for Terminal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Terminal::Label(l) => write!(f, r#"Terminal::Label({})"#, l),
-            Terminal::Number(n) => write!(f, r#"Terminal::Number({})"#, n),
-            Terminal::Variable(v) => write!(f, r#"Terminal::Variable({})"#, v),
+            Terminal::Label(l) => write!(f, r#"Terminal::Label({l})"#),
+            Terminal::Number(n) => write!(f, r#"Terminal::Number({n})"#),
+            Terminal::Variable(v) => write!(f, r#"Terminal::Variable({v})"#),
         }
     }
 }
@@ -319,9 +319,9 @@ impl Debug for Terminal {
 impl fmt::Display for Terminal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Terminal::Label(l) => write!(f, r#"Label({})"#, l),
-            Terminal::Number(n) => write!(f, r#"{}"#, n),
-            Terminal::Variable(v) => write!(f, r#"Variable({})"#, v),
+            Terminal::Label(l) => write!(f, r#"Label({l})"#),
+            Terminal::Number(n) => write!(f, r#"{n}"#),
+            Terminal::Variable(v) => write!(f, r#"Variable({v})"#),
         }
     }
 }

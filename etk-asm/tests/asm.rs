@@ -10,11 +10,11 @@ fn source<P>(paths: &[P]) -> PathBuf
 where
     P: AsRef<Path>,
 {
-    let rel: PathBuf = paths.into_iter().collect();
+    let rel: PathBuf = paths.iter().collect();
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     root.push("tests");
     root.push("asm");
-    root.join(&rel)
+    root.join(rel)
 }
 
 #[test]
