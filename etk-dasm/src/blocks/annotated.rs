@@ -930,7 +930,7 @@ impl<'a> Annotator<'a> {
 
             assert!(!op.is_exit());
 
-            pc += op.size() as usize;
+            pc += op.size();
         }
 
         Exit::FallThrough(pc)

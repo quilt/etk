@@ -306,14 +306,14 @@ impl fmt::Display for AbstractOp {
             Self::Op(op) => {
                 write!(f, "{}", op.code())?;
                 if let Some(imm) = op.immediate() {
-                    write!(f, " {}", imm)?;
+                    write!(f, " {imm}")?;
                 }
                 Ok(())
             }
-            Self::Push(txt) => write!(f, r#"%push({})"#, txt),
-            Self::Label(lbl) => write!(f, r#"{}:"#, lbl),
-            Self::Macro(m) => write!(f, "{}", m),
-            Self::MacroDefinition(defn) => write!(f, "{}", defn),
+            Self::Push(txt) => write!(f, r#"%push({txt})"#),
+            Self::Label(lbl) => write!(f, r#"{lbl}:"#),
+            Self::Macro(m) => write!(f, "{m}"),
+            Self::MacroDefinition(defn) => write!(f, "{defn}"),
         }
     }
 }

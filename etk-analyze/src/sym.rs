@@ -45,7 +45,7 @@ impl<'z> Z3Visit<'z> {
     }
 
     fn make_var(&self, var: &Var) -> BV<'z> {
-        let name = format!("etk_{}", var);
+        let name = format!("etk_{var}");
         BV::new_const(self.context, name, 256)
     }
 
@@ -461,7 +461,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[1]).add(&Expr::constant(&[2]));
+        let expr = Expr::constant([1]).add(&Expr::constant([2]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(3));
     }
@@ -471,7 +471,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[1]).add(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([1]).add(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(0));
     }
@@ -481,7 +481,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).sub(&Expr::constant(&[2]));
+        let expr = Expr::constant([3]).sub(&Expr::constant([2]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(1));
     }
@@ -491,7 +491,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).sub(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([3]).sub(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(4));
     }
@@ -501,7 +501,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).mul(&Expr::constant(&[4]));
+        let expr = Expr::constant([3]).mul(&Expr::constant([4]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(12));
     }
@@ -511,7 +511,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0xff; 32]).mul(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([0xff; 32]).mul(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(1));
     }
@@ -521,7 +521,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0xff; 32]).div(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([0xff; 32]).div(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(1));
     }
@@ -531,7 +531,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[1]).div(&Expr::constant(&[0]));
+        let expr = Expr::constant([1]).div(&Expr::constant([0]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(0));
     }
@@ -541,7 +541,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0]).div(&Expr::constant(&[0]));
+        let expr = Expr::constant([0]).div(&Expr::constant([0]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(0));
     }
@@ -551,7 +551,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0]).div(&Expr::constant(&[1]));
+        let expr = Expr::constant([0]).div(&Expr::constant([1]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(0));
     }
@@ -561,7 +561,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0xff; 32]).s_div(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([0xff; 32]).s_div(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(1));
     }
@@ -571,7 +571,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0]).s_div(&Expr::constant(&[0]));
+        let expr = Expr::constant([0]).s_div(&Expr::constant([0]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(0));
     }
@@ -581,10 +581,10 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[1]).s_div(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([1]).s_div(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
 
-        let expected = Expr::constant(&[0xff; 32]).to_z3(&ctx);
+        let expected = Expr::constant([0xff; 32]).to_z3(&ctx);
 
         assert_eq!(ast, expected);
     }
@@ -594,7 +594,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).modulo(&Expr::constant(&[2]));
+        let expr = Expr::constant([3]).modulo(&Expr::constant([2]));
         let ast = expr.to_z3(&ctx).simplify();
 
         let expected = BV::from_u64(&ctx, 1, 256);
@@ -607,7 +607,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).modulo(&Expr::constant(&[0]));
+        let expr = Expr::constant([3]).modulo(&Expr::constant([0]));
         let ast = expr.to_z3(&ctx).simplify();
 
         let expected = BV::from_u64(&ctx, 0, 256);
@@ -620,7 +620,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[1]).modulo(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([1]).modulo(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
 
         let expected = BV::from_u64(&ctx, 1, 256);
@@ -633,7 +633,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0xff; 32]).modulo(&Expr::constant(&[1]));
+        let expr = Expr::constant([0xff; 32]).modulo(&Expr::constant([1]));
         let ast = expr.to_z3(&ctx).simplify();
 
         let expected = BV::from_u64(&ctx, 0, 256);
@@ -646,7 +646,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0]).s_modulo(&Expr::constant(&[0]));
+        let expr = Expr::constant([0]).s_modulo(&Expr::constant([0]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(0));
     }
@@ -656,7 +656,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[1]).s_modulo(&Expr::constant(&[0]));
+        let expr = Expr::constant([1]).s_modulo(&Expr::constant([0]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(0));
     }
@@ -669,9 +669,9 @@ mod tests {
         let mut neg_two = [0xff; 32];
         neg_two[31] = 0xfe;
 
-        let expr = Expr::constant(&[0xff; 32]).s_modulo(&Expr::constant(&neg_two));
+        let expr = Expr::constant([0xff; 32]).s_modulo(&Expr::constant(neg_two));
         let ast = expr.to_z3(&ctx).simplify();
-        let expected = Expr::constant(&[0xff; 32]).to_z3(&ctx);
+        let expected = Expr::constant([0xff; 32]).to_z3(&ctx);
         assert_eq!(ast, expected);
     }
 
@@ -683,7 +683,7 @@ mod tests {
         let mut neg_two = [0xff; 32];
         neg_two[31] = 0xfe;
 
-        let expr = Expr::constant(&neg_two).s_modulo(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant(neg_two).s_modulo(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(0));
     }
@@ -693,7 +693,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).exp(&Expr::constant(&[4]));
+        let expr = Expr::constant([3]).exp(&Expr::constant([4]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(0x51));
     }
@@ -703,7 +703,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).exp(&Expr::constant(&[0]));
+        let expr = Expr::constant([3]).exp(&Expr::constant([0]));
         let ast = expr.to_z3(&ctx).simplify();
         assert_eq!(ast.as_u64(), Some(1));
     }
@@ -713,7 +713,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0xff; 32]).exp(&Expr::constant(&[2]));
+        let expr = Expr::constant([0xff; 32]).exp(&Expr::constant([2]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
 
@@ -728,7 +728,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[2]).lt(&Expr::constant(&[3]));
+        let expr = Expr::constant([2]).lt(&Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -739,7 +739,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).lt(&Expr::constant(&[2]));
+        let expr = Expr::constant([3]).lt(&Expr::constant([2]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -750,7 +750,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).lt(&Expr::constant(&[3]));
+        let expr = Expr::constant([3]).lt(&Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -761,7 +761,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[2]).gt(&Expr::constant(&[3]));
+        let expr = Expr::constant([2]).gt(&Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -772,7 +772,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).gt(&Expr::constant(&[2]));
+        let expr = Expr::constant([3]).gt(&Expr::constant([2]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -783,7 +783,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).gt(&Expr::constant(&[3]));
+        let expr = Expr::constant([3]).gt(&Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -794,7 +794,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[2]).s_gt(&Expr::constant(&[3]));
+        let expr = Expr::constant([2]).s_gt(&Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -805,7 +805,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).s_gt(&Expr::constant(&[2]));
+        let expr = Expr::constant([3]).s_gt(&Expr::constant([2]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -816,7 +816,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).s_gt(&Expr::constant(&[3]));
+        let expr = Expr::constant([3]).s_gt(&Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -827,7 +827,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).s_gt(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([3]).s_gt(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -838,7 +838,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[2]).s_lt(&Expr::constant(&[3]));
+        let expr = Expr::constant([2]).s_lt(&Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -849,7 +849,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).s_lt(&Expr::constant(&[2]));
+        let expr = Expr::constant([3]).s_lt(&Expr::constant([2]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -860,7 +860,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).s_lt(&Expr::constant(&[3]));
+        let expr = Expr::constant([3]).s_lt(&Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -871,7 +871,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).s_lt(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([3]).s_lt(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -882,7 +882,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).is_eq(&Expr::constant(&[3]));
+        let expr = Expr::constant([3]).is_eq(&Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -893,7 +893,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).is_eq(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([3]).is_eq(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -904,7 +904,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).and(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([3]).and(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 3, 256);
         assert_eq!(ast, expected);
@@ -915,7 +915,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).and(&Expr::constant(&[1]));
+        let expr = Expr::constant([3]).and(&Expr::constant([1]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -926,9 +926,9 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).or(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([3]).or(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
-        let expected = Expr::constant(&[0xff; 32]).to_z3(&ctx);
+        let expected = Expr::constant([0xff; 32]).to_z3(&ctx);
         assert_eq!(ast, expected);
     }
 
@@ -937,7 +937,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[4]).or(&Expr::constant(&[1]));
+        let expr = Expr::constant([4]).or(&Expr::constant([1]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 5, 256);
         assert_eq!(ast, expected);
@@ -948,7 +948,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[3]).xor(&Expr::constant(&[1]));
+        let expr = Expr::constant([3]).xor(&Expr::constant([1]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 2, 256);
         assert_eq!(ast, expected);
@@ -962,7 +962,7 @@ mod tests {
         let value: [_; 32] =
             hex!("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff");
 
-        let expr = Expr::constant(&[32]).byte(&Expr::constant(&value));
+        let expr = Expr::constant([32]).byte(&Expr::constant(value));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0x0, 256);
         assert_eq!(ast, expected);
@@ -976,7 +976,7 @@ mod tests {
         let value: [_; 32] =
             hex!("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff");
 
-        let expr = Expr::constant(&[31]).byte(&Expr::constant(&value));
+        let expr = Expr::constant([31]).byte(&Expr::constant(value));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0xff, 256);
         assert_eq!(ast, expected);
@@ -990,7 +990,7 @@ mod tests {
         let value: [_; 32] =
             hex!("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff");
 
-        let expr = Expr::constant(&[30]).byte(&Expr::constant(&value));
+        let expr = Expr::constant([30]).byte(&Expr::constant(value));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0xee, 256);
         assert_eq!(ast, expected);
@@ -1004,7 +1004,7 @@ mod tests {
         let value: [_; 32] =
             hex!("AB112233445566778899aabbccddeeff00112233445566778899aabbccddeeff");
 
-        let expr = Expr::constant(&[0]).byte(&Expr::constant(&value));
+        let expr = Expr::constant([0]).byte(&Expr::constant(value));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0xab, 256);
         assert_eq!(ast, expected);
@@ -1015,7 +1015,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[4]).shl(&Expr::constant(&[1]));
+        let expr = Expr::constant([4]).shl(&Expr::constant([1]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0x10, 256);
         assert_eq!(ast, expected);
@@ -1032,7 +1032,7 @@ mod tests {
         value[2] = 0x72;
         value[3] = 0xdd;
 
-        let expr = Expr::constant(&[224]).shr(&Expr::constant(&value));
+        let expr = Expr::constant([224]).shr(&Expr::constant(value));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0x23b872dd, 256);
         assert_eq!(ast, expected);
@@ -1043,7 +1043,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[248]).shr(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([248]).shr(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0xff, 256);
         assert_eq!(ast, expected);
@@ -1054,9 +1054,9 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[248]).sar(&Expr::constant(&[0xff; 32]));
+        let expr = Expr::constant([248]).sar(&Expr::constant([0xff; 32]));
         let ast = expr.to_z3(&ctx).simplify();
-        let expected = Expr::constant(&[0xff; 32]).to_z3(&ctx);
+        let expected = Expr::constant([0xff; 32]).to_z3(&ctx);
         assert_eq!(ast, expected);
     }
 
@@ -1065,7 +1065,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[1]).sar(&Expr::constant(&[1]));
+        let expr = Expr::constant([1]).sar(&Expr::constant([1]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -1076,7 +1076,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[1]).is_zero();
+        let expr = Expr::constant([1]).is_zero();
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -1087,7 +1087,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0]).is_zero();
+        let expr = Expr::constant([0]).is_zero();
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -1098,7 +1098,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[0xff; 32]).not();
+        let expr = Expr::constant([0xff; 32]).not();
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -1109,7 +1109,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[5]).add_mod(&Expr::constant(&[8]), &Expr::constant(&[3]));
+        let expr = Expr::constant([5]).add_mod(&Expr::constant([8]), &Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -1120,7 +1120,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[5]).add_mod(&Expr::constant(&[8]), &Expr::constant(&[0]));
+        let expr = Expr::constant([5]).add_mod(&Expr::constant([8]), &Expr::constant([0]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);
@@ -1131,7 +1131,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[5]).mul_mod(&Expr::constant(&[8]), &Expr::constant(&[3]));
+        let expr = Expr::constant([5]).mul_mod(&Expr::constant([8]), &Expr::constant([3]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 1, 256);
         assert_eq!(ast, expected);
@@ -1142,7 +1142,7 @@ mod tests {
         let config = z3::Config::new();
         let ctx = z3::Context::new(&config);
 
-        let expr = Expr::constant(&[5]).mul_mod(&Expr::constant(&[8]), &Expr::constant(&[0]));
+        let expr = Expr::constant([5]).mul_mod(&Expr::constant([8]), &Expr::constant([0]));
         let ast = expr.to_z3(&ctx).simplify();
         let expected = BV::from_u64(&ctx, 0, 256);
         assert_eq!(ast, expected);

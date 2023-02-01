@@ -368,14 +368,14 @@ mod tests {
             let connected = self
                 .connected
                 .into_iter()
-                .map(|x| x.borrow().clone())
+                .map(|x| *x.borrow())
                 .map(|(f, t)| Self::find_nodes(&cfg, f, t))
                 .map(|(f, t)| (f, t, true));
 
             let unconnected = self
                 .unconnected
                 .into_iter()
-                .map(|x| x.borrow().clone())
+                .map(|x| *x.borrow())
                 .map(|(f, t)| Self::find_nodes(&cfg, f, t))
                 .map(|(f, t)| (f, t, false));
 

@@ -269,7 +269,7 @@ impl Assembler {
                         }) => {
                             let labels = op.expr().unwrap().labels(&self.declared_macros).unwrap();
                             let declared: HashSet<_> =
-                                self.declared_labels.into_iter().map(|(k, _)| k).collect();
+                                self.declared_labels.into_keys().collect();
                             let invoked: HashSet<_> = labels.into_iter().collect();
                             let missing = invoked
                                 .difference(&declared)
@@ -780,7 +780,7 @@ mod tests {
     fn assemble_variable_push_const() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![AbstractOp::Push(
-            Terminal::Number((0x00aaaaaaaaaaaaaaaaaaaaaaaa as u128).into()).into(),
+            Terminal::Number(0x00aaaaaaaaaaaaaaaaaaaaaaaa_u128.into()).into(),
         )])?;
         assert_eq!(13, sz);
         assert_eq!(asm.take(), hex!("6baaaaaaaaaaaaaaaaaaaaaaaa"));
@@ -813,7 +813,7 @@ mod tests {
     fn assemble_variable_push_const0() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let sz = asm.push_all(vec![AbstractOp::Push(
-            Terminal::Number((0x00 as u128).into()).into(),
+            Terminal::Number(0x00_u128.into()).into(),
         )])?;
         assert_eq!(2, sz);
         assert_eq!(asm.take(), hex!("6000"));
@@ -1273,7 +1273,7 @@ mod tests {
             AbstractOp::Macro(InstructionMacroInvocation {
                 name: "my_macro".into(),
                 parameters: vec![
-                    BigInt::from_bytes_be(Sign::Plus, &vec![0x42]).into(),
+                    BigInt::from_bytes_be(Sign::Plus, &[0x42]).into(),
                     Terminal::Label("b".to_string()).into(),
                 ],
             }),

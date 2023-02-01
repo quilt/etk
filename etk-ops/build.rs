@@ -52,7 +52,7 @@ fn read_fork(name: &str) -> Result<[(String, Op); 256], Error> {
 
     let mut input_path = PathBuf::from(root);
     input_path.push("src");
-    input_path.push(&format!("{}.toml", name));
+    input_path.push(&format!("{name}.toml"));
 
     let mut input_bytes = Vec::new();
     File::open(&input_path)?.read_to_end(&mut input_bytes)?;
@@ -65,7 +65,7 @@ fn read_fork(name: &str) -> Result<[(String, Op); 256], Error> {
             let name = format!("Invalid{:X}{:x}", (code & 0xF0) >> 4, code & 0x0F);
             let op = Op {
                 code,
-                mnemonic: format!("invalid_{:02x}", code),
+                mnemonic: format!("invalid_{code:02x}"),
                 extra_len: 0,
                 pushes: 0,
                 pops: 0,
@@ -841,7 +841,7 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
 
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
     let mut out_path = PathBuf::from(out_dir);
-    out_path.push(&format!("{}.rs", fork_name));
+    out_path.push(&format!("{fork_name}.rs"));
 
     File::create(&out_path)?.write_all(tokens.to_string().as_bytes())?;
 

@@ -331,13 +331,11 @@ mod tests {
 
     #[test]
     fn parse_include() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             push1 1
             %include("foo.asm")
             push1 2
-            "#,
-        );
+            "#.to_string();
         let expected = nodes![
             Op::from(Push1(Imm::from(1u8))),
             Node::Include(PathBuf::from("foo.asm")),
@@ -348,13 +346,11 @@ mod tests {
 
     #[test]
     fn parse_include_hex() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             push1 1
             %include_hex("foo.hex")
             push1 2
-            "#,
-        );
+            "#.to_string();
         let expected = nodes![
             Op::from(Push1(Imm::from(1u8))),
             Node::IncludeHex(PathBuf::from("foo.hex")),
@@ -365,13 +361,11 @@ mod tests {
 
     #[test]
     fn parse_import() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             push1 1
             %import("foo.asm")
             push1 2
-            "#,
-        );
+            "#.to_string();
         let expected = nodes![
             Op::from(Push1(Imm::from(1u8))),
             Node::Import(PathBuf::from("foo.asm")),
@@ -382,11 +376,9 @@ mod tests {
 
     #[test]
     fn parse_import_extra_argument() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             %import("foo.asm", "bar.asm")
-            "#,
-        );
+            "#.to_string();
         assert!(matches!(
             parse_asm(&asm),
             Err(ParseError::ExtraArgument {
@@ -398,11 +390,9 @@ mod tests {
 
     #[test]
     fn parse_import_missing_argument() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             %import()
-            "#,
-        );
+            "#.to_string();
         assert!(matches!(
             parse_asm(&asm),
             Err(ParseError::MissingArgument {
@@ -415,23 +405,19 @@ mod tests {
 
     #[test]
     fn parse_import_argument_type() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             %import(0x44)
-            "#,
-        );
+            "#.to_string();
         assert_matches!(parse_asm(&asm), Err(ParseError::ArgumentType { .. }))
     }
 
     #[test]
     fn parse_import_spaces() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             push1 1
             %import( "hello.asm" )
             push1 2
-            "#,
-        );
+            "#.to_string();
         let expected = nodes![
             Op::from(Push1(Imm::from(1u8))),
             Node::Import(PathBuf::from("hello.asm")),
@@ -442,13 +428,11 @@ mod tests {
 
     #[test]
     fn parse_push_macro_with_label() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             push1 1
             %push( hello )
             push1 2
-            "#,
-        );
+            "#.to_string();
         let expected = nodes![
             Op::from(Push1(Imm::from(1u8))),
             AbstractOp::Push(Imm::with_label("hello")),
@@ -459,8 +443,7 @@ mod tests {
 
     #[test]
     fn parse_instruction_macro() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             %macro my_macro(foo, bar)
                 gasprice
                 pop
@@ -469,8 +452,7 @@ mod tests {
                 %another_macro()
             %end
             %my_macro(0x42, 10)
-            "#,
-        );
+            "#.to_string();
         let expected = nodes![
             AbstractOp::MacroDefinition(
                 InstructionMacroDefinition {
@@ -498,10 +480,10 @@ mod tests {
             AbstractOp::Macro(InstructionMacroInvocation {
                 name: "my_macro".into(),
                 parameters: vec![
-                    BigInt::from_bytes_be(Sign::Plus, &vec![0x42]).into(),
+                    BigInt::from_bytes_be(Sign::Plus, &[0x42]).into(),
                     BigInt::from_bytes_be(
                         Sign::Plus,
-                        &vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10]
+                        &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10]
                     )
                     .into()
                 ]
@@ -513,14 +495,12 @@ mod tests {
 
     #[test]
     fn parse_expression() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             push1 1+-1
             push1 2*foo
             push1 (1+(2*foo))-(bar/42)
             push1 0x20+0o1+0b10
-            "#,
-        );
+            "#.to_string();
         let expected = nodes![
             Op::from(Push1(Imm::with_expression(Expression::Plus(
                 1.into(),
@@ -556,13 +536,11 @@ mod tests {
 
     #[test]
     fn parse_push_macro_with_expression() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             push1 1
             %push( 1 + 1 )
             push1 2
-            "#,
-        );
+            "#.to_string();
         let expected = nodes![
             Op::from(Push1(Imm::from(1u8))),
             AbstractOp::Push(Imm::with_expression(Expression::Plus(1.into(), 1.into()))),
@@ -573,14 +551,12 @@ mod tests {
 
     #[test]
     fn parse_expression_macro() {
-        let asm = format!(
-            r#"
+        let asm = r#"
             %def foobar()
                 1+2
             %end
             push1 foobar()
-            "#,
-        );
+            "#.to_string();
         let expected = nodes![
             ExpressionMacroDefinition {
                 name: "foobar".into(),
