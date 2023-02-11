@@ -109,6 +109,20 @@ fn instruction_macro_with_two_instructions_per_line() {
 }
 
 #[test]
+fn expression_macro_uint() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["expression-macro", "uint.etk"]))?;
+
+    assert_eq!(
+        output,
+        hex!("60ff7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+    );
+
+    Ok(())
+}
+
+#[test]
 fn every_op() -> Result<(), Error> {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);

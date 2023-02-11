@@ -1,0 +1,5 @@
+%def foobar()
+    0
+%end
+push1 uint8(-1)
+push32 uint256(foobar()-1)

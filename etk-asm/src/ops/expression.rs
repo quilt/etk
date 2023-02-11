@@ -1,5 +1,5 @@
 use super::macros::{ExpressionMacroInvocation, MacroDefinition};
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use snafu::OptionExt;
 use snafu::{Backtrace, Snafu};
 use std::collections::HashMap;
@@ -113,6 +113,9 @@ pub enum Expression {
 
     /// A division operation.
     Divide(Box<Self>, Box<Self>),
+
+    /// A signed to unsigned integer conversion operation.
+    Uint(Box<Self>, usize),
 }
 
 impl Debug for Expression {
@@ -126,6 +129,9 @@ impl Debug for Expression {
             Expression::Times(lhs, rhs) => write!(f, r#"Expression::Times({:?}, {:?})"#, lhs, rhs),
             Expression::Divide(lhs, rhs) => {
                 write!(f, r#"Expression::Divide({:?}, {:?})"#, lhs, rhs)
+            }
+            Expression::Uint(s, bits) => {
+                write!(f, r#"Expression::Uint{}({:?})"#, bits, s)
             }
         }
     }
@@ -141,6 +147,7 @@ impl fmt::Display for Expression {
             Expression::Minus(lhs, rhs) => write!(f, r#"{}-{}"#, lhs, rhs),
             Expression::Times(lhs, rhs) => write!(f, r#"{}*{}"#, lhs, rhs),
             Expression::Divide(lhs, rhs) => write!(f, r#"{}/{}"#, lhs, rhs),
+            Expression::Uint(s, bits) => write!(f, r#"uint{}({})"#, bits, s),
         }
     }
 }
@@ -219,6 +226,17 @@ impl Expression {
                 Expression::Minus(lhs, rhs) => eval(lhs, ctx)? - eval(rhs, ctx)?,
                 Expression::Times(lhs, rhs) => eval(lhs, ctx)? * eval(rhs, ctx)?,
                 Expression::Divide(lhs, rhs) => eval(lhs, ctx)? / eval(rhs, ctx)?,
+                Expression::Uint(expr, bits) => {
+                    let eval = eval(expr, ctx)?;
+                    match eval.sign() {
+                        Sign::Minus => {
+                            let mut bytes = eval.to_signed_bytes_be();
+                            bytes.resize(bits / 8, 0xff);
+                            BigInt::from_bytes_le(Sign::Plus, &bytes)
+                        }
+                        _ => eval,
+                    }
+                }
             };
 
             Ok(ret)
@@ -232,7 +250,7 @@ impl Expression {
     pub fn labels(&self, macros: &MacrosMap) -> Result<Vec<String>, Error> {
         fn dfs(x: &Expression, m: &MacrosMap) -> Result<Vec<String>, Error> {
             match x {
-                Expression::Expression(e) => dfs(e, m),
+                Expression::Expression(e) | Expression::Uint(e, _) => dfs(e, m),
                 Expression::Macro(macro_invocation) => m
                     .get(&macro_invocation.name)
                     .context(UnknownMacro {
@@ -261,7 +279,7 @@ impl Expression {
     pub fn replace_label(&mut self, old: &str, new: &str) {
         fn dfs(x: &mut Expression, old: &str, new: &str) {
             match x {
-                Expression::Expression(e) => dfs(e, new, old),
+                Expression::Expression(e) | Expression::Uint(e, _) => dfs(e, new, old),
                 Expression::Terminal(Terminal::Label(ref mut label)) => {
                     if *label == old {
                         *label = new.to_string();
@@ -290,7 +308,7 @@ impl Expression {
                         *x = expr.clone();
                     }
                 }
-                Expression::Expression(e) => dfs(e, var, expr),
+                Expression::Expression(e) | Expression::Uint(e, _) => dfs(e, var, expr),
                 Expression::Plus(lhs, rhs)
                 | Expression::Minus(lhs, rhs)
                 | Expression::Times(lhs, rhs)

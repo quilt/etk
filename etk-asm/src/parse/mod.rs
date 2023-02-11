@@ -594,4 +594,60 @@ mod tests {
         ];
         assert_eq!(parse_asm(&asm).unwrap(), expected);
     }
+
+    #[test]
+    fn parse_uint() {
+        let asm = r#"
+            push1 uint8(-1)
+            push1 uint8(-2)
+            push32 uint8(-1)
+            push32 uint256(-1)
+        "#;
+        let expected = nodes![
+            Op::from(Push1(Imm::with_expression(Expression::Uint(
+                Box::new(Expression::Terminal(Terminal::Number(BigInt::from(-1)))),
+                8
+            )))),
+            Op::from(Push1(Imm::with_expression(Expression::Uint(
+                Box::new(Expression::Terminal(Terminal::Number(BigInt::from(-2)))),
+                8
+            )))),
+            Op::from(Push32(Imm::with_expression(Expression::Uint(
+                Box::new(Expression::Terminal(Terminal::Number(BigInt::from(-1)))),
+                8
+            )))),
+            Op::from(Push32(Imm::with_expression(Expression::Uint(
+                Box::new(Expression::Terminal(Terminal::Number(BigInt::from(-1)))),
+                256
+            )))),
+        ];
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+    }
+
+    #[test]
+    fn parse_uint_nested() {
+        let asm = r#"
+            %def foobar()
+                -1
+            %end
+            push1 uint8(foobar())
+        "#;
+        let expected = nodes![
+            ExpressionMacroDefinition {
+                name: "foobar".into(),
+                parameters: vec![],
+                content: Imm::with_expression(Expression::Terminal(Terminal::Number(
+                    BigInt::from(-1)
+                ))),
+            },
+            Op::from(Push1(Imm::with_expression(Expression::Uint(
+                Box::new(Expression::Macro(ExpressionMacroInvocation {
+                    name: "foobar".into(),
+                    parameters: vec![]
+                })),
+                8
+            )))),
+        ];
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+    }
 }
