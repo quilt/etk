@@ -403,7 +403,7 @@ dependencies = [
 
 [[package]]
 name = "etk-4byte"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "bincode",
  "brotli",
@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "etk-analyze"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "assert_matches",
  "clap 3.1.18",
@@ -430,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "etk-asm"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "assert_matches",
  "clap 3.1.18",
@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "etk-cli"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "clap 3.1.18",
  "hex",
@@ -459,7 +459,7 @@ dependencies = [
 
 [[package]]
 name = "etk-dasm"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "clap 3.1.18",
  "etk-4byte",
@@ -473,7 +473,7 @@ dependencies = [
 
 [[package]]
 name = "etk-ops"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "educe",
  "indexmap",

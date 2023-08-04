@@ -1,6 +1,6 @@
 [package]
 name = "etk-asm"
-version = "0.3.0-dev"
+version = "0.3.0"
 authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
