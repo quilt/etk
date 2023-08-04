@@ -6,7 +6,7 @@
 mod error {
     use crate::ops::Expression;
     use crate::ParseError;
-    use etk_ops::london::Op;
+    use etk_ops::shanghai::Op;
     use num_bigint::BigInt;
     use snafu::{Backtrace, Snafu};
 
@@ -132,7 +132,7 @@ mod error {
 pub use self::error::Error;
 use crate::ops::expression::{self, Terminal};
 use crate::ops::{self, AbstractOp, Assemble, Expression, Imm, MacroDefinition};
-use etk_ops::london::Op;
+use etk_ops::shanghai::Op;
 use rand::Rng;
 use snafu::OptionExt;
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
@@ -185,7 +185,7 @@ impl From<Vec<u8>> for RawOp {
 /// ```rust
 /// use etk_asm::asm::Assembler;
 /// use etk_asm::ops::AbstractOp;
-/// use etk_ops::london::{Op, GetPc};
+/// use etk_ops::shanghai::{Op, GetPc};
 /// # use etk_asm::asm::Error;
 /// #
 /// # use hex_literal::hex;
@@ -280,6 +280,7 @@ impl Assembler {
                         _ => unreachable!(),
                     }
                 }
+                // bug: if a variable is used when it isn't available, e.g. push1 $size
                 _ => unreachable!(),
             };
         }
@@ -711,7 +712,7 @@ mod tests {
         InstructionMacroDefinition, InstructionMacroInvocation, Terminal,
     };
     use assert_matches::assert_matches;
-    use etk_ops::london::*;
+    use etk_ops::shanghai::*;
     use hex_literal::hex;
     use num_bigint::{BigInt, Sign};
 

@@ -21,7 +21,7 @@ use self::{
 };
 use crate::ast::Node;
 use crate::ops::AbstractOp;
-use etk_ops::london::Op;
+use etk_ops::shanghai::Op;
 use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
 
@@ -86,7 +86,7 @@ mod tests {
         InstructionMacroDefinition, InstructionMacroInvocation, Terminal,
     };
     use assert_matches::assert_matches;
-    use etk_ops::london::*;
+    use etk_ops::shanghai::*;
     use hex_literal::hex;
     use num_bigint::Sign;
     use std::path::PathBuf;
@@ -104,12 +104,14 @@ mod tests {
             pc
             gas
             xor
+            push0
         "#;
         let expected = nodes![
             Op::from(Stop),
             Op::from(GetPc),
             Op::from(Gas),
-            Op::from(Xor)
+            Op::from(Xor),
+            Op::from(Push0)
         ];
         assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }

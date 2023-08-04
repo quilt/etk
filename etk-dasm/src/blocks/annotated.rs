@@ -2,7 +2,7 @@
 //! (ie. stack/memory/storage).
 use crate::sym::{Expr, Var};
 
-use etk_ops::london::*;
+use etk_ops::shanghai::*;
 
 use std::collections::VecDeque;
 
@@ -523,6 +523,7 @@ impl<'a> Annotator<'a> {
                 // No-op
             }
 
+            Op::Push0(_) => stack.push_const(&[0; 1]),
             Op::Push1(Push1(imm)) => stack.push_const(imm),
             Op::Push2(Push2(imm)) => stack.push_const(imm),
             Op::Push3(Push3(imm)) => stack.push_const(imm),
@@ -815,7 +816,6 @@ impl<'a> Annotator<'a> {
             | Op::Invalid5c(_)
             | Op::Invalid5d(_)
             | Op::Invalid5e(_)
-            | Op::Invalid5f(_)
             | Op::InvalidA5(_)
             | Op::InvalidA6(_)
             | Op::InvalidA7(_)

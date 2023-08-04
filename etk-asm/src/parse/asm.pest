@@ -21,7 +21,7 @@ op = @{
 	"jumpi" | "jump" | "pc" | "msize" | "gas" | swap | dup | log |
 	"create2" | "callcode" | "call" | "return" | "delegatecall" | "create" |
 	"staticcall" | "revert" | "selfdestruct" | "byte" | "chainid" | "selfbalance" |
-	"basefee" | "invalid"
+	"basefee" | "invalid" | "push0"
 }
 push = ${ "push" ~  word_size ~ WHITESPACE ~ expression }
 swap = @{ "swap" ~ half_word_size }
