@@ -282,7 +282,7 @@ impl<'a> Annotator<'a> {
         self.stacks.push(last);
     }
 
-    fn annotate_one<'s>(pc: usize, stack: &mut StackWindow<'s>, op: &Op<[u8]>) -> Option<Exit> {
+    fn annotate_one(pc: usize, stack: &mut StackWindow, op: &Op<[u8]>) -> Option<Exit> {
         match op {
             Op::Stop(_) => {
                 return Some(Exit::Terminate);
@@ -930,7 +930,7 @@ impl<'a> Annotator<'a> {
 
             assert!(!op.is_exit());
 
-            pc += op.size() as usize;
+            pc += op.size();
         }
 
         Exit::FallThrough(pc)

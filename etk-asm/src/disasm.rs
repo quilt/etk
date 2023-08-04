@@ -75,7 +75,7 @@ impl<'a> Iterator for Iter<'a> {
         let buffer = &mut self.disassembler.buffer;
         let front = *buffer.front()?;
         let specifier = Op::<()>::from(front);
-        let len = specifier.size() as usize;
+        let len = specifier.size();
         if buffer.len() < len {
             return None;
         }

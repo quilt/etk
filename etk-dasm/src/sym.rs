@@ -521,7 +521,7 @@ impl<'a, 'b> Visit for DisplayVisit<'a, 'b> {
         match op {
             Sym::Const(v) => {
                 // TODO: Technically this should be in decimal, not hex.
-                write!(self.0, "0x{}", hex::encode(&**v))
+                write!(self.0, "0x{}", hex::encode(**v))
             }
             Sym::Var(v) => write!(self.0, "{}", v),
             Sym::AddMod => write!(self.0, "(("),
