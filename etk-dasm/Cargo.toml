@@ -16,11 +16,11 @@ cli = ["clap", "etk-cli", "snafu", "etk-4byte"]
 
 [dependencies]
 hex = "0.4.3"
-etk-ops = { path = "../etk-ops", version = "0.3.0-dev" }
-etk-asm = { path = "../etk-asm", version = "0.3.0-dev" }
+etk-ops = { path = "../etk-ops", version = "0.3.0" }
+etk-asm = { path = "../etk-asm", version = "0.3.0" }
 clap = { optional = true, version = "3.1", features = ["derive"] }
-etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0-dev" }
-etk-4byte = { optional = true, path = "../etk-4byte", version = "0.3.0-dev" }
+etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0" }
+etk-4byte = { optional = true, path = "../etk-4byte", version = "0.3.0" }
 snafu = { optional = true, version = "0.7.1" }
 
 [dev-dependencies]

@@ -17,9 +17,9 @@ cli = ["etk-cli", "etk-asm", "clap", "snafu"]
 [dependencies]
 snafu = { optional = true, version = "0.7.1" }
 clap = { optional = true, version = "3.1", features = ["derive"] }
-etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0-dev" }
-etk-asm = { optional = true, path = "../etk-asm", version = "0.3.0-dev" }
-etk-dasm = { path = "../etk-dasm", version = "0.3.0-dev" }
+etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0" }
+etk-asm = { optional = true, path = "../etk-asm", version = "0.3.0" }
+etk-dasm = { path = "../etk-dasm", version = "0.3.0" }
 z3 = { version = "0.11.2", features = ["static-link-z3"] }
 
 [dependencies.petgraph]
@@ -28,7 +28,7 @@ default-features = false
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-etk-asm = { path = "../etk-asm", version = "0.3.0-dev" }
+etk-asm = { path = "../etk-asm", version = "0.3.0" }
 hex-literal = "0.3.4"
 
 [[bin]]

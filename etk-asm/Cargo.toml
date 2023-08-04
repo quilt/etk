@@ -16,8 +16,8 @@ cli = ["clap", "etk-cli"]
 backtraces = [ "snafu/backtraces", "etk-ops/backtraces" ]
 
 [dependencies]
-etk-ops = { path = "../etk-ops", version = "0.3.0-dev" }
-etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0-dev" }
+etk-ops = { path = "../etk-ops", version = "0.3.0" }
+etk-cli = { optional = true, path = "../etk-cli", version = "0.3.0" }
 hex = "0.4.3"
 num-bigint = "0.4"
 pest = "2.1.3"
