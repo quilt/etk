@@ -1,7 +1,7 @@
 //! A list of EVM instructions with a single point of entry and a single exit.
 use etk_asm::disasm::Offset;
 
-use etk_ops::london::{Op, Operation};
+use etk_ops::shanghai::{Op, Operation};
 
 /// A list of EVM instructions with a single point of entry and a single exit.
 #[derive(Debug, Eq, PartialEq)]
@@ -107,7 +107,7 @@ impl Separator {
 
 #[cfg(test)]
 mod tests {
-    use etk_ops::london::*;
+    use etk_ops::shanghai::*;
 
     use super::*;
 

@@ -2,7 +2,7 @@
 //! (ie. stack/memory/storage).
 use crate::sym::{Expr, Var};
 
-use etk_ops::london::*;
+use etk_ops::shanghai::*;
 
 use std::collections::VecDeque;
 
@@ -282,7 +282,7 @@ impl<'a> Annotator<'a> {
         self.stacks.push(last);
     }
 
-    fn annotate_one<'s>(pc: usize, stack: &mut StackWindow<'s>, op: &Op<[u8]>) -> Option<Exit> {
+    fn annotate_one(pc: usize, stack: &mut StackWindow, op: &Op<[u8]>) -> Option<Exit> {
         match op {
             Op::Stop(_) => {
                 return Some(Exit::Terminate);
@@ -523,6 +523,7 @@ impl<'a> Annotator<'a> {
                 // No-op
             }
 
+            Op::Push0(_) => stack.push_const(&[0; 1]),
             Op::Push1(Push1(imm)) => stack.push_const(imm),
             Op::Push2(Push2(imm)) => stack.push_const(imm),
             Op::Push3(Push3(imm)) => stack.push_const(imm),
@@ -815,7 +816,6 @@ impl<'a> Annotator<'a> {
             | Op::Invalid5c(_)
             | Op::Invalid5d(_)
             | Op::Invalid5e(_)
-            | Op::Invalid5f(_)
             | Op::InvalidA5(_)
             | Op::InvalidA6(_)
             | Op::InvalidA7(_)
@@ -930,7 +930,7 @@ impl<'a> Annotator<'a> {
 
             assert!(!op.is_exit());
 
-            pc += op.size() as usize;
+            pc += op.size();
         }
 
         Exit::FallThrough(pc)

@@ -25,7 +25,7 @@ mod error {
     }
 }
 
-use etk_ops::london::Op;
+use etk_ops::shanghai::Op;
 
 pub use self::error::Error;
 
@@ -75,7 +75,7 @@ impl<'a> Iterator for Iter<'a> {
         let buffer = &mut self.disassembler.buffer;
         let front = *buffer.front()?;
         let specifier = Op::<()>::from(front);
-        let len = specifier.size() as usize;
+        let len = specifier.size();
         if buffer.len() < len {
             return None;
         }
@@ -96,7 +96,7 @@ impl<'a> Iterator for Iter<'a> {
 ///
 /// ## Example
 /// ```rust
-/// use etk_ops::london::{Op, GetPc, Stop};
+/// use etk_ops::shanghai::{Op, GetPc, Stop};
 /// use etk_asm::disasm::Disassembler;
 /// # use etk_asm::disasm::Offset;
 ///
@@ -158,7 +158,7 @@ impl Disassembler {
 
 #[cfg(test)]
 mod tests {
-    use etk_ops::london::*;
+    use etk_ops::shanghai::*;
 
     use hex_literal::hex;
 

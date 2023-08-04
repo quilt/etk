@@ -850,4 +850,5 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
 
 fn main() {
     generate_fork("london").unwrap();
+    generate_fork("shanghai").unwrap();
 }

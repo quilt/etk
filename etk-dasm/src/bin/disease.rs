@@ -65,7 +65,7 @@ fn run() -> Result<(), Error> {
         for op in block.ops {
             let len = op.size();
             let off = Offset::new(offset, DisplayOp(op));
-            offset += len as usize;
+            offset += len;
 
             writeln!(out, "{}", off)?;
         }

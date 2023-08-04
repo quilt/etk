@@ -1,6 +1,6 @@
 use etk_4byte::reverse_selector;
 
-use etk_ops::london::{Op, Operation};
+use etk_ops::shanghai::{Op, Operation};
 
 use std::fmt;
 
@@ -69,7 +69,7 @@ impl fmt::Display for DisplayOp {
 
 #[cfg(test)]
 mod tests {
-    use etk_ops::london::*;
+    use etk_ops::shanghai::*;
 
     use hex_literal::hex;
 

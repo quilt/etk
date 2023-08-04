@@ -294,6 +294,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmake"
+version = "0.1.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a31c789563b815f77f4250caee12365734369f942439b7defd71e18a48197130"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -394,7 +403,7 @@ dependencies = [
 
 [[package]]
 name = "etk-4byte"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "bincode",
  "brotli",
@@ -406,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "etk-analyze"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "assert_matches",
  "clap 3.1.18",
@@ -421,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "etk-asm"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "assert_matches",
  "clap 3.1.18",
@@ -440,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "etk-cli"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "clap 3.1.18",
  "hex",
@@ -450,7 +459,7 @@ dependencies = [
 
 [[package]]
 name = "etk-dasm"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "clap 3.1.18",
  "etk-4byte",
@@ -464,7 +473,7 @@ dependencies = [
 
 [[package]]
 name = "etk-ops"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "educe",
  "indexmap",
@@ -1872,4 +1881,5 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c82dcbc58be4bf1994c520066cb2bd6c3d36aed0fdc57244f34d277421986a6"
 dependencies = [
  "bindgen",
+ "cmake",
 ]

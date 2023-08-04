@@ -1,0 +1,903 @@
+[Stop]
+code = 0x00
+mnemonic = "stop"
+pushes = 0
+pops = 0
+exits = true
+
+[Add]
+code = 0x01
+mnemonic = "add"
+pushes = 1
+pops = 2
+
+[Mul]
+code = 0x02
+mnemonic = "mul"
+pushes = 1
+pops = 2
+
+[Sub]
+code = 0x03
+mnemonic = "sub"
+pushes = 1
+pops = 2
+
+[Div]
+code = 0x04
+mnemonic = "div"
+pushes = 1
+pops = 2
+
+[SDiv]
+code = 0x05
+mnemonic = "sdiv"
+pushes = 1
+pops = 2
+
+[Mod]
+code = 0x06
+mnemonic = "mod"
+pushes = 1
+pops = 2
+
+[SMod]
+code = 0x07
+mnemonic = "smod"
+pushes = 1
+pops = 2
+
+[AddMod]
+code = 0x08
+mnemonic = "addmod"
+pushes = 1
+pops = 3
+
+[MulMod]
+code = 0x09
+mnemonic = "mulmod"
+pushes = 1
+pops = 3
+
+[Exp]
+code = 0x0a
+mnemonic = "exp"
+pushes = 1
+pops = 2
+
+[SignExtend]
+code = 0x0b
+mnemonic = "signextend"
+pushes = 1
+pops = 2
+
+[Lt]
+code = 0x10
+mnemonic = "lt"
+pushes = 1
+pops = 2
+
+[Gt]
+code = 0x11
+mnemonic = "gt"
+pushes = 1
+pops = 2
+
+[SLt]
+code = 0x12
+mnemonic = "slt"
+pushes = 1
+pops = 2
+
+[SGt]
+code = 0x13
+mnemonic = "sgt"
+pushes = 1
+pops = 2
+
+[Eq]
+code = 0x14
+mnemonic = "eq"
+pushes = 1
+pops = 2
+
+[IsZero]
+code = 0x15
+mnemonic = "iszero"
+pushes = 1
+pops = 1
+
+[And]
+code = 0x16
+mnemonic = "and"
+pushes = 1
+pops = 2
+
+[Or]
+code = 0x17
+mnemonic = "or"
+pushes = 1
+pops = 2
+
+[Xor]
+code = 0x18
+mnemonic = "xor"
+pushes = 1
+pops = 2
+
+[Not]
+code = 0x19
+mnemonic = "not"
+pushes = 1
+pops = 1
+
+[Byte]
+code = 0x1a
+mnemonic = "byte"
+pushes = 1
+pops = 2
+
+[Shl]
+code = 0x1b
+mnemonic = "shl"
+pushes = 1
+pops = 2
+
+[Shr]
+code = 0x1c
+mnemonic = "shr"
+pushes = 1
+pops = 2
+
+[Sar]
+code = 0x1d
+mnemonic = "sar"
+pushes = 1
+pops = 2
+
+[Keccak256]
+code = 0x20
+mnemonic = "keccak256"
+pushes = 1
+pops = 2
+
+[Address]
+code = 0x30
+mnemonic = "address"
+pushes = 1
+pops = 0
+
+[Balance]
+code = 0x31
+mnemonic = "balance"
+pushes = 1
+pops = 1
+
+[Origin]
+code = 0x32
+mnemonic = "origin"
+pushes = 1
+pops = 0
+
+[Caller]
+code = 0x33
+mnemonic = "caller"
+pushes = 1
+pops = 0
+
+[CallValue]
+code = 0x34
+mnemonic = "callvalue"
+pushes = 1
+pops = 0
+
+[CallDataLoad]
+code = 0x35
+mnemonic = "calldataload"
+pushes = 1
+pops = 1
+
+[CallDataSize]
+code = 0x36
+mnemonic = "calldatasize"
+pushes = 1
+pops = 0
+
+[CallDataCopy]
+code = 0x37
+mnemonic = "calldatacopy"
+pushes = 0
+pops = 3
+
+[CodeSize]
+code = 0x38
+mnemonic = "codesize"
+pushes = 1
+pops = 0
+
+[CodeCopy]
+code = 0x39
+mnemonic = "codecopy"
+pushes = 0
+pops = 3
+
+[GasPrice]
+code = 0x3a
+mnemonic = "gasprice"
+pushes = 1
+pops = 0
+
+[ExtCodeSize]
+code = 0x3b
+mnemonic = "extcodesize"
+pushes = 1
+pops = 1
+
+[ExtCodeCopy]
+code = 0x3c
+mnemonic = "extcodecopy"
+pushes = 0
+pops = 4
+
+[ReturnDataSize]
+code = 0x3d
+mnemonic = "returndatasize"
+pushes = 1
+pops = 0
+
+[ReturnDataCopy]
+code = 0x3e
+mnemonic = "returndatacopy"
+pushes = 0
+pops = 3
+
+[ExtCodeHash]
+code = 0x3f
+mnemonic = "extcodehash"
+pushes = 1
+pops = 1
+
+[BlockHash]
+code = 0x40
+mnemonic = "blockhash"
+pushes = 1
+pops = 1
+
+[Coinbase]
+code = 0x41
+mnemonic = "coinbase"
+pushes = 1
+pops = 0
+
+[Timestamp]
+code = 0x42
+mnemonic = "timestamp"
+pushes = 1
+pops = 0
+
+[Number]
+code = 0x43
+mnemonic = "number"
+pushes = 1
+pops = 0
+
+[Difficulty]
+code = 0x44
+mnemonic = "difficulty"
+pushes = 1
+pops = 0
+
+[GasLimit]
+code = 0x45
+mnemonic = "gaslimit"
+pushes = 1
+pops = 0
+
+[ChainId]
+code = 0x46
+mnemonic = "chainid"
+pushes = 1
+pops = 0
+
+[SelfBalance]
+code = 0x47
+mnemonic = "selfbalance"
+pushes = 1
+pops = 0
+
+[BaseFee]
+code = 0x48
+mnemonic = "basefee"
+pushes = 1
+pops = 0
+
+[Pop]
+code = 0x50
+mnemonic = "pop"
+pushes = 0
+pops = 1
+
+[MLoad]
+code = 0x51
+mnemonic = "mload"
+pushes = 1
+pops = 1
+
+[MStore]
+code = 0x52
+mnemonic = "mstore"
+pushes = 0
+pops = 2
+
+[MStore8]
+code = 0x53
+mnemonic = "mstore8"
+pushes = 1
+pops = 2
+
+[SLoad]
+code = 0x54
+mnemonic = "sload"
+pushes = 1
+pops = 1
+
+[SStore]
+code = 0x55
+mnemonic = "sstore"
+pushes = 0
+pops = 2
+
+[Jump]
+code = 0x56
+mnemonic = "jump"
+pushes = 0
+pops = 1
+jump = true
+
+[JumpI]
+code = 0x57
+mnemonic = "jumpi"
+pushes = 0
+pops = 2
+jump = true
+
+[GetPc]
+code = 0x58
+mnemonic = "pc"
+pushes = 1
+pops = 0
+
+[MSize]
+code = 0x59
+mnemonic = "msize"
+pushes = 1
+pops = 0
+
+[Gas]
+code = 0x5a
+mnemonic = "gas"
+pushes = 1
+pops = 0
+
+[JumpDest]
+code = 0x5b
+mnemonic = "jumpdest"
+pushes = 0
+pops = 0
+jump_target = true
+
+[Push0]
+code = 0x5f
+mnemonic = "push0"
+extra_len = 0
+pushes = 1
+pops = 0
+
+[Push1]
+code = 0x60
+mnemonic = "push1"
+extra_len = 1
+pushes = 1
+pops = 0
+
+[Push2]
+code = 0x61
+mnemonic = "push2"
+extra_len = 2
+pushes = 1
+pops = 0
+
+[Push3]
+code = 0x62
+mnemonic = "push3"
+extra_len = 3
+pushes = 1
+pops = 0
+
+[Push4]
+code = 0x63
+mnemonic = "push4"
+extra_len = 4
+pushes = 1
+pops = 0
+
+[Push5]
+code = 0x64
+mnemonic = "push5"
+extra_len = 5
+pushes = 1
+pops = 0
+
+[Push6]
+code = 0x65
+mnemonic = "push6"
+extra_len = 6
+pushes = 1
+pops = 0
+
+[Push7]
+code = 0x66
+mnemonic = "push7"
+extra_len = 7
+pushes = 1
+pops = 0
+
+[Push8]
+code = 0x67
+mnemonic = "push8"
+extra_len = 8
+pushes = 1
+pops = 0
+
+[Push9]
+code = 0x68
+mnemonic = "push9"
+extra_len = 9
+pushes = 1
+pops = 0
+
+[Push10]
+code = 0x69
+mnemonic = "push10"
+extra_len = 10
+pushes = 1
+pops = 0
+
+[Push11]
+code = 0x6a
+mnemonic = "push11"
+extra_len = 11
+pushes = 1
+pops = 0
+
+[Push12]
+code = 0x6b
+mnemonic = "push12"
+extra_len = 12
+pushes = 1
+pops = 0
+
+[Push13]
+code = 0x6c
+mnemonic = "push13"
+extra_len = 13
+pushes = 1
+pops = 0
+
+[Push14]
+code = 0x6d
+mnemonic = "push14"
+extra_len = 14
+pushes = 1
+pops = 0
+
+[Push15]
+code = 0x6e
+mnemonic = "push15"
+extra_len = 15
+pushes = 1
+pops = 0
+
+[Push16]
+code = 0x6f
+mnemonic = "push16"
+extra_len = 16
+pushes = 1
+pops = 0
+
+[Push17]
+code = 0x70
+mnemonic = "push17"
+extra_len = 17
+pushes = 1
+pops = 0
+
+[Push18]
+code = 0x71
+mnemonic = "push18"
+extra_len = 18
+pushes = 1
+pops = 0
+
+[Push19]
+code = 0x72
+mnemonic = "push19"
+extra_len = 19
+pushes = 1
+pops = 0
+
+[Push20]
+code = 0x73
+mnemonic = "push20"
+extra_len = 20
+pushes = 1
+pops = 0
+
+[Push21]
+code = 0x74
+mnemonic = "push21"
+extra_len = 21
+pushes = 1
+pops = 0
+
+[Push22]
+code = 0x75
+mnemonic = "push22"
+extra_len = 22
+pushes = 1
+pops = 0
+
+[Push23]
+code = 0x76
+mnemonic = "push23"
+extra_len = 23
+pushes = 1
+pops = 0
+
+[Push24]
+code = 0x77
+mnemonic = "push24"
+extra_len = 24
+pushes = 1
+pops = 0
+
+[Push25]
+code = 0x78
+mnemonic = "push25"
+extra_len = 25
+pushes = 1
+pops = 0
+
+[Push26]
+code = 0x79
+mnemonic = "push26"
+extra_len = 26
+pushes = 1
+pops = 0
+
+[Push27]
+code = 0x7a
+mnemonic = "push27"
+extra_len = 27
+pushes = 1
+pops = 0
+
+[Push28]
+code = 0x7b
+mnemonic = "push28"
+extra_len = 28
+pushes = 1
+pops = 0
+
+[Push29]
+code = 0x7c
+mnemonic = "push29"
+extra_len = 29
+pushes = 1
+pops = 0
+
+[Push30]
+code = 0x7d
+mnemonic = "push30"
+extra_len = 30
+pushes = 1
+pops = 0
+
+[Push31]
+code = 0x7e
+mnemonic = "push31"
+extra_len = 31
+pushes = 1
+pops = 0
+
+[Push32]
+code = 0x7f
+mnemonic = "push32"
+extra_len = 32
+pushes = 1
+pops = 0
+
+[Dup1]
+code = 0x80
+mnemonic = "dup1"
+pushes = 2
+pops = 1
+
+[Dup2]
+code = 0x81
+mnemonic = "dup2"
+pushes = 3
+pops = 2
+
+[Dup3]
+code = 0x82
+mnemonic = "dup3"
+pushes = 4
+pops = 3
+
+[Dup4]
+code = 0x83
+mnemonic = "dup4"
+pushes = 5
+pops = 4
+
+[Dup5]
+code = 0x84
+mnemonic = "dup5"
+pushes = 6
+pops = 5
+
+[Dup6]
+code = 0x85
+mnemonic = "dup6"
+pushes = 7
+pops = 6
+
+[Dup7]
+code = 0x86
+mnemonic = "dup7"
+pushes = 8
+pops = 7
+
+[Dup8]
+code = 0x87
+mnemonic = "dup8"
+pushes = 9
+pops = 8
+
+[Dup9]
+code = 0x88
+mnemonic = "dup9"
+pushes = 10
+pops = 9
+
+[Dup10]
+code = 0x89
+mnemonic = "dup10"
+pushes = 11
+pops = 10
+
+[Dup11]
+code = 0x8a
+mnemonic = "dup11"
+pushes = 12
+pops = 11
+
+[Dup12]
+code = 0x8b
+mnemonic = "dup12"
+pushes = 13
+pops = 12
+
+[Dup13]
+code = 0x8c
+mnemonic = "dup13"
+pushes = 14
+pops = 13
+
+[Dup14]
+code = 0x8d
+mnemonic = "dup14"
+pushes = 15
+pops = 14
+
+[Dup15]
+code = 0x8e
+mnemonic = "dup15"
+pushes = 16
+pops = 15
+
+[Dup16]
+code = 0x8f
+mnemonic = "dup16"
+pushes = 17
+pops = 16
+
+[Swap1]
+code = 0x90
+mnemonic = "swap1"
+pushes = 2
+pops = 2
+
+[Swap2]
+code = 0x91
+mnemonic = "swap2"
+pushes = 3
+pops = 3
+
+[Swap3]
+code = 0x92
+mnemonic = "swap3"
+pushes = 4
+pops = 4
+
+[Swap4]
+code = 0x93
+mnemonic = "swap4"
+pushes = 5
+pops = 5
+
+[Swap5]
+code = 0x94
+mnemonic = "swap5"
+pushes = 6
+pops = 6
+
+[Swap6]
+code = 0x95
+mnemonic = "swap6"
+pushes = 7
+pops = 7
+
+[Swap7]
+code = 0x96
+mnemonic = "swap7"
+pushes = 8
+pops = 8
+
+[Swap8]
+code = 0x97
+mnemonic = "swap8"
+pushes = 9
+pops = 9
+
+[Swap9]
+code = 0x98
+mnemonic = "swap9"
+pushes = 10
+pops = 10
+
+[Swap10]
+code = 0x99
+mnemonic = "swap10"
+pushes = 11
+pops = 11
+
+[Swap11]
+code = 0x9a
+mnemonic = "swap11"
+pushes = 12
+pops = 12
+
+[Swap12]
+code = 0x9b
+mnemonic = "swap12"
+pushes = 13
+pops = 13
+
+[Swap13]
+code = 0x9c
+mnemonic = "swap13"
+pushes = 14
+pops = 14
+
+[Swap14]
+code = 0x9d
+mnemonic = "swap14"
+pushes = 15
+pops = 15
+
+[Swap15]
+code = 0x9e
+mnemonic = "swap15"
+pushes = 16
+pops = 16
+
+[Swap16]
+code = 0x9f
+mnemonic = "swap16"
+pushes = 17
+pops = 17
+
+[Log0]
+code = 0xa0
+mnemonic = "log0"
+pushes = 2
+pops = 2
+
+[Log1]
+code = 0xa1
+mnemonic = "log1"
+pushes = 3
+pops = 3
+
+[Log2]
+code = 0xa2
+mnemonic = "log2"
+pushes = 4
+pops = 4
+
+[Log3]
+code = 0xa3
+mnemonic = "log3"
+pushes = 5
+pops = 5
+
+[Log4]
+code = 0xa4
+mnemonic = "log4"
+pushes = 6
+pops = 6
+
+[Create]
+code = 0xf0
+mnemonic = "create"
+pushes = 1
+pops = 3
+
+[Call]
+code = 0xf1
+mnemonic = "call"
+pushes = 1
+pops = 7
+
+[CallCode]
+code = 0xf2
+mnemonic = "callcode"
+pushes = 1
+pops = 7
+
+[Return]
+code = 0xf3
+mnemonic = "return"
+pushes = 0
+pops = 2
+exits = true
+
+[DelegateCall]
+code = 0xf4
+mnemonic = "delegatecall"
+pushes = 1
+pops = 6
+
+[Create2]
+code = 0xf5
+mnemonic = "create2"
+pushes = 1
+pops = 4
+
+[StaticCall]
+code = 0xfa
+mnemonic = "staticcall"
+pushes = 1
+pops = 6
+
+[Revert]
+code = 0xfd
+mnemonic = "revert"
+pushes = 0
+pops = 2
+exits = true
+
+[Invalid]
+code = 0xfe
+mnemonic = "invalid"
+pushes = 0
+pops = 0
+exits = true
+
+[SelfDestruct]
+code = 0xff
+mnemonic = "selfdestruct"
+pushes = 0
+pops = 2
