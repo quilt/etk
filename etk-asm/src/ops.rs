@@ -2,7 +2,7 @@
 
 mod error {
     use super::expression;
-    use etk_ops::shanghai::Op;
+    use etk_ops::cancun::Op;
     use num_bigint::BigInt;
     use snafu::{Backtrace, Snafu};
 
@@ -43,7 +43,7 @@ mod types;
 
 pub(crate) use self::error::Error;
 
-use etk_ops::shanghai::{Op, Operation, Push32};
+use etk_ops::cancun::{Op, Operation, Push32};
 
 pub use self::error::UnknownSpecifierError;
 pub use self::expression::{Context, Expression, Terminal};

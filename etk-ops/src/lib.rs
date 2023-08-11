@@ -24,6 +24,11 @@ pub mod shanghai {
     include!(concat!(env!("OUT_DIR"), "/shanghai.rs"));
 }
 
+pub mod cancun {
+    //! Instructions available in the Cancun hard fork.
+    include!(concat!(env!("OUT_DIR"), "/cancun.rs"));
+}
+
 /// Error that can occur when parsing an operation from a string.
 #[derive(Debug, Snafu)]
 pub struct FromStrError {

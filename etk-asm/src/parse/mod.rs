@@ -21,7 +21,7 @@ use self::{
 };
 use crate::ast::Node;
 use crate::ops::AbstractOp;
-use etk_ops::shanghai::Op;
+use etk_ops::cancun::Op;
 use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
 
@@ -86,7 +86,7 @@ mod tests {
         InstructionMacroDefinition, InstructionMacroInvocation, Terminal,
     };
     use assert_matches::assert_matches;
-    use etk_ops::shanghai::*;
+    use etk_ops::cancun::*;
     use hex_literal::hex;
     use num_bigint::Sign;
     use std::path::PathBuf;
