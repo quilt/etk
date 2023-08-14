@@ -25,7 +25,7 @@ mod error {
     }
 }
 
-use etk_ops::shanghai::Op;
+use etk_ops::cancun::Op;
 
 pub use self::error::Error;
 
@@ -96,7 +96,7 @@ impl<'a> Iterator for Iter<'a> {
 ///
 /// ## Example
 /// ```rust
-/// use etk_ops::shanghai::{Op, GetPc, Stop};
+/// use etk_ops::cancun::{Op, GetPc, Stop};
 /// use etk_asm::disasm::Disassembler;
 /// # use etk_asm::disasm::Offset;
 ///
@@ -158,7 +158,7 @@ impl Disassembler {
 
 #[cfg(test)]
 mod tests {
-    use etk_ops::shanghai::*;
+    use etk_ops::cancun::*;
 
     use hex_literal::hex;
 

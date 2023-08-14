@@ -2,7 +2,7 @@
 //! (ie. stack/memory/storage).
 use crate::sym::{Expr, Var};
 
-use etk_ops::shanghai::*;
+use etk_ops::cancun::*;
 
 use std::collections::VecDeque;
 
@@ -522,6 +522,12 @@ impl<'a> Annotator<'a> {
             Op::JumpDest(_) => {
                 // No-op
             }
+            Op::MCopy(_) => {
+                let _dest_offset = stack.pop();
+                let _offset = stack.pop();
+                let _len = stack.pop();
+                // TODO: Set memory
+            }
 
             Op::Push0(_) => stack.push_const(&[0; 1]),
             Op::Push1(Push1(imm)) => stack.push_const(imm),
@@ -815,7 +821,6 @@ impl<'a> Annotator<'a> {
             | Op::Invalid4f(_)
             | Op::Invalid5c(_)
             | Op::Invalid5d(_)
-            | Op::Invalid5e(_)
             | Op::InvalidA5(_)
             | Op::InvalidA6(_)
             | Op::InvalidA7(_)
