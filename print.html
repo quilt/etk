@@ -309,7 +309,7 @@ op = @{
 	&quot;jumpi&quot; | &quot;jump&quot; | &quot;pc&quot; | &quot;msize&quot; | &quot;gas&quot; | swap | dup | log |
 	&quot;create2&quot; | &quot;callcode&quot; | &quot;call&quot; | &quot;return&quot; | &quot;delegatecall&quot; | &quot;create&quot; |
 	&quot;staticcall&quot; | &quot;revert&quot; | &quot;selfdestruct&quot; | &quot;byte&quot; | &quot;chainid&quot; | &quot;selfbalance&quot; |
-	&quot;basefee&quot; | &quot;invalid&quot; | &quot;push0&quot;
+	&quot;basefee&quot; | &quot;invalid&quot; | &quot;push0&quot; | &quot;mcopy&quot;
 }
 push = ${ &quot;push&quot; ~  word_size ~ WHITESPACE ~ expression }
 swap = @{ &quot;swap&quot; ~ half_word_size }
@@ -458,6 +458,7 @@ pc
 msize
 gas
 jumpdest
+mcopy
 
 push1 0xAA
 push2 0xAABB
