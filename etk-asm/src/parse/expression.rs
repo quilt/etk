@@ -40,6 +40,13 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<Expression, ParseError> {
                     .into()
             }
             Rule::label => Terminal::Label(txt.to_string()).into(),
+            Rule::uint => {
+                let num_bits: usize = txt[4..txt.find("(").unwrap()].parse().unwrap();
+                Expression::Uint(
+                    Box::new(climber.climb(pair.into_inner(), primary, infix)),
+                    num_bits,
+                )
+            }
             Rule::selector => parse_selector(pair, 4),
             Rule::topic => parse_selector(pair, 32),
             Rule::expression_macro => macros::parse_expression_macro(pair).unwrap(),
