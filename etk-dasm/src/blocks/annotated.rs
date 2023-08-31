@@ -2,7 +2,7 @@
 //! (ie. stack/memory/storage).
 use crate::sym::{Expr, Var};
 
-use etk_ops::cancun::*;
+use etk_ops::prague::*;
 
 use std::collections::VecDeque;
 
@@ -659,6 +659,20 @@ impl<'a> Annotator<'a> {
                 let _topic3 = stack.pop();
             }
 
+            Op::Callf(Callf(imm)) => {
+                // Return stack:
+                //  (
+                //    code_section_index (imm) = current_section_index,
+                //    offset = PC_post_instruction,
+                //    stack_height = data_stack.height - types[code_section_index].inputs
+                //  )
+                // PC = 0;
+            }
+
+            Op::Retf(_) => {
+                // Pops an item from return stack and sets `current_section_index` and `PC` to values from this item.
+            }
+
             Op::Swap1(_) => stack.swap(1),
             Op::Swap2(_) => stack.swap(2),
             Op::Swap3(_) => stack.swap(3),
@@ -883,8 +897,6 @@ impl<'a> Annotator<'a> {
             | Op::InvalidE0(_)
             | Op::InvalidE1(_)
             | Op::InvalidE2(_)
-            | Op::InvalidE3(_)
-            | Op::InvalidE4(_)
             | Op::InvalidE5(_)
             | Op::InvalidE6(_)
             | Op::InvalidE7(_)

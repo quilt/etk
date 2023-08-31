@@ -1,5 +1,5 @@
 use crate::ops::{Abstract, AbstractOp, ExpressionMacroDefinition, InstructionMacroDefinition};
-use etk_ops::cancun::Op;
+use etk_ops::prague::Op;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq)]
