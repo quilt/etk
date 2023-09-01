@@ -1,7 +1,10 @@
 [package]
 name = "etk-dasm"
 version = "0.4.0-dev"
-authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
+authors = [
+    "Sam Wilson <sam.wilson@mesh.xyz>",
+    "lightclient <lightclient@protonmail.com>",
+]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 description = "EVM Toolkit disassembler"
@@ -9,7 +12,11 @@ homepage = "https://quilt.github.io/etk"
 repository = "https://github.com/quilt/etk"
 readme = "README.md"
 keywords = ["etk", "ethereum", "disassembler"]
-categories = ["cryptography::cryptocurrencies", "command-line-utilities", "development-tools"]
+categories = [
+    "cryptography::cryptocurrencies",
+    "command-line-utilities",
+    "development-tools",
+]
 
 [features]
 cli = ["clap", "etk-cli", "snafu", "etk-4byte"]

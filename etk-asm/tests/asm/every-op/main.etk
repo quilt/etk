@@ -138,6 +138,9 @@ log2
 log3
 log4
 
+dupn 0xAABBCCDDEEFF0011
+swapn 0xAABBCCDDEEFF0011
+
 create
 call
 callcode

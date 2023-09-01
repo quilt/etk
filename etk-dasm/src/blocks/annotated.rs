@@ -2,7 +2,7 @@
 //! (ie. stack/memory/storage).
 use crate::sym::{Expr, Var};
 
-use etk_ops::cancun::*;
+use etk_ops::prague::*;
 
 use std::collections::VecDeque;
 
@@ -659,6 +659,12 @@ impl<'a> Annotator<'a> {
                 let _topic3 = stack.pop();
             }
 
+            Op::DupN(DupN(imm)) => {
+                let arg = stack.peek(usize::from_be_bytes(*imm)).clone();
+                stack.push(arg)
+            }
+            Op::SwapN(SwapN(imm)) => stack.swap(usize::from_be_bytes(*imm)),
+
             Op::Swap1(_) => stack.swap(1),
             Op::Swap2(_) => stack.swap(2),
             Op::Swap3(_) => stack.swap(3),
@@ -837,8 +843,6 @@ impl<'a> Annotator<'a> {
             | Op::InvalidB2(_)
             | Op::InvalidB3(_)
             | Op::InvalidB4(_)
-            | Op::InvalidB5(_)
-            | Op::InvalidB6(_)
             | Op::InvalidB7(_)
             | Op::InvalidB8(_)
             | Op::InvalidB9(_)

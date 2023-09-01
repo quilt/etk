@@ -3,7 +3,7 @@
 ///////////////////////
 program = _{ SOI ~ inner ~ EOI }
 inner = _{ NEWLINE* ~ (stmt ~ (NEWLINE+|";"))* ~ stmt? }
-stmt = _{ label_definition | builtin | local_macro | push | op }
+stmt = _{ label_definition | builtin | local_macro | push | swapn | dupn | op}
 
 //////////////////////
 // opcode mnemonics //
@@ -21,11 +21,13 @@ op = @{
 	"jumpi" | "jump" | "pc" | "msize" | "gas" | swap | dup | log |
 	"create2" | "callcode" | "call" | "return" | "delegatecall" | "create" |
 	"staticcall" | "revert" | "selfdestruct" | "byte" | "chainid" | "selfbalance" |
-	"basefee" | "invalid" | "push0" | "mcopy"
+	"basefee" | "invalid" | "push0" | "mcopy" 
 }
 push = ${ "push" ~  word_size ~ WHITESPACE ~ expression }
 swap = @{ "swap" ~ half_word_size }
 dup  = @{ "dup" ~ half_word_size }
+swapn = ${ "swapn" ~ WHITESPACE ~ expression }
+dupn = ${ "dupn" ~ WHITESPACE ~ expression }
 log = @{ "log" ~ '0'..'4' }
 
 word_size = @{ ('1'..'2' ~ '0'..'9') | ("3" ~ '0'..'2') | '1'..'9' }
