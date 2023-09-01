@@ -2,7 +2,7 @@
 //! (ie. stack/memory/storage).
 use crate::sym::{Expr, Var};
 
-use etk_ops::cancun::*;
+use etk_ops::prague::*;
 
 use std::collections::VecDeque;
 
