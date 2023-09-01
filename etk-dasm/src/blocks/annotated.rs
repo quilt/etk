@@ -659,19 +659,11 @@ impl<'a> Annotator<'a> {
                 let _topic3 = stack.pop();
             }
 
-            Op::Callf(Callf(imm)) => {
-                // Return stack:
-                //  (
-                //    code_section_index (imm) = current_section_index,
-                //    offset = PC_post_instruction,
-                //    stack_height = data_stack.height - types[code_section_index].inputs
-                //  )
-                // PC = 0;
+            Op::DupN(DupN(imm)) => {
+                let arg = stack.peek(usize::from_be_bytes(*imm)).clone();
+                stack.push(arg)
             }
-
-            Op::Retf(_) => {
-                // Pops an item from return stack and sets `current_section_index` and `PC` to values from this item.
-            }
+            Op::SwapN(SwapN(imm)) => stack.swap(usize::from_be_bytes(*imm)),
 
             Op::Swap1(_) => stack.swap(1),
             Op::Swap2(_) => stack.swap(2),
@@ -851,8 +843,6 @@ impl<'a> Annotator<'a> {
             | Op::InvalidB2(_)
             | Op::InvalidB3(_)
             | Op::InvalidB4(_)
-            | Op::InvalidB5(_)
-            | Op::InvalidB6(_)
             | Op::InvalidB7(_)
             | Op::InvalidB8(_)
             | Op::InvalidB9(_)
@@ -897,6 +887,8 @@ impl<'a> Annotator<'a> {
             | Op::InvalidE0(_)
             | Op::InvalidE1(_)
             | Op::InvalidE2(_)
+            | Op::InvalidE3(_)
+            | Op::InvalidE4(_)
             | Op::InvalidE5(_)
             | Op::InvalidE6(_)
             | Op::InvalidE7(_)

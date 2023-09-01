@@ -21,7 +21,7 @@ use self::{
 };
 use crate::ast::Node;
 use crate::ops::AbstractOp;
-use etk_ops::prague::Op;
+use etk_ops::prague::{DupN, Op, SwapN};
 use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
 
@@ -48,6 +48,7 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
             AbstractOp::Label(pair.into_inner().next().unwrap().as_str().to_string())
         }
         Rule::push => parse_push(pair)?,
+        Rule::swapn | Rule::dupn => parse_swapn_dupn(pair)?,
         Rule::op => {
             let spec: Op<()> = pair.as_str().parse().unwrap();
             let op = Op::new(spec).unwrap();
@@ -76,6 +77,20 @@ fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     }
 
     Ok(AbstractOp::Op(spec.with(expr).unwrap()))
+}
+
+fn parse_swapn_dupn(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+    let rule = pair.as_rule();
+    let mut pair = pair.into_inner();
+    let n = expression::parse(pair.next().unwrap())?;
+
+    let spec = match rule {
+        Rule::swapn => Op::SwapN(SwapN(n.try_into().unwrap())),
+        Rule::dupn => Op::DupN(DupN(n.try_into().unwrap())),
+        _ => unreachable!(),
+    };
+
+    Ok(AbstractOp::Op(spec))
 }
 
 #[cfg(test)]

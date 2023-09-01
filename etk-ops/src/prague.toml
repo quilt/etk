@@ -845,16 +845,17 @@ mnemonic = "log4"
 pushes = 6
 pops = 6
 
-[Callf]
-code = 0xe3
-mnemonic = "callf"
-extra_len = 16
-pushes = 0
+[DupN]
+code = 0xb5
+mnemonic = "dupn"
+extra_len = 8
+pushes = 1
 pops = 0
 
-[Retf]
-code = 0xe4
-mnemonic = "retf"
+[SwapN]
+code = 0xb6
+mnemonic = "swapn"
+extra_len = 8
 pushes = 0
 pops = 0
 
