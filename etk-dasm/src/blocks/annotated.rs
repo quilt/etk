@@ -2,7 +2,7 @@
 //! (ie. stack/memory/storage).
 use crate::sym::{Expr, Var};
 
-use etk_ops::cancun::*;
+use etk_ops::prague::*;
 
 use std::collections::VecDeque;
 
@@ -659,6 +659,42 @@ impl<'a> Annotator<'a> {
                 let _topic3 = stack.pop();
             }
 
+            Op::RJump(RJump(imm)) => {
+                let dest = Expr::pc(pc as u16).add(&Expr::constant(imm));
+                return Some(Exit::Unconditional(dest));
+            }
+
+            Op::RJumpI(RJumpI(imm)) => {
+                let when_false = pc + 1;
+                let when_true = Expr::pc(pc as u16).add(&Expr::constant(imm));
+                let condition = stack.pop();
+                return Some(Exit::Branch {
+                    when_false,
+                    when_true,
+                    condition,
+                });
+            }
+
+            Op::RJumpV(RJumpV(imm)) => {
+                let max_index = &Expr::constant(&imm[0..8]);
+                let relative_offset = &Expr::constant(&imm[8..16]);
+
+                let case = stack.pop();
+
+                let when_false = pc + 1;
+
+                let table_position = case.mul(&Expr::constant([32])); // case as postition in table
+                let relative_jump = table_position.add(relative_offset); // relative_offset[case]
+                let when_true = relative_jump.add(&Expr::pc(pc as u16)); // pc + relative_offset[case]
+
+                let condition = Expr::gt(&case, max_index);
+                return Some(Exit::Branch {
+                    when_false,
+                    when_true,
+                    condition,
+                });
+            }
+
             Op::Swap1(_) => stack.swap(1),
             Op::Swap2(_) => stack.swap(2),
             Op::Swap3(_) => stack.swap(3),
@@ -880,9 +916,6 @@ impl<'a> Annotator<'a> {
             | Op::InvalidDd(_)
             | Op::InvalidDe(_)
             | Op::InvalidDf(_)
-            | Op::InvalidE0(_)
-            | Op::InvalidE1(_)
-            | Op::InvalidE2(_)
             | Op::InvalidE3(_)
             | Op::InvalidE4(_)
             | Op::InvalidE5(_)

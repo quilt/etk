@@ -21,7 +21,7 @@ use self::{
 };
 use crate::ast::Node;
 use crate::ops::AbstractOp;
-use etk_ops::cancun::Op;
+use etk_ops::prague::{Op, RJump, RJumpI, RJumpV};
 use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
 
@@ -48,6 +48,7 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
             AbstractOp::Label(pair.into_inner().next().unwrap().as_str().to_string())
         }
         Rule::push => parse_push(pair)?,
+        Rule::relative_jump => parse_relative_jump(pair)?,
         Rule::op => {
             let spec: Op<()> = pair.as_str().parse().unwrap();
             let op = Op::new(spec).unwrap();
@@ -78,6 +79,23 @@ fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     Ok(AbstractOp::Op(spec.with(expr).unwrap()))
 }
 
+fn parse_relative_jump(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+    let pair = pair.into_inner().next().unwrap();
+
+    let mut inner_pair = pair.clone().into_inner();
+    let operand = inner_pair.next().unwrap();
+    let expr = expression::parse(operand)?;
+
+    let spec = match pair.as_rule() {
+        Rule::rjump => Op::RJump(RJump(expr.try_into().unwrap())),
+        Rule::rjumpi => Op::RJumpI(RJumpI(expr.try_into().unwrap())),
+        Rule::rjumpv => Op::RJumpV(RJumpV(expr.try_into().unwrap())),
+        _ => unreachable!(),
+    };
+
+    Ok(AbstractOp::Op(spec))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,7 +104,7 @@ mod tests {
         InstructionMacroDefinition, InstructionMacroInvocation, Terminal,
     };
     use assert_matches::assert_matches;
-    use etk_ops::cancun::*;
+    use etk_ops::prague::*;
     use hex_literal::hex;
     use num_bigint::Sign;
     use std::path::PathBuf;
@@ -595,5 +613,21 @@ mod tests {
             }))),
         ];
         assert_eq!(parse_asm(&asm).unwrap(), expected);
+    }
+
+    #[test]
+    fn parse_relative_jumps() {
+        let asm = r#"
+            rjump 1
+            rjumpi 2
+            rjumpv 3
+        "#;
+
+        let expected = nodes![
+            Op::from(RJump(Imm::from(1u8))),
+            Op::from(RJumpI(Imm::from(2u8))),
+            Op::from(RJumpV(Imm::from(3u8))),
+        ];
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
     }
 }
