@@ -611,4 +611,17 @@ mod tests {
         ];
         assert_eq!(parse_asm(&asm).unwrap(), expected);
     }
+
+    #[test]
+    fn parse_dupn_swapn_ops() {
+        let asm = r#"
+            swapn 1
+            dupn 2
+        "#;
+        let expected = nodes![
+            Op::from(SwapN(Imm::from(1u8))),
+            Op::from(DupN(Imm::from(2u8)))
+        ];
+        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+    }
 }
