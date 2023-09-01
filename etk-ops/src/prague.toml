@@ -848,6 +848,7 @@ pops = 6
 [JumpF]
 code = 0xe5
 mnemonic = "jumpf"
+extra_len = 16
 pushes = 0
 pops = 0
 jump = true

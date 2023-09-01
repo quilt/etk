@@ -659,6 +659,11 @@ impl<'a> Annotator<'a> {
                 let _topic3 = stack.pop();
             }
 
+            Op::JumpF(JumpF(imm)) => {
+                let expr = Expr::constant(imm);
+                return Some(Exit::Unconditional(expr));
+            }
+
             Op::Swap1(_) => stack.swap(1),
             Op::Swap2(_) => stack.swap(2),
             Op::Swap3(_) => stack.swap(3),
@@ -885,7 +890,6 @@ impl<'a> Annotator<'a> {
             | Op::InvalidE2(_)
             | Op::InvalidE3(_)
             | Op::InvalidE4(_)
-            | Op::InvalidE5(_)
             | Op::InvalidE6(_)
             | Op::InvalidE7(_)
             | Op::InvalidE8(_)
