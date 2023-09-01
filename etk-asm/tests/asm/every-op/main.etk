@@ -138,6 +138,8 @@ log2
 log3
 log4
 
+jumpf 0xAABBCCDDEEFF00112233445566778899
+
 create
 call
 callcode

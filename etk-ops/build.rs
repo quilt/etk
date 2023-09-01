@@ -167,6 +167,11 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
     let mut immediate_mut_matches = quote! {};
     let mut into_immediate_matches = quote! {};
     let names: Vec<_> = ops.iter().map(|(n, _)| format_ident!("{}", n)).collect();
+    let immediate_ops: Vec<_> = ops
+        .iter()
+        .filter(|(_, op)| op.extra_len > 0)
+        .map(|(n, _)| format_ident!("{}", n))
+        .collect();
 
     for (name, op) in &ops {
         let name = format_ident!("{}", name);
@@ -680,41 +685,11 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
                 T: ?Sized + super::Immediates,
                 #(I: TryInto<T::#bounds, Error = E>,)*
             {
-                // TODO: Automate generating these?
                 let result = match self {
-                    Self::Push1(_) => Op::Push1(Push1(immediate.try_into()?)),
-                    Self::Push2(_) => Op::Push2(Push2(immediate.try_into()?)),
-                    Self::Push3(_) => Op::Push3(Push3(immediate.try_into()?)),
-                    Self::Push4(_) => Op::Push4(Push4(immediate.try_into()?)),
-                    Self::Push5(_) => Op::Push5(Push5(immediate.try_into()?)),
-                    Self::Push6(_) => Op::Push6(Push6(immediate.try_into()?)),
-                    Self::Push7(_) => Op::Push7(Push7(immediate.try_into()?)),
-                    Self::Push8(_) => Op::Push8(Push8(immediate.try_into()?)),
-                    Self::Push9(_) => Op::Push9(Push9(immediate.try_into()?)),
-                    Self::Push10(_) => Op::Push10(Push10(immediate.try_into()?)),
-                    Self::Push11(_) => Op::Push11(Push11(immediate.try_into()?)),
-                    Self::Push12(_) => Op::Push12(Push12(immediate.try_into()?)),
-                    Self::Push13(_) => Op::Push13(Push13(immediate.try_into()?)),
-                    Self::Push14(_) => Op::Push14(Push14(immediate.try_into()?)),
-                    Self::Push15(_) => Op::Push15(Push15(immediate.try_into()?)),
-                    Self::Push16(_) => Op::Push16(Push16(immediate.try_into()?)),
-                    Self::Push17(_) => Op::Push17(Push17(immediate.try_into()?)),
-                    Self::Push18(_) => Op::Push18(Push18(immediate.try_into()?)),
-                    Self::Push19(_) => Op::Push19(Push19(immediate.try_into()?)),
-                    Self::Push20(_) => Op::Push20(Push20(immediate.try_into()?)),
-                    Self::Push21(_) => Op::Push21(Push21(immediate.try_into()?)),
-                    Self::Push22(_) => Op::Push22(Push22(immediate.try_into()?)),
-                    Self::Push23(_) => Op::Push23(Push23(immediate.try_into()?)),
-                    Self::Push24(_) => Op::Push24(Push24(immediate.try_into()?)),
-                    Self::Push25(_) => Op::Push25(Push25(immediate.try_into()?)),
-                    Self::Push26(_) => Op::Push26(Push26(immediate.try_into()?)),
-                    Self::Push27(_) => Op::Push27(Push27(immediate.try_into()?)),
-                    Self::Push28(_) => Op::Push28(Push28(immediate.try_into()?)),
-                    Self::Push29(_) => Op::Push29(Push29(immediate.try_into()?)),
-                    Self::Push30(_) => Op::Push30(Push30(immediate.try_into()?)),
-                    Self::Push31(_) => Op::Push31(Push31(immediate.try_into()?)),
-                    Self::Push32(_) => Op::Push32(Push32(immediate.try_into()?)),
-                    _ => panic!("only push operations can be combined"),
+                    #(
+                    Self::#immediate_ops(_) => Op::#immediate_ops(#immediate_ops(immediate.try_into()?)),
+                    )*
+                    _ => panic!("only jumpf/push operations can be combined"),
                 };
 
                 Ok(result)
@@ -852,4 +827,5 @@ fn main() {
     generate_fork("london").unwrap();
     generate_fork("shanghai").unwrap();
     generate_fork("cancun").unwrap();
+    generate_fork("prague").unwrap();
 }
