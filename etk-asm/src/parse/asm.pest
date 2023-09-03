@@ -1,13 +1,9 @@
-///////////////////////
 // program structure //
-///////////////////////
 program = _{ SOI ~ inner ~ EOI }
 inner = _{ NEWLINE* ~ (stmt ~ (NEWLINE+|";"))* ~ stmt? }
 stmt = _{ label_definition | builtin | local_macro | push | op }
 
-//////////////////////
 // opcode mnemonics //
-//////////////////////
 op = @{
 	"origin" | "stop" | "mulmod" | "mul" | "sub" | "div" | "sdiv" | "mod" | "smod" |
 	"addmod" | "exp" | "signextend" | "lt" | "gt" | "slt" |
@@ -31,9 +27,7 @@ log = @{ "log" ~ '0'..'4' }
 word_size = @{ ('1'..'2' ~ '0'..'9') | ("3" ~ '0'..'2') | '1'..'9' }
 half_word_size = @{ ("1" ~ '0'..'6') | '1'..'9' }
 
-////////////////////////
 // instruction macros //
-////////////////////////
 instruction_macro_definition = { "%macro" ~ function_declaration ~ NEWLINE* ~ (instruction_macro_stmt ~ NEWLINE+)* ~ "%end" }
 instruction_macro_stmt = _{ label_definition | "%" ~ push_macro | local_macro | push | op }
 instruction_macro_variable = @{ "$" ~ function_parameter }
@@ -54,9 +48,7 @@ argument = _{ string | expression }
 string = @{ "\"" ~ string_char* ~ "\"" }
 string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }
 
-///////////////////////
 // expression macros //
-///////////////////////
 expression_macro_definition = !{ "%def" ~ function_declaration ~ NEWLINE ~ expression ~ NEWLINE ~ "%end" }
 expression_macro = { function_invocation }
 
@@ -68,9 +60,7 @@ function_invocation = _{ function_name ~ "(" ~ expression* ~ ("," ~ expression)*
 function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
 function_parameter = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 
-//////////////
 // operands //
-//////////////
 number = _{ binary | octal | hex | decimal }
 
 binary = @{ "0b" ~ ASCII_BIN_DIGIT+ }
@@ -81,9 +71,7 @@ hex = @{ "0x" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT+ }
 label = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 label_definition = { label ~ ":" }
 
-////////////////
 // infix math //
-////////////////
 expression = !{ term ~ (operation ~ term)* }
 term = _{ instruction_macro_variable | selector | topic | expression_macro | label | number | negative_decimal | "(" ~ expression ~ ")" }
 negative_decimal = @{ "-" ~ ASCII_DIGIT+ }
@@ -93,8 +81,6 @@ minus = { "-" }
 times = { "*" }
 divide = { "/" }
 
-///////////////
 // overrides //
-///////////////
 WHITESPACE = _{ " " | "\t" }
 COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* }
