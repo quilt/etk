@@ -258,6 +258,9 @@ fn every_op() -> Result<(), Error> {
         a3
         a4
 
+        e3 aabbccddeeff00112233445566778899
+        e4
+
         f0
         f1
         f2

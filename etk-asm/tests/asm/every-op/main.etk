@@ -138,6 +138,9 @@ log2
 log3
 log4
 
+callf 0xAABBCCDDEEFF00112233445566778899
+retf
+
 create
 call
 callcode
