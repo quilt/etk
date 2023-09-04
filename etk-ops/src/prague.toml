@@ -379,12 +379,11 @@ mnemonic = "gas"
 pushes = 1
 pops = 0
 
-[JumpDest]
+[Nop]
 code = 0x5b
-mnemonic = "jumpdest"
+mnemonic = "nop"
 pushes = 0
 pops = 0
-jump_target = true
 
 [MCopy]
 code = 0x5e

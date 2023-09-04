@@ -86,6 +86,7 @@ mod tests {
         InstructionMacroDefinition, InstructionMacroInvocation, Terminal,
     };
     use assert_matches::assert_matches;
+    use etk_ops::cancun::Op::JumpDest;
     use etk_ops::prague::*;
     use hex_literal::hex;
     use num_bigint::Sign;

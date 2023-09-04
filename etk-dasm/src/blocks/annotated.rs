@@ -519,7 +519,7 @@ impl<'a> Annotator<'a> {
             }
             Op::GetPc(_) => stack.push(Expr::pc(pc as u16)),
 
-            Op::JumpDest(_) => {
+            Op::Nop(_) => {
                 // No-op
             }
             Op::MCopy(_) => {
