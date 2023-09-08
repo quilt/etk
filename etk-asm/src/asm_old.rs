@@ -313,7 +313,7 @@ impl Assembler {
 
     /// Insert explicilty declared macros and labels, via `AbstractOp`, and implictly declared
     /// macros and labels via usage in `Op`.
-    pub fn declare_content(&mut self, rop: &RawOp) -> Result<(), Error> {
+    fn declare_content(&mut self, rop: &RawOp) -> Result<(), Error> {
         match rop {
             RawOp::Op(AbstractOp::Label(ref label)) => {
                 match self.declared_labels.entry(label.to_owned()) {
@@ -321,7 +321,8 @@ impl Assembler {
                         return error::DuplicateLabel { label }.fail();
                     }
                     hash_map::Entry::Vacant(v) => {
-                        v.insert(None); // Still need to calculate final position.
+                        v.insert(None);
+                        self.undeclared_labels.remove(label);
                     }
                 }
             }
@@ -338,6 +339,16 @@ impl Assembler {
             _ => (),
         };
 
+        // Get all labels used by `rop`, check if they've been defined, and if not, note them as
+        // "undeclared".
+        if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
+            for label in labels {
+                if !self.declared_labels.contains_key(&label) {
+                    self.undeclared_labels.insert(label.to_owned());
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -350,7 +361,7 @@ impl Assembler {
     {
         let rop = rop.into();
 
-        //self.declare_content(&rop)?;
+        self.declare_content(&rop)?;
 
         // Expand instruction macros immediately. We do this here because it's the same process
         // regardless if we `push_read` or `push_pending` -- in fact, `expand_macro` pushes each op
@@ -360,8 +371,16 @@ impl Assembler {
             return Ok(self.ready.len());
         }
 
-        self.push_ready(rop)?;
+        self.push_unchecked(rop)?;
         Ok(self.ready.len())
+    }
+
+    fn push_unchecked(&mut self, rop: RawOp) -> Result<(), Error> {
+        if self.pending.is_empty() && self.pending_len.is_some() {
+            self.push_ready(rop)
+        } else {
+            self.push_pending(rop)
+        }
     }
 
     fn push_ready(&mut self, rop: RawOp) -> Result<(), Error> {
@@ -428,7 +447,7 @@ impl Assembler {
         }
     }
 
-    /*fn push_pending(&mut self, rop: RawOp) -> Result<(), Error> {
+    fn push_pending(&mut self, rop: RawOp) -> Result<(), Error> {
         // Update total size of pending ops.
         if let Some(ref mut pending_len) = self.pending_len {
             match rop.size() {
@@ -549,7 +568,7 @@ impl Assembler {
         }
 
         Ok(())
-    }*/
+    }
 
     fn choose_sizes(&mut self) -> Result<(), Error> {
         let mut sizes: HashMap<Expression, Op<()>> = self

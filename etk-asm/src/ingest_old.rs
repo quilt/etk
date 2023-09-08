@@ -96,7 +96,6 @@ mod error {
 
 use crate::asm::{Assembler, RawOp};
 use crate::ast::Node;
-use crate::ops::AbstractOp;
 use crate::parse::parse_asm;
 
 pub use self::error::Error;
@@ -342,34 +341,6 @@ where
 
         Ok(())
     }
-
-    fn inspect_macros_and_labels(&mut self) {
-        if self.sources.is_empty() {
-            panic!("no sources!");
-        }
-
-        let source_zero = &mut self.sources[0];
-
-        let first_asm = match &mut source_zero.scope {
-            Scope::Independent(ref mut a) => a,
-            Scope::Same => panic!("sources[0] must be independent"),
-        };
-
-        source_zero
-            .nodes
-            .by_ref()
-            .filter(|node| {
-                matches!(
-                    node,
-                    Node::Op(AbstractOp::MacroDefinition(_)) | Node::Op(AbstractOp::Label(_))
-                )
-            })
-            .for_each(|node| {
-                if let Node::Op(op) = node {
-                    first_asm.declare_content(&RawOp::Op(op)).unwrap();
-                }
-            });
-    }
 }
 
 /// A high-level interface for assembling files into EVM bytecode.
@@ -444,8 +415,6 @@ where
         let nodes = parse_asm(src)?;
         let partial = self.sources.resolve(path.into(), Scope::independent())?;
         partial.push(nodes);
-
-        self.sources.inspect_macros_and_labels();
 
         while let Some(source) = self.sources.peek() {
             let node = match source.nodes.next() {
