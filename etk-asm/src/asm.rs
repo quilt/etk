@@ -283,12 +283,18 @@ impl Assembler {
     /// Concretize ops given calculated labels
     pub fn finish(&mut self) -> Result<(), Error> {
         for op in self.unrolled.iter() {
-            if let RawOp::Op(ref aop) = op {
-                let cop = aop
-                    .clone()
-                    .concretize((&self.declared_labels, &self.declared_macros).into());
+            match op {
+                RawOp::Op(AbstractOp::Label(_)) => continue,
+                RawOp::Op(AbstractOp::MacroDefinition(_)) => continue,
+                RawOp::Op(aop) => {
+                    let cop = aop
+                        .clone()
+                        .concretize((&self.declared_labels, &self.declared_macros).into());
 
-                cop.unwrap().assemble(&mut self.ready);
+                    // TODO cop can be an error, handle it
+                    cop.assemble(&mut self.ready);
+                }
+                RawOp::Raw(_) => continue,
             }
         }
         Ok(())
