@@ -298,7 +298,7 @@ where
         };
 
         let raw = asm.take();
-        asm.finish()?;
+        //asm.finish()?;
 
         if raw.is_empty() {
             return Ok(());
@@ -350,6 +350,7 @@ where
 
         let source_zero = &mut self.sources[0];
 
+        // change to explore all sources?
         let first_asm = match &mut source_zero.scope {
             Scope::Independent(ref mut a) => a,
             Scope::Same => panic!("sources[0] must be independent"),
@@ -357,7 +358,7 @@ where
 
         source_zero
             .nodes
-            .by_ref()
+            .clone()
             .filter(|node| {
                 matches!(
                     node,

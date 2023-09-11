@@ -276,3 +276,12 @@ fn every_op() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_ass() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["every-op", "test.etk"]))?;
+
+    Ok(())
+}

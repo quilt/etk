@@ -203,37 +203,22 @@ pub struct Assembler {
     /// Assembled ops, ready to be taken.
     ready: Vec<u8>,
 
-    /// Ops that cannot be encoded yet.
-    pending: VecDeque<RawOp>,
-
-    /// Sum of the size of all the ops in `pending`, or `None` if `pending` contains
-    /// an unsized op.
-    pending_len: Option<usize>,
-
-    /// Total number of `u8` that have been appended to `ready`.
-    concrete_len: usize,
+    unrolled: Vec<RawOp>,
 
     /// Labels, in `pending`, associated with an `AbstractOp::Label`.
     declared_labels: HashMap<String, Option<usize>>,
 
     /// Macros, in `pending`, associated with an `AbstractOp::Macro`.
     declared_macros: HashMap<String, MacroDefinition>,
-
-    /// Labels, in `pending`, that have been referred to (ex. with push) but
-    /// have not been declared with an `AbstractOp::Label`.
-    undeclared_labels: HashSet<String>,
 }
 
 impl Default for Assembler {
     fn default() -> Self {
         Self {
             ready: Default::default(),
-            pending: Default::default(),
-            pending_len: Some(0),
-            concrete_len: 0,
+            unrolled: Default::default(),
             declared_labels: Default::default(),
             declared_macros: Default::default(),
-            undeclared_labels: Default::default(),
         }
     }
 }
@@ -244,55 +229,9 @@ impl Assembler {
         Self::default()
     }
 
-    /// Indicate that the input sequence is complete. Returns any errors that
-    /// may remain.
-    pub fn finish(self) -> Result<(), Error> {
-        if let Some(undef) = self.pending.front() {
-            return match undef {
-                RawOp::Op(AbstractOp::Macro(invc)) => error::UndeclaredInstructionMacro {
-                    name: invc.name.clone(),
-                }
-                .fail(),
-                RawOp::Op(op) => {
-                    match op
-                        .clone()
-                        .concretize((&self.declared_labels, &self.declared_macros).into())
-                    {
-                        Ok(_) => unreachable!(),
-                        Err(ops::Error::ContextIncomplete {
-                            source: expression::Error::UnknownMacro { name, .. },
-                            ..
-                        }) => error::UndeclaredExpressionMacro { name }.fail(),
-                        Err(ops::Error::ContextIncomplete {
-                            source: expression::Error::UnknownLabel { .. },
-                            ..
-                        }) => {
-                            let labels = op.expr().unwrap().labels(&self.declared_macros).unwrap();
-                            let declared = self.declared_labels.into_keys().collect();
-                            let invoked: HashSet<_> = labels.into_iter().collect();
-                            let missing = invoked
-                                .difference(&declared)
-                                .cloned()
-                                .collect::<Vec<String>>();
-                            error::UndeclaredLabels { labels: missing }.fail()
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-                // bug: if a variable is used when it isn't available, e.g. push1 $size
-                _ => unreachable!(),
-            };
-        }
-
-        if !self.ready.is_empty() {
-            panic!("not all assembled bytecode has been taken");
-        }
-
-        Ok(())
-    }
-
     /// Collect any assembled instructions that are ready to be output.
     pub fn take(&mut self) -> Vec<u8> {
+        self.finish().unwrap();
         std::mem::take(&mut self.ready)
     }
 
@@ -308,7 +247,7 @@ impl Assembler {
             self.push(op)?;
         }
 
-        Ok(self.ready.len())
+        Ok(self.unrolled.len())
     }
 
     /// Insert explicilty declared macros and labels, via `AbstractOp`, and implictly declared
@@ -341,6 +280,20 @@ impl Assembler {
         Ok(())
     }
 
+    /// Concretize ops given calculated labels
+    pub fn finish(&mut self) -> Result<(), Error> {
+        for op in self.unrolled.iter() {
+            if let RawOp::Op(ref aop) = op {
+                let cop = aop
+                    .clone()
+                    .concretize((&self.declared_labels, &self.declared_macros).into());
+
+                cop.unwrap().assemble(&mut self.ready);
+            }
+        }
+        Ok(())
+    }
+
     /// Feed a single instruction into the `Assembler`.
     ///
     /// Returns the number of bytes that can be collected with [`Assembler::take`]
@@ -350,264 +303,20 @@ impl Assembler {
     {
         let rop = rop.into();
 
-        //self.declare_content(&rop)?;
-
-        // Expand instruction macros immediately. We do this here because it's the same process
-        // regardless if we `push_read` or `push_pending` -- in fact, `expand_macro` pushes each op
-        // individually which calls the correct unchecked push.
+        // Expand instruction macros immediately.
         if let RawOp::Op(AbstractOp::Macro(ref m)) = rop {
             self.expand_macro(&m.name, &m.parameters)?;
             return Ok(self.ready.len());
         }
 
-        self.push_ready(rop)?;
-        Ok(self.ready.len())
-    }
-
-    fn push_ready(&mut self, rop: RawOp) -> Result<(), Error> {
-        match rop {
-            RawOp::Op(AbstractOp::Label(label)) => {
-                let old = self
-                    .declared_labels
-                    .insert(label, Some(self.concrete_len))
-                    .expect("label should exist");
-                assert_eq!(old, None, "label should have been undefined");
-                Ok(())
-            }
-            RawOp::Op(AbstractOp::MacroDefinition(_)) => Ok(()),
-            RawOp::Op(AbstractOp::Macro(ref m)) => {
-                match self.declared_macros.get(&m.name) {
-                    // Do nothing if the instruction macro has been defined.
-                    Some(MacroDefinition::Instruction(_)) => (),
-                    _ => {
-                        assert_eq!(self.pending_len, Some(0));
-                        self.pending_len = None;
-                        self.pending.push_back(rop);
-                    }
-                }
-                Ok(())
-            }
-            RawOp::Op(ref op) => {
-                match op
-                    .clone()
-                    .concretize((&self.declared_labels, &self.declared_macros).into())
-                {
-                    Ok(cop) => {
-                        self.concrete_len += cop.size();
-                        cop.assemble(&mut self.ready);
-                    }
-                    Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
-                        return error::ExpressionTooLarge {
-                            expr: op.expr().unwrap().clone(),
-                            value,
-                            spec,
-                        }
-                        .fail()
-                    }
-                    Err(ops::Error::ExpressionNegative { value, .. }) => {
-                        return error::ExpressionNegative {
-                            expr: op.expr().unwrap().clone(),
-                            value,
-                        }
-                        .fail()
-                    }
-                    Err(_) => {
-                        assert_eq!(self.pending_len, Some(0));
-                        self.pending_len = rop.size();
-                        self.pending.push_back(rop);
-                    }
-                }
-
-                Ok(())
-            }
-            RawOp::Raw(raw) => {
-                self.concrete_len += raw.len();
-                self.ready.extend(raw);
-                Ok(())
-            }
-        }
-    }
-
-    /*fn push_pending(&mut self, rop: RawOp) -> Result<(), Error> {
-        // Update total size of pending ops.
-        if let Some(ref mut pending_len) = self.pending_len {
-            match rop.size() {
-                Some(size) => *pending_len += size,
-                None => self.pending_len = None,
-            }
+        // When a label is declared, we need to save its position for the final concretization.
+        if let RawOp::Op(AbstractOp::Label(ref label)) = rop {
+            self.declared_labels
+                .insert(label.to_owned(), Some(self.unrolled.len()));
         }
 
-        // Handle new label and macro definitions.
-        match (self.pending_len, rop) {
-            (Some(pending_len), RawOp::Op(AbstractOp::Label(lbl))) => {
-                // The label has a defined address.
-                let address = self.concrete_len + pending_len;
-                let item = self.declared_labels.get_mut(&*lbl).unwrap();
-                *item = Some(address);
-            }
-            (None, rop @ RawOp::Op(AbstractOp::Label(_))) => {
-                self.pending.push_back(rop);
-                if self.undeclared_labels.is_empty() {
-                    self.choose_sizes()?;
-                }
-            }
-            (_, RawOp::Op(AbstractOp::MacroDefinition(defn))) => {
-                if let Some(RawOp::Op(AbstractOp::Macro(invc))) = self.pending.front() {
-                    if defn.name() == &invc.name {
-                        let invc = invc.clone();
-                        self.pending.pop_front();
-                        self.expand_macro(&invc.name, &invc.parameters)?;
-                    }
-                }
-            }
-            (_, rop) => {
-                // Not a label.
-                self.pending.push_back(rop);
-            }
-        }
-
-        // Repeatedly check if the front of the pending list is ready.
-        while let Some(next) = self.pending.front() {
-            let op = match next {
-                RawOp::Op(AbstractOp::Push(Imm {
-                    tree: Expression::Terminal(Terminal::Label(_)),
-                    ..
-                })) => {
-                    if self.undeclared_labels.is_empty() {
-                        unreachable!()
-                    } else {
-                        // Still waiting on more labels.
-                        break;
-                    }
-                }
-                RawOp::Op(AbstractOp::Label(_)) => unreachable!(),
-                RawOp::Op(AbstractOp::Macro(_)) => {
-                    // Still waiting on more macros.
-                    break;
-                }
-                RawOp::Op(op) => op,
-                RawOp::Raw(_) => {
-                    self.pop_pending()?;
-                    continue;
-                }
-            };
-
-            match op
-                .clone()
-                .concretize((&self.declared_labels, &self.declared_macros).into())
-            {
-                Ok(cop) => {
-                    let front = self.pending.front_mut().unwrap();
-                    *front = RawOp::Op(cop.into());
-                }
-                Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
-                    return error::ExpressionTooLarge {
-                        expr: op.expr().unwrap().clone(),
-                        value,
-                        spec,
-                    }
-                    .fail();
-                }
-                Err(_) => {
-                    // Still waiting for some definition.
-                    break;
-                }
-            }
-
-            self.pop_pending()?;
-        }
-
-        Ok(())
-    }
-
-    fn pop_pending(&mut self) -> Result<(), Error> {
-        let popped = self.pending.pop_front().unwrap();
-
-        let size;
-
-        match popped {
-            RawOp::Raw(raw) => {
-                size = raw.len();
-                self.ready.extend(raw);
-            }
-            RawOp::Op(aop) => {
-                let cop = aop
-                    .concretize((&self.declared_labels, &self.declared_macros).into())
-                    // Already able to concretize in `push_pending` loop.
-                    .unwrap();
-                size = cop.size();
-                cop.assemble(&mut self.ready);
-            }
-        }
-
-        self.concrete_len += size;
-
-        if self.pending.is_empty() {
-            self.pending_len = Some(0);
-        } else if let Some(ref mut pending_len) = self.pending_len {
-            *pending_len -= size;
-        }
-
-        Ok(())
-    }*/
-
-    fn choose_sizes(&mut self) -> Result<(), Error> {
-        let mut sizes: HashMap<Expression, Op<()>> = self
-            .pending
-            .iter()
-            .filter(|op| matches!(op, RawOp::Op(AbstractOp::Push(_))))
-            .map(|op| (op.expr().unwrap().clone(), Op::<()>::push_for(1).unwrap()))
-            .collect();
-
-        let mut subasm;
-
-        loop {
-            // Create a sub-assembler to try assembling with the sizes in
-            // `undefined_labels`.
-            subasm = Self::default();
-            subasm.concrete_len = self.concrete_len;
-            subasm.declared_labels = self.declared_labels.clone();
-
-            let result: Result<Vec<_>, Error> = self
-                .pending
-                .iter()
-                .map(|op| {
-                    let new = match op {
-                        RawOp::Op(AbstractOp::Push(Imm { tree, .. })) => {
-                            let new = sizes[tree].with(tree.clone()).unwrap();
-                            let aop = AbstractOp::new(new);
-                            RawOp::Op(aop)
-                        }
-                        op => op.clone(),
-                    };
-
-                    subasm.push_pending(new)
-                })
-                .collect();
-
-            match result {
-                Ok(_) => {
-                    assert!(subasm.pending.is_empty());
-                    break;
-                }
-                Err(Error::ExpressionTooLarge { expr, .. }) => {
-                    // If an expression is too large for an op, increase the width of that op.
-                    let item = sizes.get_mut(&expr).unwrap();
-                    let new_size = item.upsize().context(error::UnsizedPushTooLarge)?;
-                    *item = new_size;
-                }
-                Err(e) => return Err(e),
-            }
-        }
-
-        // Insert the results of the sub-assembler into self.
-        let raw = subasm.take();
-        self.pending_len = Some(raw.len());
-        self.pending.clear();
-        self.pending.push_back(RawOp::Raw(raw));
-        self.declared_labels = subasm.declared_labels;
-
-        Ok(())
+        self.unrolled.push(rop);
+        Ok(self.unrolled.len())
     }
 
     fn expand_macro(
@@ -670,15 +379,10 @@ impl Assembler {
                 Ok(Some(self.push_all(m.contents)?))
             }
             _ => {
-                assert_eq!(self.pending_len, Some(0));
-                self.pending_len = None;
-                self.pending.push_back(RawOp::Op(AbstractOp::Macro(
-                    ops::InstructionMacroInvocation {
-                        name: name.to_string(),
-                        parameters: parameters.to_vec(),
-                    },
-                )));
-                Ok(None)
+                return error::UndeclaredInstructionMacro {
+                    name: name.to_string(),
+                }
+                .fail()
             }
         }
     }
