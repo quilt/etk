@@ -198,20 +198,13 @@ impl From<Vec<u8>> for RawOp {
 /// # assert_eq!(output, hex!("58"));
 /// # Result::<(), Error>::Ok(())
 /// ```
-#[derive(Debug)]
+
 pub struct Assembler {
     /// Assembled ops, ready to be taken.
     ready: Vec<u8>,
 
-    /// Ops that cannot be encoded yet.
-    pending: VecDeque<RawOp>,
-
-    /// Sum of the size of all the ops in `pending`, or `None` if `pending` contains
-    /// an unsized op.
-    pending_len: Option<usize>,
-
-    /// Total number of `u8` that have been appended to `ready`.
-    concrete_len: usize,
+    /// Assembled ops, not yet ready to be taken.
+    unrolled: Vec<RawOp>,
 
     /// Labels, in `pending`, associated with an `AbstractOp::Label`.
     declared_labels: HashMap<String, Option<usize>>,
@@ -221,19 +214,32 @@ pub struct Assembler {
 
     /// Labels, in `pending`, that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
-    undeclared_labels: HashSet<String>,
+    undeclared_labels: Vec<PendingLabel>,
+
+    /// Macros in pending
+    undeclared_macros: Vec<PendingMacro>,
+}
+#[derive(Debug)]
+struct PendingMacro {
+    position: usize,
+    name: String,
+    arguments: Vec<String>,
+}
+#[derive(Debug)]
+struct PendingLabel {
+    position: usize,
+    name: String,
 }
 
 impl Default for Assembler {
     fn default() -> Self {
         Self {
             ready: Default::default(),
-            pending: Default::default(),
-            pending_len: Some(0),
-            concrete_len: 0,
+            unrolled: Default::default(),
             declared_labels: Default::default(),
             declared_macros: Default::default(),
             undeclared_labels: Default::default(),
+            undeclared_macros: Default::default(),
         }
     }
 }
@@ -311,8 +317,7 @@ impl Assembler {
         Ok(self.ready.len())
     }
 
-    /// Insert explicilty declared macros and labels, via `AbstractOp`, and implictly declared
-    /// macros and labels via usage in `Op`.
+    /// Insert explicilty declared macros and labels, via `AbstractOp`.
     fn declare_content(&mut self, rop: &RawOp) -> Result<(), Error> {
         match rop {
             RawOp::Op(AbstractOp::Label(ref label)) => {
@@ -321,8 +326,15 @@ impl Assembler {
                         return error::DuplicateLabel { label }.fail();
                     }
                     hash_map::Entry::Vacant(v) => {
-                        v.insert(None);
-                        self.undeclared_labels.remove(label);
+                        v.insert(Some(self.ready.len()));
+
+                        for ul in self.undeclared_labels.iter() {
+                            if ul.name == *label {
+                                self.unrolled.insert(ul.position, rop.clone());
+                            }
+                        }
+
+                        self.undeclared_labels.retain(|ul| ul.name != *label);
                     }
                 }
             }
@@ -333,21 +345,19 @@ impl Assembler {
                     }
                     hash_map::Entry::Vacant(v) => {
                         v.insert(defn.to_owned());
+
+                        for um in self.undeclared_macros.iter() {
+                            if um.name == *defn.name() {
+                                self.unrolled.insert(um.position, rop.clone());
+                            }
+                        }
+
+                        self.undeclared_macros.retain(|um| um.name != *defn.name());
                     }
                 }
             }
             _ => (),
         };
-
-        // Get all labels used by `rop`, check if they've been defined, and if not, note them as
-        // "undeclared".
-        if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
-            for label in labels {
-                if !self.declared_labels.contains_key(&label) {
-                    self.undeclared_labels.insert(label.to_owned());
-                }
-            }
-        }
 
         Ok(())
     }
