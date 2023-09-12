@@ -58,7 +58,7 @@ fn run() -> Result<(), Error> {
     let blocks = separator
         .take()
         .into_iter()
-        .chain(separator.finish().into_iter())
+        .chain(separator.finish())
         .map(|x| AnnotatedBlock::annotate(&x));
 
     let mut cfg = ControlFlowGraph::new(blocks);

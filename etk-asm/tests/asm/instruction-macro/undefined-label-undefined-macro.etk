@@ -1,0 +1,6 @@
+%macro revert_if_neq() 
+        push1 revert
+%end
+
+%revert_if_neq()
+%revert()

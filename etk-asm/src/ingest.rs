@@ -51,13 +51,15 @@ mod error {
         },
 
         /// An error that occurred while parsing a file.
-        #[snafu(context(false))]
         #[non_exhaustive]
-        #[snafu(display("parsing failed"))]
+        #[snafu(display("parsing failed on path `{}`", path.to_string_lossy()))]
         Parse {
             /// The underlying source of this error.
             #[snafu(backtrace)]
             source: ParseError,
+
+            /// The location of the error.
+            path: PathBuf,
         },
 
         /// An error that occurred while assembling a file.
@@ -106,40 +108,7 @@ use std::fs::{read_to_string, File};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
-fn parse_file<P: AsRef<Path>>(path: P) -> Result<Vec<Node>, Error> {
-    let asm = read_to_string(path.as_ref()).with_context(|_| error::Io {
-        message: "reading file before parsing",
-        path: path.as_ref().to_owned(),
-    })?;
-    let nodes = parse_asm(&asm)?;
-
-    Ok(nodes)
-}
-
-#[derive(Debug)]
-enum Scope {
-    Same,
-    Independent(Box<Assembler>),
-}
-
-impl Scope {
-    fn same() -> Self {
-        Self::Same
-    }
-
-    fn independent() -> Self {
-        Self::Independent(Box::new(Assembler::new()))
-    }
-}
-
-#[derive(Debug)]
-struct Source {
-    path: PathBuf,
-    nodes: std::vec::IntoIter<Node>,
-    scope: Scope,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Root {
     original: PathBuf,
     canonicalized: PathBuf,
@@ -211,135 +180,44 @@ impl Root {
     }
 }
 
-#[must_use]
-struct PartialSource<'a, W> {
-    stack: &'a mut SourceStack<W>,
-    path: PathBuf,
-    scope: Scope,
-}
-
-impl<'a, W> PartialSource<'a, W> {
-    fn path(&self) -> &Path {
-        &self.path
-    }
-
-    fn push(self, nodes: Vec<Node>) -> &'a mut Source {
-        self.stack.sources.push(Source {
-            path: self.path,
-            nodes: nodes.into_iter(),
-            scope: self.scope,
-        });
-
-        self.stack.sources.last_mut().unwrap()
-    }
-}
-
 #[derive(Debug)]
-struct SourceStack<W> {
-    output: W,
-    sources: Vec<Source>,
+struct Program {
     root: Option<Root>,
+    sources: Vec<PathBuf>,
 }
 
-impl<W> SourceStack<W> {
-    fn new(output: W) -> Self {
+impl Program {
+    fn new(path: PathBuf) -> Self {
         Self {
-            output,
-            sources: Default::default(),
-            root: Default::default(),
+            root: Root::new(path.clone()).ok(),
+            sources: vec![path],
         }
     }
 
-    fn resolve(&mut self, path: PathBuf, scope: Scope) -> Result<PartialSource<W>, Error> {
+    fn push_path(&mut self, path: &PathBuf) -> Result<PathBuf, Error> {
         ensure!(self.sources.len() <= 255, error::RecursionLimit);
 
         let path = if let Some(ref root) = self.root {
             let last = self.sources.last().unwrap();
-            let dir = match last.path.parent() {
+            let dir = match last.parent() {
                 Some(s) => s,
                 None => Path::new("./"),
             };
             let candidate = dir.join(path);
             root.check(&candidate)?;
+            self.sources.push(candidate.clone());
             candidate
         } else {
             assert!(self.sources.is_empty());
-            self.root = Some(Root::new(path.clone())?);
-            path
+            self.root = Some(Root::new(path.to_owned())?);
+            path.clone()
         };
 
-        Ok(PartialSource {
-            stack: self,
-            path,
-            scope,
-        })
+        Ok(path)
     }
 
-    fn peek(&mut self) -> Option<&mut Source> {
-        self.sources.last_mut()
-    }
-}
-
-impl<W> SourceStack<W>
-where
-    W: Write,
-{
-    fn pop(&mut self) -> Result<(), Error> {
-        let popped = self.sources.pop().unwrap();
-
-        if self.sources.is_empty() {
-            self.root = None;
-        }
-
-        let mut asm = match popped.scope {
-            Scope::Independent(a) => a,
-            Scope::Same => return Ok(()),
-        };
-
-        let raw = asm.take();
-        asm.finish()?;
-
-        if raw.is_empty() {
-            return Ok(());
-        }
-
-        if self.sources.is_empty() {
-            self.output.write_all(&raw).context(error::Io {
-                message: "writing output",
-                path: None,
-            })?;
-            Ok(())
-        } else {
-            self.write(RawOp::Raw(raw))
-        }
-    }
-
-    fn write(&mut self, mut op: RawOp) -> Result<(), Error> {
-        if self.sources.is_empty() {
-            panic!("no sources!");
-        }
-
-        for frame in self.sources[1..].iter_mut().rev() {
-            let asm = match frame.scope {
-                Scope::Same => continue,
-                Scope::Independent(ref mut a) => a,
-            };
-
-            if 0 == asm.push(op)? {
-                return Ok(());
-            } else {
-                op = RawOp::Raw(asm.take());
-            }
-        }
-
-        let first_asm = match self.sources[0].scope {
-            Scope::Independent(ref mut a) => a,
-            Scope::Same => panic!("sources[0] must be independent"),
-        };
-
-        first_asm.push(op)?;
-
-        Ok(())
+    fn pop_path(&mut self) {
+        self.sources.pop();
     }
 }
 
@@ -370,15 +248,13 @@ where
 /// ```
 #[derive(Debug)]
 pub struct Ingest<W> {
-    sources: SourceStack<W>,
+    output: W,
 }
 
 impl<W> Ingest<W> {
     /// Make a new `Ingest` that writes assembled bytes to `output`.
     pub fn new(output: W) -> Self {
-        Self {
-            sources: SourceStack::new(output),
-        }
+        Self { output }
     }
 }
 
@@ -403,7 +279,8 @@ where
             path: path.clone(),
         })?;
 
-        self.ingest(path, &text)
+        self.ingest(path, &text)?;
+        Ok(())
     }
 
     /// Assemble instructions from `src` as if they were read from a file located
@@ -412,61 +289,70 @@ where
     where
         P: Into<PathBuf>,
     {
-        let nodes = parse_asm(src)?;
-        let partial = self.sources.resolve(path.into(), Scope::independent())?;
-        partial.push(nodes);
+        let mut program = Program::new(path.into());
+        let nodes = self.preprocess(&mut program, src)?;
+        let mut asm = Assembler::new();
+        let raw = asm.assemble(&nodes)?;
 
-        while let Some(source) = self.sources.peek() {
-            let node = match source.nodes.next() {
-                Some(n) => n,
-                None => {
-                    self.sources.pop()?;
-                    continue;
-                }
-            };
+        self.output.write_all(&raw).context(error::Io {
+            message: "writing output",
+            path: None,
+        })?;
 
+        Ok(())
+    }
+
+    fn preprocess(&mut self, program: &mut Program, src: &str) -> Result<Vec<RawOp>, Error> {
+        let nodes = parse_asm(src).with_context(|_| error::Parse {
+            path: program.sources.last().unwrap().clone(),
+        })?;
+        let mut raws = Vec::new();
+        for node in nodes {
             match node {
                 Node::Op(op) => {
-                    self.sources.write(RawOp::Op(op))?;
+                    raws.push(RawOp::Op(op));
                 }
-                Node::Raw(raw) => {
-                    self.sources.write(RawOp::Raw(raw))?;
+                Node::Import(imp_path) => {
+                    let new_raws = self.resolve_and_ingest(program, imp_path)?;
+                    raws.extend(new_raws);
                 }
-                Node::Import(path) => {
-                    let partial = self.sources.resolve(path, Scope::same())?;
-                    let parsed = parse_file(partial.path())?;
-                    partial.push(parsed);
+                Node::Include(inc_path) => {
+                    let inc_raws = self.resolve_and_ingest(program, inc_path)?;
+                    raws.push(RawOp::Scope(inc_raws));
                 }
-                Node::Include(path) => {
-                    let partial = self.sources.resolve(path, Scope::independent())?;
-                    let parsed = parse_file(partial.path())?;
-                    partial.push(parsed);
-                }
-                Node::IncludeHex(path) => {
-                    let partial = self.sources.resolve(path, Scope::same())?;
-
-                    let file =
-                        std::fs::read_to_string(partial.path()).with_context(|_| error::Io {
-                            message: "reading hex include",
-                            path: partial.path().to_owned(),
-                        })?;
+                Node::IncludeHex(hex_path) => {
+                    let file = std::fs::read_to_string(&hex_path).with_context(|_| error::Io {
+                        message: "reading hex include",
+                        path: hex_path.to_owned(),
+                    })?;
 
                     let raw = hex::decode(file.trim())
                         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
                         .context(error::InvalidHex {
-                            path: partial.path().to_owned(),
+                            path: hex_path.to_owned(),
                         })?;
 
-                    partial.push(vec![Node::Raw(raw)]);
+                    raws.push(RawOp::Raw(raw))
                 }
             }
         }
 
-        if !self.sources.sources.is_empty() {
-            panic!("extra sources?");
-        }
+        Ok(raws)
+    }
 
-        Ok(())
+    fn resolve_and_ingest(
+        &mut self,
+        program: &mut Program,
+        path: PathBuf,
+    ) -> Result<Vec<RawOp>, Error> {
+        let source = program.push_path(&path)?;
+        let code = read_to_string(source).with_context(|_| error::Io {
+            message: "reading file before parsing",
+            path: path.to_owned(),
+        })?;
+        let new_raws = self.preprocess(program, &code)?;
+        program.pop_path();
+        Ok(new_raws)
     }
 }
 
@@ -538,6 +424,7 @@ mod tests {
         let mut output = Vec::new();
         let mut ingest = Ingest::new(&mut output);
         ingest.ingest(root, &text)?;
+
         assert_eq!(output, hex!("60015b586000566002"));
 
         Ok(())
