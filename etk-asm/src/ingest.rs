@@ -314,6 +314,17 @@ where
         }
     }
 
+    fn finish(&mut self) {
+        for frame in self.sources.iter_mut().rev() {
+            let asm = match frame.scope {
+                Scope::Same => continue,
+                Scope::Independent(ref mut a) => a,
+            };
+
+            asm.finish().unwrap();
+        }
+    }
+
     fn write(&mut self, mut op: RawOp) -> Result<(), Error> {
         if self.sources.is_empty() {
             panic!("no sources!");
@@ -461,6 +472,8 @@ where
                 }
             }
         }
+
+        self.sources.finish();
 
         if !self.sources.sources.is_empty() {
             panic!("extra sources?");

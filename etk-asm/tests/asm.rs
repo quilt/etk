@@ -75,6 +75,8 @@ fn instruction_macro() -> Result<(), Error> {
     let mut ingester = Ingest::new(&mut output);
     ingester.ingest_file(source(&["instruction-macro", "main.etk"]))?;
 
+    println!("{:x?}", output);
+
     assert_eq!(
         output,
         hex!("5b5860005660406005600d601561000061004260086100006100426008")
@@ -297,12 +299,15 @@ fn every_op2() -> Result<(), Error> {
     // 56: jump
 
     //label1:
-    //jumpdest
+    //    djumpdest
     //    push1 0x01
 
     //push1 label1
     //jump
+
+    // [91, 88, 96, 0, 86, 96, 64, 96, 5, 96, 3|13, 96, 17|21, 97, 0, 0, 97, 0, 66, 96, 8, 97, 0, 0, 97, 0, 66, 96, 8]
     println!("{:x?}", output);
+    println!("{:?}", output);
 
     Ok(())
 }

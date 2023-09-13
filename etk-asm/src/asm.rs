@@ -336,6 +336,7 @@ impl Assembler {
                     }
                     hash_map::Entry::Vacant(v) => {
                         v.insert(None);
+                        self.undefined_labels.retain(|l| l.label != *label);
                     }
                 }
             }
@@ -355,20 +356,21 @@ impl Assembler {
                     }
                 }
             }
-            _ => {
-                println!("declare_content (salio): {:?}", rop)
-            }
+            _ => {}
         };
 
         // Get all labels used by `rop`, check if they've been defined, and if not, note them as
         // "undeclared".
-        //if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
-        //    for label in labels {
-        //        if !self.declared_labels.contains_key(&label) {
-        //            self.undefined_labels.insert(label.to_owned());
-        //        }
-        //    }
-        //}
+        if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
+            for label in labels {
+                if !self.declared_labels.contains_key(&label) {
+                    self.undefined_labels.push(PendingLabel {
+                        label: label.to_owned(),
+                        offset: self.ready.len(),
+                    });
+                }
+            }
+        }
 
         Ok(())
     }
@@ -381,6 +383,7 @@ impl Assembler {
         O: Into<RawOp>,
     {
         let rop = rop.into();
+        println!("pushing {:?}", rop);
 
         self.declare_content(&rop)?;
 
@@ -484,6 +487,7 @@ impl Assembler {
 
                 // First pass, find locally defined labels and rename them.
                 for op in m.contents.iter_mut() {
+                    println!("macro {:?} op: {:?}", name, op);
                     match op {
                         AbstractOp::Label(ref mut label) => {
                             let mangled = format!("{}_{}_{}", m.name, label, rng.gen::<u64>());
