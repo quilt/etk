@@ -1,0 +1,7 @@
+push1 label1
+jump
+
+label1:
+    jumpdest
+    push1 0x01
+

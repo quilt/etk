@@ -276,3 +276,33 @@ fn every_op() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn every_op2() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["every-op", "test.etk"]))?;
+
+    //assert_eq!(
+    //    output,
+    //    hex!(
+    //        "
+    //        00
+    //"
+    //    )
+    //);
+
+    // 5b: jumpdest
+    // 60: push1
+    // 56: jump
+
+    //label1:
+    //jumpdest
+    //    push1 0x01
+
+    //push1 label1
+    //jump
+    println!("{:x?}", output);
+
+    Ok(())
+}
