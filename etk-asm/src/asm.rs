@@ -361,7 +361,7 @@ impl Assembler {
 
         // Get all labels used by `rop`, check if they've been defined, and if not, note them as
         // "undeclared".
-        if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
+        /*if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
             for label in labels {
                 if !self.declared_labels.contains_key(&label) {
                     self.undefined_labels.push(PendingLabel {
@@ -370,7 +370,7 @@ impl Assembler {
                     });
                 }
             }
-        }
+        }*/
 
         Ok(())
     }
@@ -437,6 +437,11 @@ impl Assembler {
                     }
                     Err(ops::Error::ContextIncomplete { source }) => match source {
                         UnknownLabel { label, .. } => {
+                            let size = match op.size() {
+                                Some(size) => size,
+                                None => 2, // push + label
+                            };
+                            self.concrete_len += size;
                             self.ready.push(rop);
                             self.undefined_labels.push(PendingLabel {
                                 label: label.to_owned(),
