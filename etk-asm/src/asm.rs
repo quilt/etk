@@ -265,7 +265,11 @@ impl Assembler {
     pub fn take(&mut self) -> Vec<u8> {
         let output = self.finish();
         match output {
-            Ok(v) => std::mem::take(&mut v.clone()),
+            Ok(v) => {
+                self.ready.clear();
+                self.concrete_len = 0;
+                v
+            }
             Err(e) => {
                 eprintln!("error: {}", e);
                 Vec::new()
@@ -296,7 +300,7 @@ impl Assembler {
         // Concretize every RawOp ready, and collect the results.
         let mut output = Vec::new();
         for ready_op in self.ready.iter() {
-            if let &RawOp::Op(ref op) = ready_op {
+            if let RawOp::Op(ref op) = ready_op {
                 match op
                     .clone()
                     .concretize((&self.declared_labels, &self.declared_macros).into())
@@ -304,6 +308,9 @@ impl Assembler {
                     Ok(cop) => cop.assemble(&mut output),
                     Err(e) => unreachable!("all ops should be concretizable: {}", e),
                 }
+            } else if let RawOp::Raw(raw) = ready_op {
+                self.concrete_len += raw.len();
+                output.extend(raw);
             }
         }
 
@@ -392,11 +399,11 @@ impl Assembler {
         // individually which calls the correct unchecked push.
         if let RawOp::Op(AbstractOp::Macro(ref m)) = rop {
             self.expand_macro(&m.name, &m.parameters)?;
-            return Ok(self.ready.len());
+            return Ok(self.concrete_len);
         }
 
         self.push_ready(rop)?;
-        Ok(self.ready.len())
+        Ok(self.concrete_len)
     }
 
     fn push_ready(&mut self, rop: RawOp) -> Result<(), Error> {

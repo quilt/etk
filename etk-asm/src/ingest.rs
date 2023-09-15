@@ -297,7 +297,7 @@ where
         };
 
         let raw = asm.take();
-        asm.finish()?;
+        //asm.finish()?;
 
         if raw.is_empty() {
             return Ok(());
@@ -314,7 +314,7 @@ where
         }
     }
 
-    fn finish(&mut self) {
+    /*fn finish(&mut self) {
         for frame in self.sources.iter_mut().rev() {
             let asm = match frame.scope {
                 Scope::Same => continue,
@@ -323,7 +323,7 @@ where
 
             asm.finish().unwrap();
         }
-    }
+    }*/
 
     fn write(&mut self, mut op: RawOp) -> Result<(), Error> {
         if self.sources.is_empty() {
@@ -473,7 +473,7 @@ where
             }
         }
 
-        self.sources.finish();
+        //self.sources.finish();
 
         if !self.sources.sources.is_empty() {
             panic!("extra sources?");
