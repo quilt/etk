@@ -560,19 +560,24 @@ impl Assembler {
                     }
                 }
 
-                let mut pushed_size = 0;
-                for op in m.contents.iter().rev() {
-                    let ps = self.push(op.clone(), position)?;
-                    pushed_size += ps;
-                }
+                match position {
+                    Some(pos) => {
+                        let actual_size = self.ready.len();
+                        for op in m.contents.iter() {
+                            let offset = self.ready.len() - actual_size + pos;
+                            self.push(op.clone(), Some(offset))?;
+                        }
 
-                Ok(Some(pushed_size))
+                        Ok(Some(self.concrete_len))
+                    }
+                    None => Ok(Some(self.push_all(m.contents)?)),
+                }
             }
             _ => {
                 self.undefined_macros.push(PendingMacro {
                     name: name.to_owned(),
                     parameters: parameters.to_owned(),
-                    offset: self.ready.len(),
+                    offset: self.concrete_len,
                 });
                 Ok(None)
             }
