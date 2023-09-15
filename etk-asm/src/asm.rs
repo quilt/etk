@@ -238,6 +238,9 @@ pub struct PendingMacro {
     /// The name of the macro.
     name: String,
 
+    /// Parameters of the macro.
+    parameters: Vec<Expression>,
+
     /// The offset of the macro.
     offset: usize,
 }
@@ -326,10 +329,10 @@ impl Assembler {
         O: Into<RawOp>,
     {
         for op in ops {
-            self.push(op)?;
+            self.push(op, None)?;
         }
 
-        Ok(self.ready.len())
+        Ok(self.concrete_len)
     }
 
     /// Insert explicilty declared macros and labels, via `AbstractOp`, and implictly declared
@@ -354,12 +357,6 @@ impl Assembler {
                     }
                     hash_map::Entry::Vacant(v) => {
                         v.insert(defn.to_owned());
-
-                        for m in self.undefined_macros.iter() {
-                            if m.name == *defn.name() {
-                                self.ready.insert(m.offset, rop.clone());
-                            }
-                        }
                     }
                 }
             }
@@ -385,7 +382,7 @@ impl Assembler {
     /// Feed a single instruction into the `Assembler`.
     ///
     /// Returns the number of bytes that can be collected with [`Assembler::take`]
-    pub fn push<O>(&mut self, rop: O) -> Result<usize, Error>
+    pub fn push<O>(&mut self, rop: O, pos: Option<usize>) -> Result<usize, Error>
     where
         O: Into<RawOp>,
     {
@@ -398,15 +395,15 @@ impl Assembler {
         // regardless if we `push_read` or `push_pending` -- in fact, `expand_macro` pushes each op
         // individually which calls the correct unchecked push.
         if let RawOp::Op(AbstractOp::Macro(ref m)) = rop {
-            self.expand_macro(&m.name, &m.parameters)?;
+            self.expand_macro(&m.name, &m.parameters, None)?;
             return Ok(self.concrete_len);
         }
 
-        self.push_ready(rop)?;
+        self.push_ready(rop, pos)?;
         Ok(self.concrete_len)
     }
 
-    fn push_ready(&mut self, rop: RawOp) -> Result<(), Error> {
+    fn push_ready(&mut self, rop: RawOp, pos: Option<usize>) -> Result<(), Error> {
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
                 let old = self
@@ -416,7 +413,26 @@ impl Assembler {
                 assert_eq!(old, None, "label should have been undefined");
                 Ok(())
             }
-            RawOp::Op(AbstractOp::MacroDefinition(_)) => Ok(()),
+            RawOp::Op(AbstractOp::MacroDefinition(ref defn)) => {
+                let macros_to_expand: Vec<_> = self
+                    .undefined_macros
+                    .iter()
+                    .filter(|um| um.name == *defn.name())
+                    .map(|um| (um.name.clone(), um.parameters.clone(), um.offset))
+                    .collect();
+
+                let expanded_names: HashSet<_> =
+                    macros_to_expand.iter().map(|(name, _, _)| name).collect();
+
+                self.undefined_macros
+                    .retain(|um| !expanded_names.contains(&um.name));
+
+                for (name, parameters, offset) in macros_to_expand.iter() {
+                    self.expand_macro(name, parameters, Some(*offset))?;
+                }
+
+                Ok(())
+            }
             RawOp::Op(AbstractOp::Macro(ref m)) => Ok(()),
             RawOp::Op(ref op) => {
                 match op
@@ -425,7 +441,11 @@ impl Assembler {
                 {
                     Ok(cop) => {
                         self.concrete_len += cop.size();
-                        self.ready.push(rop);
+                        match pos {
+                            Some(pos) => _ = self.ready.insert(pos, rop),
+                            None => self.ready.push(rop),
+                        }
+                        //self.ready.push(rop);
                     }
                     Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
                         return error::ExpressionTooLarge {
@@ -446,7 +466,7 @@ impl Assembler {
                         UnknownLabel { label, .. } => {
                             let size = match op.size() {
                                 Some(size) => size,
-                                None => 2, // push + label
+                                None => 2, // %push(label)
                             };
                             self.concrete_len += size;
                             self.ready.push(rop);
@@ -455,14 +475,15 @@ impl Assembler {
                                 offset: self.concrete_len,
                             });
                         }
-                        UnknownMacro { name, .. } => {
-                            self.ready.push(rop);
-                            self.undefined_macros.push(PendingMacro {
-                                name: name.to_owned(),
-                                offset: self.concrete_len,
-                            });
-                        }
-                        UndefinedVariable { name, .. } => todo!(),
+                        UnknownMacro { name, .. } => todo!("unknown macro {}", name),
+                        //{
+                        //    self.ready.push(rop);
+                        //    self.undefined_macros.push(PendingMacro {
+                        //        name: name.to_owned(),
+                        //        offset: self.concrete_len,
+                        //    });
+                        //}
+                        UndefinedVariable { name, .. } => todo!("undefined variable {}", name),
                     },
                 }
 
@@ -470,7 +491,11 @@ impl Assembler {
             }
             RawOp::Raw(raw) => {
                 self.concrete_len += raw.len();
-                self.ready.push(RawOp::Raw(raw));
+                match pos {
+                    Some(pos) => _ = self.ready.splice(pos..pos, vec![RawOp::Raw(raw)]),
+                    None => self.ready.push(RawOp::Raw(raw)),
+                }
+                //self.ready.push(RawOp::Raw(raw));
                 Ok(())
             }
         }
@@ -480,6 +505,7 @@ impl Assembler {
         &mut self,
         name: &str,
         parameters: &[Expression],
+        position: Option<usize>,
     ) -> Result<Option<usize>, Error> {
         // Remap labels to macro scope.
         match self.declared_macros.get(name).cloned() {
@@ -534,11 +560,18 @@ impl Assembler {
                     }
                 }
 
-                Ok(Some(self.push_all(m.contents)?))
+                let mut pushed_size = 0;
+                for op in m.contents.iter().rev() {
+                    let ps = self.push(op.clone(), position)?;
+                    pushed_size += ps;
+                }
+
+                Ok(Some(pushed_size))
             }
             _ => {
                 self.undefined_macros.push(PendingMacro {
                     name: name.to_owned(),
+                    parameters: parameters.to_owned(),
                     offset: self.ready.len(),
                 });
                 Ok(None)
@@ -547,7 +580,6 @@ impl Assembler {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -708,9 +740,9 @@ mod tests {
     #[test]
     fn assemble_variable_push2() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        asm.push(AbstractOp::Push(Imm::with_label("auto")))?;
+        asm.push(AbstractOp::Push(Imm::with_label("auto")), None)?;
         for _ in 0..255 {
-            asm.push(AbstractOp::new(GetPc))?;
+            asm.push(AbstractOp::new(GetPc), None)?;
         }
 
         asm.push_all(vec![
@@ -1245,5 +1277,3 @@ mod tests {
         Ok(())
     }
 }
-
- */

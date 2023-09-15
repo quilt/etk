@@ -336,7 +336,7 @@ where
                 Scope::Independent(ref mut a) => a,
             };
 
-            if 0 == asm.push(op)? {
+            if 0 == asm.push(op, None)? {
                 return Ok(());
             } else {
                 op = RawOp::Raw(asm.take());
@@ -348,7 +348,7 @@ where
             Scope::Same => panic!("sources[0] must be independent"),
         };
 
-        first_asm.push(op)?;
+        first_asm.push(op, None)?;
 
         Ok(())
     }
