@@ -136,6 +136,7 @@ use crate::ops::{self, AbstractOp, Assemble, Expression, Imm, MacroDefinition};
 use etk_ops::cancun::{Op, Push1};
 use rand::Rng;
 use snafu::OptionExt;
+use std::cmp;
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 
 /// An item to be assembled, which can be either an [`AbstractOp`] or a raw byte
@@ -346,7 +347,6 @@ impl Assembler {
                     }
                     hash_map::Entry::Vacant(v) => {
                         v.insert(None);
-                        self.undefined_labels.retain(|l| l.label != *label);
                     }
                 }
             }
@@ -365,7 +365,7 @@ impl Assembler {
 
         // Get all labels used by `rop`, check if they've been defined, and if not, note them as
         // "undeclared".
-        /*if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
+        if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
             for label in labels {
                 if !self.declared_labels.contains_key(&label) {
                     self.undefined_labels.push(PendingLabel {
@@ -374,7 +374,7 @@ impl Assembler {
                     });
                 }
             }
-        }*/
+        }
 
         Ok(())
     }
@@ -406,9 +406,19 @@ impl Assembler {
     fn push_ready(&mut self, rop: RawOp, pos: Option<usize>) -> Result<(), Error> {
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
+                let mut dst = 0;
+                for ul in self.undefined_labels.iter() {
+                    if ul.label == label {
+                        let tmp = ((self.concrete_len - ul.offset) / 256) as f32;
+                        dst = cmp::max(tmp.floor() as usize, dst)
+                    }
+                }
+
+                self.undefined_labels.retain(|l| l.label != *label);
+
                 let old = self
                     .declared_labels
-                    .insert(label, Some(self.concrete_len))
+                    .insert(label, Some(self.concrete_len + dst))
                     .expect("label should exist");
                 assert_eq!(old, None, "label should have been undefined");
                 Ok(())
@@ -433,7 +443,7 @@ impl Assembler {
 
                 Ok(())
             }
-            RawOp::Op(AbstractOp::Macro(ref m)) => Ok(()),
+            RawOp::Op(AbstractOp::Macro(_)) => Ok(()),
             RawOp::Op(ref op) => {
                 match op
                     .clone()
@@ -445,7 +455,6 @@ impl Assembler {
                             Some(pos) => _ = self.ready.insert(pos, rop),
                             None => self.ready.push(rop),
                         }
-                        //self.ready.push(rop);
                     }
                     Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
                         return error::ExpressionTooLarge {
@@ -466,14 +475,14 @@ impl Assembler {
                         UnknownLabel { label, .. } => {
                             let size = match op.size() {
                                 Some(size) => size,
-                                None => 2, // %push(label)
+                                None => 2, // %push(label) with min size
                             };
                             self.concrete_len += size;
                             self.ready.push(rop);
-                            self.undefined_labels.push(PendingLabel {
-                                label: label.to_owned(),
-                                offset: self.ready.len(),
-                            });
+                            //self.undefined_labels.push(PendingLabel {
+                            //    label: label.to_owned(),
+                            //    offset: self.ready.len(),
+                            //});
                         }
                         UnknownMacro { name, .. } => todo!("unknown macro {}", name),
                         //{
@@ -495,7 +504,6 @@ impl Assembler {
                     Some(pos) => _ = self.ready.splice(pos..pos, vec![RawOp::Raw(raw)]),
                     None => self.ready.push(RawOp::Raw(raw)),
                 }
-                //self.ready.push(RawOp::Raw(raw));
                 Ok(())
             }
         }

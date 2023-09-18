@@ -278,38 +278,3 @@ fn every_op() -> Result<(), Error> {
 
     Ok(())
 }
-
-#[test]
-fn every_op2() -> Result<(), Error> {
-    let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
-    ingester.ingest_file(source(&["subdirectory", "main.etk"]))?;
-
-    //assert_eq!(
-    //    output,
-    //    hex!(
-    //        "
-    //        00
-    //"
-    //    )
-    //);
-
-    // 5b: jumpdest
-    // 60: push1
-    // 56: jump
-
-    //label1:
-    //    djumpdest
-    //    push1 0x01
-
-    //push1 label1
-    //jump
-
-    // [99, 192, 1, 192, 222] == [99, 192, 1, 192, 222, 96, 255]
-    println!("Output (hex) {:x?}", output);
-    println!("Output (dec) {:?}", output);
-    println!("Expected (dec) {:?}", hex!("63c001c0de60ff"));
-    assert_eq!(output, hex!("63c001c0de60ff"));
-
-    Ok(())
-}
