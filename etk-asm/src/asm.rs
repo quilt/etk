@@ -472,7 +472,7 @@ impl Assembler {
                             self.ready.push(rop);
                             self.undefined_labels.push(PendingLabel {
                                 label: label.to_owned(),
-                                offset: self.concrete_len,
+                                offset: self.ready.len(),
                             });
                         }
                         UnknownMacro { name, .. } => todo!("unknown macro {}", name),
@@ -577,7 +577,7 @@ impl Assembler {
                 self.undefined_macros.push(PendingMacro {
                     name: name.to_owned(),
                     parameters: parameters.to_owned(),
-                    offset: self.concrete_len,
+                    offset: self.ready.len(),
                 });
                 Ok(None)
             }
