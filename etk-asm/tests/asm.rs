@@ -1,6 +1,9 @@
 use assert_matches::assert_matches;
 
-use etk_asm::ingest::{Error, Ingest};
+use etk_asm::{
+    asm::Assembler,
+    ingest::{Error, Ingest},
+};
 
 use hex_literal::hex;
 
@@ -75,8 +78,6 @@ fn instruction_macro() -> Result<(), Error> {
     let mut ingester = Ingest::new(&mut output);
     ingester.ingest_file(source(&["instruction-macro", "main.etk"]))?;
 
-    println!("{:x?}", output);
-
     assert_eq!(
         output,
         hex!("5b5860005660406005600d601561000061004260086100006100426008")
@@ -108,6 +109,22 @@ fn instruction_macro_with_two_instructions_per_line() {
         .unwrap_err();
 
     assert_matches!(err, Error::Parse { .. });
+}
+
+#[test]
+fn undefined_label_undefined_macro() {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    let err = ingester
+        .ingest_file(source(&[
+            "instruction-macro",
+            "undefined-label-undefined-macro.etk",
+        ]))
+        .unwrap_err();
+
+    assert_matches!(err, etk_asm::ingest::Error::Assemble { source:
+             etk_asm::asm::Error::UndeclaredLabels { labels, .. }, .. 
+    } if labels == vec!["revert".to_string()]);
 }
 
 #[test]

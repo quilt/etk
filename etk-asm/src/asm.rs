@@ -202,8 +202,11 @@ impl From<Vec<u8>> for RawOp {
 /// ```
 #[derive(Debug)]
 pub struct Assembler {
-    /// Assembled ops, ready to be taken.
+    /// Assembled ops, not yet ready to be taken.
     ready: Vec<RawOp>,
+
+    /// Assembled ops, ready to be taken.
+    output: Vec<u8>,
 
     /// Number ob bytes in 'ready' that are ready to be taken.
     concrete_len: usize,
@@ -224,7 +227,7 @@ pub struct Assembler {
 }
 
 /// TODO Temporal DOC
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PendingLabel {
     /// The name of the label.
     label: String,
@@ -234,7 +237,7 @@ pub struct PendingLabel {
 }
 
 /// TODO Temporal DOC
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PendingMacro {
     /// The name of the macro.
     name: String,
@@ -250,6 +253,7 @@ impl Default for Assembler {
     fn default() -> Self {
         Self {
             ready: Default::default(),
+            output: Default::default(),
             concrete_len: 0,
             declared_labels: Default::default(),
             declared_macros: Default::default(),
@@ -267,11 +271,12 @@ impl Assembler {
 
     /// Collect any assembled instructions that are ready to be output.
     pub fn take(&mut self) -> Vec<u8> {
-        let output = self.finish();
+        let output = self.concretize_ops();
         match output {
             Ok(v) => {
                 self.ready.clear();
                 //self.concrete_len = 0;
+                //self.output.clear();
                 v
             }
             Err(e) => {
@@ -282,7 +287,45 @@ impl Assembler {
     }
 
     /// Temporal documentation. TODO
-    pub fn finish(&mut self) -> Result<Vec<u8>, Error> {
+    fn concretize_ops(&mut self) -> Result<Vec<u8>, Error> {
+        let mut output = Vec::new();
+        for op in self.ready.iter() {
+            if let RawOp::Op(ref op) = op {
+                match op
+                    .clone()
+                    .concretize((&self.declared_labels, &self.declared_macros).into())
+                {
+                    Ok(cop) => cop.assemble(&mut output),
+                    Err(ops::Error::ContextIncomplete { source }) => match source {
+                        UnknownLabel { label: _label, .. } => {
+                            let undefined_names: Vec<_> = self
+                                .undefined_labels
+                                .iter()
+                                .map(|PendingLabel { label, .. }| label.clone())
+                                .collect();
+                            return error::UndeclaredLabels {
+                                labels: undefined_names,
+                            }
+                            .fail();
+                        }
+                        UnknownMacro { name, .. } => {
+                            return error::UndeclaredInstructionMacro { name }.fail();
+                        }
+
+                        UndefinedVariable { name, .. } => todo!("undefined variable {}", name),
+                    },
+                    Err(_) => unreachable!("all ops should be concretizable"),
+                }
+            } else if let RawOp::Raw(raw) = op {
+                output.extend(raw);
+            }
+        }
+
+        Ok(output)
+    }
+
+    /// Temporal documentation. TODO
+    pub fn finish(&mut self) -> Result<(), Error> {
         if !self.undefined_labels.is_empty() {
             return error::UndeclaredLabels {
                 labels: self
@@ -302,23 +345,22 @@ impl Assembler {
         }
 
         // Concretize every RawOp ready, and collect the results.
-        let mut output = Vec::new();
-        for ready_op in self.ready.iter() {
+        /*for ready_op in self.ready.iter() {
             if let RawOp::Op(ref op) = ready_op {
                 match op
                     .clone()
                     .concretize((&self.declared_labels, &self.declared_macros).into())
                 {
-                    Ok(cop) => cop.assemble(&mut output),
+                    Ok(cop) => cop.assemble(&mut self.output),
                     Err(e) => unreachable!("all ops should be concretizable: {}", e),
                 }
             } else if let RawOp::Raw(raw) = ready_op {
                 self.concrete_len += raw.len();
-                output.extend(raw);
+                self.output.extend(raw);
             }
-        }
+        }*/
 
-        Ok(output)
+        Ok(())
     }
 
     /// Feed instructions into the `Assembler`.

@@ -297,7 +297,7 @@ where
         };
 
         let raw = asm.take();
-        //asm.finish()?;
+        asm.finish()?;
 
         if raw.is_empty() {
             return Ok(());
