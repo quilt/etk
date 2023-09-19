@@ -271,7 +271,7 @@ impl Assembler {
         match output {
             Ok(v) => {
                 self.ready.clear();
-                self.concrete_len = 0;
+                //self.concrete_len = 0;
                 v
             }
             Err(e) => {
@@ -410,7 +410,7 @@ impl Assembler {
                 for ul in self.undefined_labels.iter() {
                     if ul.label == label {
                         let tmp = ((self.concrete_len - ul.offset) / 256) as f32;
-                        dst = cmp::max(tmp.floor() as usize, dst)
+                        dst = cmp::max(tmp.floor() as usize, dst);
                     }
                 }
 
