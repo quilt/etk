@@ -414,11 +414,11 @@ impl Assembler {
             return Ok(self.concrete_len);
         }
 
-        self.push_ready(rop, pos)?;
+        self.push_rawop(rop, pos)?;
         Ok(self.concrete_len)
     }
 
-    fn push_ready(&mut self, rop: RawOp, pos: Option<usize>) -> Result<(), Error> {
+    fn push_rawop(&mut self, rop: RawOp, pos: Option<usize>) -> Result<(), Error> {
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
                 let mut dst = 0;
