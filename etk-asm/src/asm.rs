@@ -149,13 +149,6 @@ pub enum RawOp {
 }
 
 impl RawOp {
-    fn size(&self) -> Option<usize> {
-        match self {
-            Self::Op(op) => op.size(),
-            Self::Raw(raw) => Some(raw.len()),
-        }
-    }
-
     fn expr(&self) -> Option<&Expression> {
         match self {
             Self::Op(op) => op.expr(),
@@ -197,7 +190,7 @@ impl From<Vec<u8>> for RawOp {
 /// # assert_eq!(output, hex!("58"));
 /// # Result::<(), Error>::Ok(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Assembler {
     /// Assembled ops, not yet ready to be taken.
     ready: Vec<RawOp>,
@@ -241,19 +234,6 @@ pub struct PendingMacro {
 
     /// Concrete position where the macro was invoked.
     position: usize,
-}
-
-impl Default for Assembler {
-    fn default() -> Self {
-        Self {
-            ready: Default::default(),
-            concrete_len: 0,
-            declared_labels: Default::default(),
-            declared_macros: Default::default(),
-            undefined_labels: Default::default(),
-            undefined_macros: Default::default(),
-        }
-    }
 }
 
 impl Assembler {
@@ -467,7 +447,7 @@ impl Assembler {
                     Ok(cop) => {
                         self.concrete_len += cop.size();
                         match pos {
-                            Some(pos) => _ = self.ready.insert(pos, rop),
+                            Some(pos) => self.ready.insert(pos, rop),
                             None => self.ready.push(rop),
                         }
                     }
@@ -488,10 +468,7 @@ impl Assembler {
                     }
                     Err(ops::Error::ContextIncomplete { source }) => match source {
                         UnknownLabel { label: _label, .. } => {
-                            let size = match op.size() {
-                                Some(size) => size,
-                                None => 2, // %push(label) with min size (to be updated)
-                            };
+                            let size = op.size().unwrap_or(2); // %push(label) with min size (to be updated)
                             self.concrete_len += size;
                             self.ready.push(rop);
                         }
