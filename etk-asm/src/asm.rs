@@ -131,13 +131,10 @@ mod error {
 
 pub use self::error::Error;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
-use crate::ops::expression::{self, Terminal};
-use crate::ops::{self, AbstractOp, Assemble, Expression, Imm, MacroDefinition};
-use etk_ops::cancun::{Op, Push1};
+use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
 use rand::Rng;
-use snafu::OptionExt;
 use std::cmp;
-use std::collections::{hash_map, HashMap, HashSet, VecDeque};
+use std::collections::{hash_map, HashMap, HashSet};
 
 /// An item to be assembled, which can be either an [`AbstractOp`] or a raw byte
 /// sequence.
@@ -205,9 +202,6 @@ pub struct Assembler {
     /// Assembled ops, not yet ready to be taken.
     ready: Vec<RawOp>,
 
-    /// Assembled ops, ready to be taken.
-    output: Vec<u8>,
-
     /// Number ob bytes in 'ready' that are ready to be taken.
     concrete_len: usize,
 
@@ -226,17 +220,17 @@ pub struct Assembler {
     undefined_macros: Vec<PendingMacro>,
 }
 
-/// TODO Temporal DOC
+/// Struct used to keep track of pending label invocations and their positions in code.
 #[derive(Debug, Clone)]
 pub struct PendingLabel {
     /// The name of the label.
     label: String,
 
-    /// The offset of the label.
-    offset: usize,
+    /// Concrete position where the label was invoked.
+    position: usize,
 }
 
-/// TODO Temporal DOC
+/// Struct used to keep track of pending macro invocations and thwey positions in code.
 #[derive(Debug, Clone)]
 pub struct PendingMacro {
     /// The name of the macro.
@@ -245,15 +239,14 @@ pub struct PendingMacro {
     /// Parameters of the macro.
     parameters: Vec<Expression>,
 
-    /// The offset of the macro.
-    offset: usize,
+    /// Concrete position where the macro was invoked.
+    position: usize,
 }
 
 impl Default for Assembler {
     fn default() -> Self {
         Self {
             ready: Default::default(),
-            output: Default::default(),
             concrete_len: 0,
             declared_labels: Default::default(),
             declared_macros: Default::default(),
@@ -275,8 +268,6 @@ impl Assembler {
         match output {
             Ok(v) => {
                 self.ready.clear();
-                //self.concrete_len = 0;
-                //self.output.clear();
                 v
             }
             Err(e) => {
@@ -286,7 +277,7 @@ impl Assembler {
         }
     }
 
-    /// Temporal documentation. TODO
+    /// Concretize all assembled instructions.
     fn concretize_ops(&mut self) -> Result<Vec<u8>, Error> {
         let mut output = Vec::new();
         for op in self.ready.iter() {
@@ -324,7 +315,8 @@ impl Assembler {
         Ok(output)
     }
 
-    /// Temporal documentation. TODO
+    /// Indicate that the input sequence is complete. Returns any errors that
+    /// may remain.
     pub fn finish(&mut self) -> Result<(), Error> {
         if !self.undefined_labels.is_empty() {
             return error::UndeclaredLabels {
@@ -343,22 +335,6 @@ impl Assembler {
             }
             .fail();
         }
-
-        // Concretize every RawOp ready, and collect the results.
-        /*for ready_op in self.ready.iter() {
-            if let RawOp::Op(ref op) = ready_op {
-                match op
-                    .clone()
-                    .concretize((&self.declared_labels, &self.declared_macros).into())
-                {
-                    Ok(cop) => cop.assemble(&mut self.output),
-                    Err(e) => unreachable!("all ops should be concretizable: {}", e),
-                }
-            } else if let RawOp::Raw(raw) = ready_op {
-                self.concrete_len += raw.len();
-                self.output.extend(raw);
-            }
-        }*/
 
         Ok(())
     }
@@ -412,7 +388,7 @@ impl Assembler {
                 if !self.declared_labels.contains_key(&label) {
                     self.undefined_labels.push(PendingLabel {
                         label: label.to_owned(),
-                        offset: self.ready.len(),
+                        position: self.ready.len(),
                     });
                 }
             }
@@ -429,13 +405,10 @@ impl Assembler {
         O: Into<RawOp>,
     {
         let rop = rop.into();
-        println!("pushing {:?}", rop);
 
         self.declare_content(&rop)?;
 
-        // Expand instruction macros immediately. We do this here because it's the same process
-        // regardless if we `push_read` or `push_pending` -- in fact, `expand_macro` pushes each op
-        // individually which calls the correct unchecked push.
+        // Expand instruction macros immediately.
         if let RawOp::Op(AbstractOp::Macro(ref m)) = rop {
             self.expand_macro(&m.name, &m.parameters, None)?;
             return Ok(self.concrete_len);
@@ -451,7 +424,7 @@ impl Assembler {
                 let mut dst = 0;
                 for ul in self.undefined_labels.iter() {
                     if ul.label == label {
-                        let tmp = ((self.concrete_len - ul.offset) / 256) as f32;
+                        let tmp = ((self.concrete_len - ul.position) / 256) as f32;
                         dst = cmp::max(tmp.floor() as usize, dst);
                     }
                 }
@@ -470,7 +443,7 @@ impl Assembler {
                     .undefined_macros
                     .iter()
                     .filter(|um| um.name == *defn.name())
-                    .map(|um| (um.name.clone(), um.parameters.clone(), um.offset))
+                    .map(|um| (um.name.clone(), um.parameters.clone(), um.position))
                     .collect();
 
                 let expanded_names: HashSet<_> =
@@ -514,26 +487,17 @@ impl Assembler {
                         .fail()
                     }
                     Err(ops::Error::ContextIncomplete { source }) => match source {
-                        UnknownLabel { label, .. } => {
+                        UnknownLabel { label: _label, .. } => {
                             let size = match op.size() {
                                 Some(size) => size,
-                                None => 2, // %push(label) with min size
+                                None => 2, // %push(label) with min size (to be updated)
                             };
                             self.concrete_len += size;
                             self.ready.push(rop);
-                            //self.undefined_labels.push(PendingLabel {
-                            //    label: label.to_owned(),
-                            //    offset: self.ready.len(),
-                            //});
                         }
-                        UnknownMacro { name, .. } => todo!("unknown macro {}", name),
-                        //{
-                        //    self.ready.push(rop);
-                        //    self.undefined_macros.push(PendingMacro {
-                        //        name: name.to_owned(),
-                        //        offset: self.concrete_len,
-                        //    });
-                        //}
+                        UnknownMacro { name, .. } => {
+                            return error::UndeclaredInstructionMacro { name }.fail()
+                        }
                         UndefinedVariable { name, .. } => todo!("undefined variable {}", name),
                     },
                 }
@@ -575,7 +539,6 @@ impl Assembler {
 
                 // First pass, find locally defined labels and rename them.
                 for op in m.contents.iter_mut() {
-                    println!("macro {:?} op: {:?}", name, op);
                     match op {
                         AbstractOp::Label(ref mut label) => {
                             let mangled = format!("{}_{}_{}", m.name, label, rng.gen::<u64>());
@@ -627,7 +590,7 @@ impl Assembler {
                 self.undefined_macros.push(PendingMacro {
                     name: name.to_owned(),
                     parameters: parameters.to_owned(),
-                    offset: self.ready.len(),
+                    position: self.ready.len(),
                 });
                 Ok(None)
             }

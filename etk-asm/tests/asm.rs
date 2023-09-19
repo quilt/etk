@@ -1,9 +1,6 @@
 use assert_matches::assert_matches;
 
-use etk_asm::{
-    asm::Assembler,
-    ingest::{Error, Ingest},
-};
+use etk_asm::ingest::{Error, Ingest};
 
 use hex_literal::hex;
 
