@@ -250,10 +250,7 @@ impl Assembler {
                 self.ready.clear();
                 v
             }
-            Err(e) => {
-                eprintln!("error: {}", e);
-                Vec::new()
-            }
+            Err(_) => Vec::new(),
         }
     }
 
