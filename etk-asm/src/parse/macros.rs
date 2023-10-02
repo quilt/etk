@@ -3,14 +3,13 @@ use super::error::ParseError;
 use super::expression;
 use super::parser::Rule;
 use crate::ast::Node;
-use crate::ingest::Root;
 use crate::ops::{
     AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation,
     InstructionMacroDefinition, InstructionMacroInvocation,
 };
 use crate::parse::{error, parse_asm};
 use pest::iterators::Pair;
-use snafu::{ensure, IntoError};
+use snafu::IntoError;
 use std::path::PathBuf;
 
 pub(crate) fn parse(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
@@ -25,62 +24,28 @@ pub(crate) fn parse(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     }
 }
 
-pub(crate) fn parse_builtin(
-    root: Root,
-    pair: Pair<Rule>,
-    mut depth: u16,
-) -> Result<Vec<Node>, ParseError> {
-    ensure!(depth <= 255, error::RecursionLimit);
+pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
     let mut pairs = pair.into_inner();
     let pair = pairs.next().unwrap();
     assert!(pairs.next().is_none());
     let rule = pair.as_rule();
 
-    depth += 1;
-
     let node = match rule {
         Rule::import => {
             let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
-            let new_path = root.canonicalized.join(args.0.clone());
-            let root = Root::new(new_path.clone()).unwrap();
-            let path = new_path.into_os_string().into_string().unwrap();
-            let code_str = &std::fs::read_to_string(&path);
-            let nodes = match code_str {
-                Ok(code) => parse_asm(root.clone(), code, depth)?,
-                Err(_) => return error::FileNotFound { path: args.0 }.fail(),
-            };
-            nodes
+            Node::Import(args.0)
         }
         Rule::include => {
             let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
-            let new_path = root.canonicalized.join(args.0.clone());
-            let root = Root::new(new_path.clone()).unwrap();
-            let path = new_path.into_os_string().into_string().unwrap();
-            let code_str = &std::fs::read_to_string(&path);
-            let nodes = match code_str {
-                Ok(code) => parse_asm(root.clone(), code, depth)?,
-                Err(_) => return error::FileNotFound { path: args.0 }.fail(),
-            };
-            vec![Node::Include(nodes)]
+            Node::Include(args.0)
         }
         Rule::include_hex => {
             let args = <(PathBuf,)>::parse_arguments(pair.into_inner())?;
-            let file = &std::fs::read_to_string(&args.0);
-
-            let raw = match file {
-                Ok(value) => hex::decode(value.trim()),
-                Err(_) => return error::FileNotFound { path: args.0 }.fail(),
-            };
-
-            match raw {
-                Ok(values) => vec![Node::IncludeHex(values)],
-                Err(e) => return Err(error::InvalidHex { path: args.0 }.into_error(Box::new(e))),
-            }
-            // TODO Check this error handling
+            Node::IncludeHex(args.0)
         }
         Rule::push_macro => {
             let expr = expression::parse(pair.into_inner().next().unwrap())?;
-            vec![Node::Op(AbstractOp::Push(expr.into()))]
+            Node::Op(AbstractOp::Push(expr.into()))
         }
         _ => unreachable!(),
     };

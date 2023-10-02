@@ -137,12 +137,15 @@ use rand::Rng;
 use std::cmp;
 use std::collections::{hash_map, HashMap, HashSet};
 
-/// An item to be assembled, which can be either an [`AbstractOp`] or a raw byte
-/// sequence.
+/// An item to be assembled, which can be either an [`AbstractOp`],
+/// the inclusion of a new scope or a raw byte sequence.
 #[derive(Debug, Clone)]
 pub enum RawOp {
     /// An instruction to be assembled.
     Op(AbstractOp),
+
+    /// A new scope to be included.
+    Scope(Vec<RawOp>),
 
     /// Raw bytes, for example from `%include_hex`, to be included verbatim in
     /// the output.
@@ -153,6 +156,7 @@ impl RawOp {
     fn expr(&self) -> Option<&Expression> {
         match self {
             Self::Op(op) => op.expr(),
+            Self::Scope(_) => None,
             Self::Raw(_) => None,
         }
     }
@@ -265,7 +269,7 @@ impl Assembler {
         for op in nodes {
             let op = op.into();
             if let RawOp::Op(AbstractOp::MacroDefinition(_)) = op {
-                self.declare_content(op)?
+                self.declare_macro(op)?
             }
         }
 
@@ -336,12 +340,12 @@ impl Assembler {
             .fail();
         }
 
-        if !self.undefined_macros.is_empty() {
+        /*if !self.undefined_macros.is_empty() {
             return error::UndeclaredInstructionMacro {
                 name: self.undefined_macros[0].name.to_owned(),
             }
             .fail();
-        }
+        }*/
 
         Ok(())
     }
@@ -355,7 +359,7 @@ impl Assembler {
         O: Into<RawOp>,
     {
         for op in ops {
-            self.push(op, None)?;
+            self.push(op)?;
         }
 
         Ok(self.concrete_len)
@@ -363,22 +367,12 @@ impl Assembler {
 
     /// Insert explicilty declared macros and labels, via `AbstractOp`, and implictly declared
     /// macros and labels via usage in `Op`.
-    pub fn declare_content<O>(&mut self, rop: O) -> Result<(), Error>
+    fn declare_macro<O>(&mut self, rop: O) -> Result<(), Error>
     where
         O: Into<RawOp>,
     {
         let rop = rop.into();
         match rop {
-            RawOp::Op(AbstractOp::Label(ref label)) => {
-                match self.declared_labels.entry(label.to_owned()) {
-                    hash_map::Entry::Occupied(_) => {
-                        return error::DuplicateLabel { label }.fail();
-                    }
-                    hash_map::Entry::Vacant(v) => {
-                        v.insert(None);
-                    }
-                }
-            }
             RawOp::Op(AbstractOp::MacroDefinition(ref defn)) => {
                 match self.declared_macros.entry(defn.name().to_owned()) {
                     hash_map::Entry::Occupied(_) => {
@@ -411,15 +405,27 @@ impl Assembler {
     /// Feed a single instruction into the `Assembler`.
     ///
     /// Returns the number of bytes that can be collected with [`Assembler::take`]
-    pub fn push<O>(&mut self, rop: O, pos: Option<usize>) -> Result<usize, Error>
+    pub fn push<O>(&mut self, rop: O) -> Result<usize, Error>
     where
         O: Into<RawOp>,
     {
         let rop = rop.into();
         println!("pushing {:?}", rop);
 
-        //self.declare_content(&rop)?;
-        if let RawOp::Op(AbstractOp::Label(ref label)) = rop {
+        self.declare_label(&rop)?;
+
+        // Expand instruction macros immediately.
+        if let RawOp::Op(AbstractOp::Macro(ref m)) = rop {
+            self.expand_macro(&m.name, &m.parameters)?;
+            return Ok(self.concrete_len);
+        }
+
+        self.push_rawop(rop)?;
+        Ok(self.concrete_len)
+    }
+
+    fn declare_label(&mut self, rop: &RawOp) -> Result<(), Error> {
+        if let RawOp::Op(AbstractOp::Label(ref label)) = *rop {
             match self.declared_labels.entry(label.to_owned()) {
                 hash_map::Entry::Occupied(_) => {
                     return error::DuplicateLabel { label }.fail();
@@ -429,18 +435,10 @@ impl Assembler {
                 }
             }
         }
-
-        // Expand instruction macros immediately.
-        if let RawOp::Op(AbstractOp::Macro(ref m)) = rop {
-            self.expand_macro(&m.name, &m.parameters, None)?;
-            return Ok(self.concrete_len);
-        }
-
-        self.push_rawop(rop, pos)?;
-        Ok(self.concrete_len)
+        Ok(())
     }
 
-    fn push_rawop(&mut self, rop: RawOp, pos: Option<usize>) -> Result<(), Error> {
+    fn push_rawop(&mut self, rop: RawOp) -> Result<(), Error> {
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
                 let mut dst = 0;
@@ -469,10 +467,7 @@ impl Assembler {
                 {
                     Ok(cop) => {
                         self.concrete_len += cop.size();
-                        match pos {
-                            Some(pos) => self.ready.insert(pos, rop),
-                            None => self.ready.push(rop),
-                        }
+                        self.ready.push(rop)
                     }
                     Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
                         return error::ExpressionTooLarge {
@@ -511,10 +506,15 @@ impl Assembler {
             }
             RawOp::Raw(raw) => {
                 self.concrete_len += raw.len();
-                match pos {
-                    Some(pos) => _ = self.ready.splice(pos..pos, vec![RawOp::Raw(raw)]),
-                    None => self.ready.push(RawOp::Raw(raw)),
-                }
+                self.ready.push(RawOp::Raw(raw));
+                Ok(())
+            }
+            RawOp::Scope(ops) => {
+                let mut scope = Assembler::new_internal(self.concrete_len);
+                scope.inspect_macros(ops.iter().cloned())?;
+                let sz = scope.push_all(ops)?;
+                self.concrete_len += sz;
+                self.ready.push(RawOp::Scope(scope.ready));
                 Ok(())
             }
         }
@@ -524,7 +524,6 @@ impl Assembler {
         &mut self,
         name: &str,
         parameters: &[Expression],
-        position: Option<usize>,
     ) -> Result<Option<usize>, Error> {
         // Remap labels to macro scope.
         match self.declared_macros.get(name).cloned() {
@@ -578,18 +577,7 @@ impl Assembler {
                     }
                 }
 
-                match position {
-                    Some(pos) => {
-                        let actual_size = self.ready.len();
-                        for op in m.contents.iter() {
-                            let offset = self.ready.len() - actual_size + pos;
-                            self.push(op.clone(), Some(offset))?;
-                        }
-
-                        Ok(Some(self.ready.len()))
-                    }
-                    None => Ok(Some(self.push_all(m.contents)?)),
-                }
+                Ok(Some(self.push_all(m.contents)?))
             }
             _ => return error::UndeclaredInstructionMacro { name }.fail(),
         }
@@ -756,9 +744,9 @@ mod tests {
     #[test]
     fn assemble_variable_push2() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        asm.push(AbstractOp::Push(Imm::with_label("auto")), None)?;
+        asm.push(AbstractOp::Push(Imm::with_label("auto")))?;
         for _ in 0..255 {
-            asm.push(AbstractOp::new(GetPc), None)?;
+            asm.push(AbstractOp::new(GetPc))?;
         }
 
         asm.push_all(vec![

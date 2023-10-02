@@ -20,23 +20,23 @@ use self::{
     parser::{AsmParser, Rule},
 };
 
+use crate::ast::Node;
 use crate::ops::AbstractOp;
-use crate::{ast::Node, ingest::Root};
 use etk_ops::cancun::Op;
 use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
 
-pub(crate) fn parse_asm(root: Root, asm: &str, depth: u16) -> Result<Vec<Node>, ParseError> {
+pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     let mut program: Vec<Node> = Vec::new();
 
     let pairs = AsmParser::parse(Rule::program, asm)?;
     for pair in pairs {
         let node = match pair.as_rule() {
-            Rule::builtin => macros::parse_builtin(root.clone(), pair, depth)?,
+            Rule::builtin => macros::parse_builtin(pair)?,
             Rule::EOI => continue,
-            _ => vec![parse_abstract_op(pair)?.into()],
+            _ => parse_abstract_op(pair)?.into(),
         };
-        program.extend(node);
+        program.push(node);
     }
 
     Ok(program)
@@ -78,7 +78,7 @@ fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
 
     Ok(AbstractOp::Op(spec.with(expr).unwrap()))
 }
-/*
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -598,4 +598,3 @@ mod tests {
         assert_eq!(parse_asm(&asm).unwrap(), expected);
     }
 }
- */

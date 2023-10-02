@@ -87,14 +87,6 @@ pub enum ParseError {
         /// The location of the error.
         backtrace: Backtrace,
     },
-
-    /// A recursion limit was reached while including or importing a file.
-    #[snafu(display("too many levels of recursion/includes"))]
-    #[non_exhaustive]
-    RecursionLimit {
-        /// The location of the error.
-        backtrace: Backtrace,
-    },
 }
 
 impl From<Error<Rule>> for ParseError {
