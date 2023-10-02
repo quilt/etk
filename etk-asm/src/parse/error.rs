@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use pest::error::Error;
 
 use snafu::{Backtrace, IntoError, Snafu};
@@ -57,6 +59,39 @@ pub enum ParseError {
     #[snafu(display("incorrect argument type"))]
     #[non_exhaustive]
     ArgumentType {
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// An argument provided to a macro was of the wrong type.
+    #[snafu(display("File {} does not exist", path.to_string_lossy()))]
+    #[non_exhaustive]
+    FileNotFound {
+        /// Path to the offending file.
+        path: PathBuf,
+
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// An included fail failed to parse as hexadecimal.
+    #[snafu(display("included file `{}` is invalid hex: {}", path.to_string_lossy(), source))]
+    #[non_exhaustive]
+    InvalidHex {
+        /// Path to the offending file.
+        path: PathBuf,
+
+        /// The underlying source of this error.
+        source: Box<dyn std::error::Error>,
+
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// A recursion limit was reached while including or importing a file.
+    #[snafu(display("too many levels of recursion/includes"))]
+    #[non_exhaustive]
+    RecursionLimit {
         /// The location of the error.
         backtrace: Backtrace,
     },

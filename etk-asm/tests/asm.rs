@@ -120,8 +120,8 @@ fn undefined_label_undefined_macro() {
         .unwrap_err();
 
     assert_matches!(err, etk_asm::ingest::Error::Assemble { source:
-             etk_asm::asm::Error::UndeclaredLabels { labels, .. }, .. 
-    } if labels == vec!["revert".to_string()]);
+             etk_asm::asm::Error::UndeclaredInstructionMacro { name, .. }, .. 
+    } if name == "revert".to_string());
 }
 
 #[test]
@@ -290,5 +290,17 @@ fn every_op() -> Result<(), Error> {
         )
     );
 
+    Ok(())
+}
+
+#[test]
+fn test_erc20() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["erc20", "Contract.etk"]))?;
+
+    let str_out: Vec<_> = output.iter().map(|&byte| format!("{:02x}", byte)).collect();
+    //assert_eq!(output, hex!("6000600060006000600060006000"));
+    println!("output: {:?}", str_out.concat());
     Ok(())
 }

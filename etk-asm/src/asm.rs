@@ -130,6 +130,7 @@ mod error {
 }
 
 pub use self::error::Error;
+use crate::ast::Node;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
 use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
 use rand::Rng;
@@ -195,7 +196,7 @@ pub struct Assembler {
     /// Assembled ops, not yet ready to be taken.
     ready: Vec<RawOp>,
 
-    /// Number ob bytes in 'ready' that are ready to be taken.
+    /// Number of bytes in 'ready' that are ready to be taken.
     concrete_len: usize,
 
     /// Labels, in `pending`, associated with an `AbstractOp::Label`.
@@ -219,11 +220,11 @@ pub struct PendingLabel {
     /// The name of the label.
     label: String,
 
-    /// Concrete position where the label was invoked.
+    /// Position where the label was invoked.
     position: usize,
 }
 
-/// Struct used to keep track of pending macro invocations and thwey positions in code.
+/// Struct used to keep track of pending macro invocations and their positions in code.
 #[derive(Debug, Clone)]
 pub struct PendingMacro {
     /// The name of the macro.
@@ -232,7 +233,7 @@ pub struct PendingMacro {
     /// Parameters of the macro.
     parameters: Vec<Expression>,
 
-    /// Concrete position where the macro was invoked.
+    /// Position where the macro was invoked.
     position: usize,
 }
 
@@ -240,6 +241,35 @@ impl Assembler {
     /// Create a new `Assembler`.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// TODO: Add DOC
+    pub fn new_internal(concrete_len: usize) -> Self {
+        Self {
+            concrete_len,
+            ..Self::default()
+        }
+    }
+
+    /// TODO: Add DOC
+    pub fn get_concrete_len(&self) -> usize {
+        self.concrete_len
+    }
+
+    /// TODO: Add DOC
+    pub fn inspect_macros<I, O>(&mut self, nodes: I) -> Result<(), Error>
+    where
+        I: IntoIterator<Item = O>,
+        O: Into<RawOp>,
+    {
+        for op in nodes {
+            let op = op.into();
+            if let RawOp::Op(AbstractOp::MacroDefinition(_)) = op {
+                self.declare_content(op)?
+            }
+        }
+
+        Ok(())
     }
 
     /// Collect any assembled instructions that are ready to be output.
@@ -333,7 +363,11 @@ impl Assembler {
 
     /// Insert explicilty declared macros and labels, via `AbstractOp`, and implictly declared
     /// macros and labels via usage in `Op`.
-    fn declare_content(&mut self, rop: &RawOp) -> Result<(), Error> {
+    pub fn declare_content<O>(&mut self, rop: O) -> Result<(), Error>
+    where
+        O: Into<RawOp>,
+    {
+        let rop = rop.into();
         match rop {
             RawOp::Op(AbstractOp::Label(ref label)) => {
                 match self.declared_labels.entry(label.to_owned()) {
@@ -382,8 +416,19 @@ impl Assembler {
         O: Into<RawOp>,
     {
         let rop = rop.into();
+        println!("pushing {:?}", rop);
 
-        self.declare_content(&rop)?;
+        //self.declare_content(&rop)?;
+        if let RawOp::Op(AbstractOp::Label(ref label)) = rop {
+            match self.declared_labels.entry(label.to_owned()) {
+                hash_map::Entry::Occupied(_) => {
+                    return error::DuplicateLabel { label }.fail();
+                }
+                hash_map::Entry::Vacant(v) => {
+                    v.insert(None);
+                }
+            }
+        }
 
         // Expand instruction macros immediately.
         if let RawOp::Op(AbstractOp::Macro(ref m)) = rop {
@@ -415,26 +460,7 @@ impl Assembler {
                 assert_eq!(old, None, "label should have been undefined");
                 Ok(())
             }
-            RawOp::Op(AbstractOp::MacroDefinition(ref defn)) => {
-                let macros_to_expand: Vec<_> = self
-                    .undefined_macros
-                    .iter()
-                    .filter(|um| um.name == *defn.name())
-                    .map(|um| (um.name.clone(), um.parameters.clone(), um.position))
-                    .collect();
-
-                let expanded_names: HashSet<_> =
-                    macros_to_expand.iter().map(|(name, _, _)| name).collect();
-
-                self.undefined_macros
-                    .retain(|um| !expanded_names.contains(&um.name));
-
-                for (name, parameters, offset) in macros_to_expand.iter() {
-                    self.expand_macro(name, parameters, Some(*offset))?;
-                }
-
-                Ok(())
-            }
+            RawOp::Op(AbstractOp::MacroDefinition(_)) => Ok(()),
             RawOp::Op(AbstractOp::Macro(_)) => Ok(()),
             RawOp::Op(ref op) => {
                 match op
@@ -467,6 +493,11 @@ impl Assembler {
                         UnknownLabel { label: _label, .. } => {
                             let size = op.size().unwrap_or(2); // %push(label) with min size (to be updated)
                             self.concrete_len += size;
+
+                            self.undefined_labels.push(PendingLabel {
+                                label: _label.to_owned(),
+                                position: self.ready.len(),
+                            });
                             self.ready.push(rop);
                         }
                         UnknownMacro { name, .. } => {
@@ -555,19 +586,12 @@ impl Assembler {
                             self.push(op.clone(), Some(offset))?;
                         }
 
-                        Ok(Some(self.concrete_len))
+                        Ok(Some(self.ready.len()))
                     }
                     None => Ok(Some(self.push_all(m.contents)?)),
                 }
             }
-            _ => {
-                self.undefined_macros.push(PendingMacro {
-                    name: name.to_owned(),
-                    parameters: parameters.to_owned(),
-                    position: self.ready.len(),
-                });
-                Ok(None)
-            }
+            _ => return error::UndeclaredInstructionMacro { name }.fail(),
         }
     }
 }
@@ -897,6 +921,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone())?;
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 0);
         let out = asm.take();
@@ -933,6 +958,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone())?;
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 13);
         let out = asm.take();
@@ -965,6 +991,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone())?;
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 8);
         let out = asm.take();
@@ -997,6 +1024,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone())?;
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 8);
         let out = asm.take();
@@ -1029,6 +1057,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone())?;
         let sz = asm.push_all(ops)?;
         assert_eq!(7, sz);
         assert_eq!(asm.take(), hex!("5b600560065858"));
@@ -1042,8 +1071,10 @@ mod tests {
             InstructionMacroInvocation::with_zero_parameters("my_macro".into()),
         )];
         let mut asm = Assembler::new();
-        asm.push_all(ops)?;
-        let err = asm.finish().unwrap_err();
+        asm.inspect_macros(ops.clone())?;
+        let err = asm.push_all(ops).unwrap_err();
+        //let err = asm.finish().unwrap_err();
+        println!("{:?}", err);
         assert_matches!(err, Error::UndeclaredInstructionMacro { name, .. } if name == "my_macro");
 
         Ok(())
@@ -1066,7 +1097,8 @@ mod tests {
             .into(),
         ];
         let mut asm = Assembler::new();
-        let err = asm.push_all(ops).unwrap_err();
+        let err = asm.inspect_macros(ops.clone()).unwrap_err();
+        //let err = asm.push_all(ops).unwrap_err();
         assert_matches!(err, Error::DuplicateMacro { name, .. } if name == "my_macro");
 
         Ok(())
@@ -1086,6 +1118,7 @@ mod tests {
             )),
         ];
         let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone())?;
         let err = asm.push_all(ops).unwrap_err();
         assert_matches!(err, Error::DuplicateLabel { label, .. } if label == "a");
 
@@ -1113,6 +1146,7 @@ mod tests {
             AbstractOp::new(Push1(Imm::with_label("a"))),
         ];
         let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone())?;
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 5);
 
@@ -1149,6 +1183,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone())?;
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 7);
         let out = asm.take();
@@ -1261,6 +1296,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone())?;
         let sz = asm.push_all(ops)?;
         assert_eq!(sz, 2);
         let out = asm.take();
