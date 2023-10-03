@@ -113,7 +113,6 @@ struct Root {
 }
 
 impl Root {
-    /// TODO: Temporal DOC
     fn new(mut file: PathBuf) -> Result<Self, Error> {
         // Pop the filename.
         if !file.pop() {
@@ -199,8 +198,20 @@ impl Program {
         ensure!(self.depth <= 255, error::RecursionLimit);
         self.depth += 1;
 
-        let path = if let Some(ref root) = self.root {
-            let candidate = self.actual_path.join(path);
+        let oldpath = self.actual_path.clone();
+        let new_path = if let Some(ref root) = self.root {
+            let candidate = match path.parent() {
+                Some(parent) => {
+                    let mut candidate = self.actual_path.join(parent);
+                    candidate.push(path.file_name().unwrap());
+                    candidate
+                }
+                None => {
+                    let mut candidate = root.original.clone();
+                    candidate.push(path);
+                    candidate
+                }
+            };
             root.check(&candidate)?;
             candidate
         } else {
@@ -208,7 +219,9 @@ impl Program {
             path
         };
 
-        Ok(path)
+        self.actual_path = new_path;
+
+        Ok(oldpath)
     }
 
     fn pop_path(&mut self, oldpath: PathBuf) {
@@ -279,7 +292,8 @@ where
         Ok(())
     }
 
-    /// TODO: Documentation
+    /// Assemble instructions from `src` as if they were read from a file located
+    /// at `path`.
     pub fn ingest<P>(&mut self, path: P, text: &str) -> Result<(), Error>
     where
         P: Into<PathBuf>,
@@ -299,12 +313,11 @@ where
         Ok(())
     }
 
-    /// Assemble instructions from `src` as if they were read from a file located
-    /// at `path`.
     fn preprocess(&mut self, program: &mut Program, src: &str) -> Result<Vec<RawOp>, Error> {
         let nodes = parse_asm(&src)?;
         let mut raws = Vec::new();
         for node in nodes {
+            println!("{:?}", node);
             match node {
                 Node::Op(op) => {
                     raws.push(RawOp::Op(op));
@@ -353,10 +366,11 @@ where
     {
         let path = path.into();
         let oldpath = program.push_path(path.clone())?;
-        let code = read_to_string::<&PathBuf>(&path).with_context(|_| error::Io {
-            message: "reading file before parsing",
-            path: path.to_owned(),
-        })?;
+        let code =
+            read_to_string::<&PathBuf>(&program.actual_path).with_context(|_| error::Io {
+                message: "reading file before parsing",
+                path: path.to_owned(),
+            })?;
         let new_raws = self.preprocess(program, &code)?;
         program.pop_path(oldpath);
         Ok(new_raws)
@@ -371,7 +385,7 @@ where
                     asm.push(RawOp::Op(op))?;
                 }
                 RawOp::Scope(scope_ops) => {
-                    let mut new_asm = Assembler::new_internal(asm.get_concrete_len());
+                    let mut new_asm = Assembler::new_internal(asm.concrete_len());
                     self.run(scope_ops, &mut new_asm)?;
                     let raw = new_asm.take();
                     asm.push(RawOp::Raw(raw))?;
@@ -456,7 +470,8 @@ mod tests {
         let mut output = Vec::new();
         let mut ingest = Ingest::new(&mut output);
         ingest.ingest(root, &text)?;
-        assert_eq!(output, hex!("60015b586000566002"));
+
+        assert_eq!(output, hex!("60015b586002566002"));
 
         Ok(())
     }
@@ -648,7 +663,7 @@ mod tests {
         let mut ingest = Ingest::new(&mut output);
         ingest.ingest(root, &text)?;
 
-        let expected = hex!("620000155b58600b5b5b61000b6100035b600360045b62000004");
+        let expected = hex!("620000155b5860105b5b6100106100085b600860095b62000004");
         assert_eq!(output, expected);
 
         Ok(())

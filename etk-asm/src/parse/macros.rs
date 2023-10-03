@@ -7,9 +7,7 @@ use crate::ops::{
     AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation,
     InstructionMacroDefinition, InstructionMacroInvocation,
 };
-use crate::parse::{error, parse_asm};
 use pest::iterators::Pair;
-use snafu::IntoError;
 use std::path::PathBuf;
 
 pub(crate) fn parse(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {

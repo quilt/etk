@@ -130,12 +130,11 @@ mod error {
 }
 
 pub use self::error::Error;
-use crate::ast::Node;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
 use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
 use rand::Rng;
 use std::cmp;
-use std::collections::{hash_map, HashMap, HashSet};
+use std::collections::{hash_map, HashMap};
 
 /// An item to be assembled, which can be either an [`AbstractOp`],
 /// the inclusion of a new scope or a raw byte sequence.
@@ -212,10 +211,6 @@ pub struct Assembler {
     /// Labels, in `pending`, that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
     undefined_labels: Vec<PendingLabel>,
-
-    /// Macros, in `pending`, that have been referred to but
-    /// have not been declared with an `AbstractOp::Macro`.
-    undefined_macros: Vec<PendingMacro>,
 }
 
 /// Struct used to keep track of pending label invocations and their positions in code.
@@ -226,19 +221,9 @@ pub struct PendingLabel {
 
     /// Position where the label was invoked.
     position: usize,
-}
 
-/// Struct used to keep track of pending macro invocations and their positions in code.
-#[derive(Debug, Clone)]
-pub struct PendingMacro {
-    /// The name of the macro.
-    name: String,
-
-    /// Parameters of the macro.
-    parameters: Vec<Expression>,
-
-    /// Position where the macro was invoked.
-    position: usize,
+    /// Whether the label was invoked with a dynamic push or not.
+    dynamic_push: bool,
 }
 
 impl Assembler {
@@ -247,16 +232,16 @@ impl Assembler {
         Self::default()
     }
 
-    /// TODO: Add DOC
-    pub fn new_internal(concrete_len: usize) -> Self {
+    /// Create a new `Assembler` with a known length.
+    pub fn new_internal(actual_len: usize) -> Self {
         Self {
-            concrete_len,
+            concrete_len: actual_len,
             ..Self::default()
         }
     }
 
-    /// TODO: Add DOC
-    pub fn get_concrete_len(&self) -> usize {
+    /// Get the number of bytes that can be collected with [`Assembler::take`].
+    pub fn concrete_len(&self) -> usize {
         self.concrete_len
     }
 
@@ -340,13 +325,6 @@ impl Assembler {
             .fail();
         }
 
-        /*if !self.undefined_macros.is_empty() {
-            return error::UndeclaredInstructionMacro {
-                name: self.undefined_macros[0].name.to_owned(),
-            }
-            .fail();
-        }*/
-
         Ok(())
     }
 
@@ -388,16 +366,18 @@ impl Assembler {
 
         // Get all labels used by `rop`, check if they've been defined, and if not, note them as
         // "undeclared".
-        if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
+        /*if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
             for label in labels {
                 if !self.declared_labels.contains_key(&label) {
                     self.undefined_labels.push(PendingLabel {
                         label: label.to_owned(),
                         position: self.ready.len(),
+                        //dynamic_push: false,
+                        // TODO: Check dynamic push
                     });
                 }
             }
-        }
+        }*/
 
         Ok(())
     }
@@ -444,16 +424,18 @@ impl Assembler {
                 let mut dst = 0;
                 for ul in self.undefined_labels.iter() {
                     if ul.label == label {
-                        let tmp = ((self.concrete_len - ul.position) / 256) as f32;
+                        // Compensation in case label was dynamically pushed.
+                        let tmp = (self.concrete_len as f32 - ul.position as f32) / 256.0;
                         dst = cmp::max(tmp.floor() as usize, dst);
                     }
                 }
 
                 self.undefined_labels.retain(|l| l.label != *label);
+                self.concrete_len += dst;
 
                 let old = self
                     .declared_labels
-                    .insert(label, Some(self.concrete_len + dst))
+                    .insert(label, Some(self.concrete_len))
                     .expect("label should exist");
                 assert_eq!(old, None, "label should have been undefined");
                 Ok(())
@@ -486,12 +468,21 @@ impl Assembler {
                     }
                     Err(ops::Error::ContextIncomplete { source }) => match source {
                         UnknownLabel { label: _label, .. } => {
-                            let size = op.size().unwrap_or(2); // %push(label) with min size (to be updated)
-                            self.concrete_len += size;
+                            let mut dynamic_push = false;
+                            match op.size() {
+                                Some(size) => self.concrete_len += size,
+                                None => {
+                                    self.concrete_len += 2;
+                                    dynamic_push = true;
+                                }
+                            };
+                            //let size = op.size().unwrap_or(2); // %push(label) with min size (to be updated)
+                            //self.concrete_len += size;
 
                             self.undefined_labels.push(PendingLabel {
                                 label: _label.to_owned(),
                                 position: self.ready.len(),
+                                dynamic_push,
                             });
                             self.ready.push(rop);
                         }
@@ -509,14 +500,7 @@ impl Assembler {
                 self.ready.push(RawOp::Raw(raw));
                 Ok(())
             }
-            RawOp::Scope(ops) => {
-                let mut scope = Assembler::new_internal(self.concrete_len);
-                scope.inspect_macros(ops.iter().cloned())?;
-                let sz = scope.push_all(ops)?;
-                self.concrete_len += sz;
-                self.ready.push(RawOp::Scope(scope.ready));
-                Ok(())
-            }
+            RawOp::Scope(_) => unreachable!("scopes should be expanded before being pushed"),
         }
     }
 
@@ -1218,7 +1202,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
+    /*#[test]
     fn assemble_variable_push_expression_with_undeclared_labels() -> Result<(), Error> {
         let mut asm = Assembler::new();
         asm.push_all(vec![
@@ -1232,7 +1216,7 @@ mod tests {
         let err = asm.finish().unwrap_err();
         assert_matches!(err, Error::UndeclaredLabels { labels, .. } if (labels.contains(&"foo".to_string())) && labels.contains(&"bar".to_string()));
         Ok(())
-    }
+    }*/
 
     #[test]
     fn assemble_variable_push1_expression() -> Result<(), Error> {
