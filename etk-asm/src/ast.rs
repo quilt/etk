@@ -6,7 +6,6 @@ use etk_ops::cancun::Op;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Node {
     Op(AbstractOp),
-    Raw(Vec<u8>),
     Import(PathBuf),
     Include(PathBuf),
     IncludeHex(PathBuf),

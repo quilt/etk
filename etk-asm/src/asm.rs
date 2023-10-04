@@ -151,16 +151,6 @@ pub enum RawOp {
     Raw(Vec<u8>),
 }
 
-impl RawOp {
-    fn expr(&self) -> Option<&Expression> {
-        match self {
-            Self::Op(op) => op.expr(),
-            Self::Scope(_) => None,
-            Self::Raw(_) => None,
-        }
-    }
-}
-
 impl From<AbstractOp> for RawOp {
     fn from(op: AbstractOp) -> Self {
         Self::Op(op)
@@ -350,34 +340,16 @@ impl Assembler {
         O: Into<RawOp>,
     {
         let rop = rop.into();
-        match rop {
-            RawOp::Op(AbstractOp::MacroDefinition(ref defn)) => {
-                match self.declared_macros.entry(defn.name().to_owned()) {
-                    hash_map::Entry::Occupied(_) => {
-                        return error::DuplicateMacro { name: defn.name() }.fail()
-                    }
-                    hash_map::Entry::Vacant(v) => {
-                        v.insert(defn.to_owned());
-                    }
+        if let RawOp::Op(AbstractOp::MacroDefinition(ref defn)) = rop {
+            match self.declared_macros.entry(defn.name().to_owned()) {
+                hash_map::Entry::Occupied(_) => {
+                    return error::DuplicateMacro { name: defn.name() }.fail()
+                }
+                hash_map::Entry::Vacant(v) => {
+                    v.insert(defn.to_owned());
                 }
             }
-            _ => {}
-        };
-
-        // Get all labels used by `rop`, check if they've been defined, and if not, note them as
-        // "undeclared".
-        /*if let Some(Ok(labels)) = rop.expr().map(|e| e.labels(&self.declared_macros)) {
-            for label in labels {
-                if !self.declared_labels.contains_key(&label) {
-                    self.undefined_labels.push(PendingLabel {
-                        label: label.to_owned(),
-                        position: self.ready.len(),
-                        //dynamic_push: false,
-                        // TODO: Check dynamic push
-                    });
-                }
-            }
-        }*/
+        }
 
         Ok(())
     }
@@ -429,7 +401,7 @@ impl Assembler {
                             ((self.concrete_len as f32 - ul.position as f32) / 256.0).floor();
 
                         // Size already accounted for %push(label) was 2.
-                        if tmp >= 1.0 {
+                        if tmp > 1.0 {
                             tmp -= 1.0;
                         }
                         dst = cmp::max(tmp as usize, dst);
@@ -569,7 +541,7 @@ impl Assembler {
 
                 Ok(Some(self.push_all(m.contents)?))
             }
-            _ => return error::UndeclaredInstructionMacro { name }.fail(),
+            _ => error::UndeclaredInstructionMacro { name }.fail(),
         }
     }
 }

@@ -299,7 +299,7 @@ where
         P: Into<PathBuf>,
     {
         let mut program = Program::new(Some(Root::new(path.into())?));
-        let nodes = self.preprocess(&mut program, &text)?;
+        let nodes = self.preprocess(&mut program, text)?;
         let mut asm = Assembler::new();
         self.run(nodes, &mut asm)?;
 
@@ -314,16 +314,13 @@ where
     }
 
     fn preprocess(&mut self, program: &mut Program, src: &str) -> Result<Vec<RawOp>, Error> {
-        let nodes = parse_asm(&src)?;
+        let nodes = parse_asm(src)?;
         let mut raws = Vec::new();
         for node in nodes {
             println!("{:?}", node);
             match node {
                 Node::Op(op) => {
                     raws.push(RawOp::Op(op));
-                }
-                Node::Raw(raw) => {
-                    raws.push(RawOp::Raw(raw));
                 }
                 Node::Import(imp_path) => {
                     let new_raws = self.resolve_and_ingest(program, imp_path)?;
