@@ -182,15 +182,15 @@ impl Root {
 struct Program {
     depth: usize,
     root: Option<Root>,
-    actual_path: PathBuf,
+    sources: Vec<PathBuf>,
 }
 
 impl Program {
-    fn new(root: Option<Root>) -> Self {
+    fn new(path: PathBuf) -> Self {
         Self {
             depth: 0,
-            root: root.clone(),
-            actual_path: root.map(|r| r.original).unwrap_or(PathBuf::new()),
+            root: Root::new(path.clone()).ok(),
+            sources: vec![path],
         }
     }
 
@@ -198,35 +198,28 @@ impl Program {
         ensure!(self.depth <= 255, error::RecursionLimit);
         self.depth += 1;
 
-        let oldpath = self.actual_path.clone();
-        let new_path = if let Some(ref root) = self.root {
-            let candidate = match path.parent() {
-                Some(parent) => {
-                    let mut candidate = self.actual_path.join(parent);
-                    candidate.push(path.file_name().unwrap());
-                    candidate
-                }
-                None => {
-                    let mut candidate = root.original.clone();
-                    candidate.push(path);
-                    candidate
-                }
+        let path = if let Some(ref root) = self.root {
+            let last = self.sources.last().unwrap();
+            let dir = match last.parent() {
+                Some(s) => s,
+                None => Path::new("./"),
             };
+            let candidate = dir.join(path);
             root.check(&candidate)?;
+            self.sources.push(candidate.clone());
             candidate
         } else {
+            assert!(self.sources.is_empty());
             self.root = Some(Root::new(path.clone())?);
             path
         };
 
-        self.actual_path = new_path;
-
-        Ok(oldpath)
+        Ok(path)
     }
 
-    fn pop_path(&mut self, oldpath: PathBuf) {
+    fn pop_path(&mut self) {
         self.depth -= 1;
-        self.actual_path = oldpath;
+        self.sources.pop();
     }
 }
 
@@ -298,10 +291,10 @@ where
     where
         P: Into<PathBuf>,
     {
-        let mut program = Program::new(Some(Root::new(path.into())?));
+        let mut program = Program::new(path.into());
         let nodes = self.preprocess(&mut program, text)?;
         let mut asm = Assembler::new();
-        self.run(nodes, &mut asm)?;
+        Self::run(nodes, &mut asm)?;
 
         let raw = asm.take();
 
@@ -362,18 +355,17 @@ where
         P: Into<PathBuf>,
     {
         let path = path.into();
-        let oldpath = program.push_path(path.clone())?;
-        let code =
-            read_to_string::<&PathBuf>(&program.actual_path).with_context(|_| error::Io {
-                message: "reading file before parsing",
-                path: path.to_owned(),
-            })?;
+        let source = program.push_path(path.clone())?;
+        let code = read_to_string::<&PathBuf>(&source).with_context(|_| error::Io {
+            message: "reading file before parsing",
+            path: path.to_owned(),
+        })?;
         let new_raws = self.preprocess(program, &code)?;
-        program.pop_path(oldpath);
+        program.pop_path();
         Ok(new_raws)
     }
 
-    fn run(&mut self, ops: Vec<RawOp>, asm: &mut Assembler) -> Result<(), Error> {
+    fn run(ops: Vec<RawOp>, asm: &mut Assembler) -> Result<(), Error> {
         asm.inspect_macros(ops.clone())?;
 
         for rawop in ops {
@@ -383,7 +375,7 @@ where
                 }
                 RawOp::Scope(scope_ops) => {
                     let mut new_asm = Assembler::new_internal(asm.concrete_len());
-                    self.run(scope_ops, &mut new_asm)?;
+                    Self::run(scope_ops, &mut new_asm)?;
                     let raw = new_asm.take();
                     asm.push(RawOp::Raw(raw))?;
                 }
