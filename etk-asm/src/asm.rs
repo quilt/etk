@@ -423,10 +423,16 @@ impl Assembler {
             RawOp::Op(AbstractOp::Label(label)) => {
                 let mut dst = 0;
                 for ul in self.undefined_labels.iter() {
-                    if ul.label == label {
+                    if (ul.label == label) & ul.dynamic_push {
                         // Compensation in case label was dynamically pushed.
-                        let tmp = (self.concrete_len as f32 - ul.position as f32) / 256.0;
-                        dst = cmp::max(tmp.floor() as usize, dst);
+                        let mut tmp =
+                            ((self.concrete_len as f32 - ul.position as f32) / 256.0).floor();
+
+                        // Size already accounted for %push(label) was 2.
+                        if tmp >= 1.0 {
+                            tmp -= 1.0;
+                        }
+                        dst = cmp::max(tmp as usize, dst);
                     }
                 }
 

@@ -292,7 +292,7 @@ fn every_op() -> Result<(), Error> {
     Ok(())
 }
 
-/*#[test]
+#[test]
 fn test_dynamic_push_and_include() -> Result<(), Error> {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);
@@ -305,7 +305,7 @@ fn test_dynamic_push_and_include() -> Result<(), Error> {
 
     Ok(())
 }
-
+/*
 #[test]
 fn test_erc20() -> Result<(), Error> {
     let mut output = Vec::new();
