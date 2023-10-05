@@ -126,6 +126,17 @@ mod error {
             #[snafu(backtrace)]
             source: ParseError,
         },
+
+        /// An instruction macro was used without being defined.
+        #[snafu(display("variable {} inside macro, was never defined", var))]
+        #[non_exhaustive]
+        UndeclaredVariableMacro {
+            /// The variable that was used without being defined.
+            var: String,
+
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
     }
 }
 
@@ -235,7 +246,7 @@ impl Assembler {
         self.concrete_len
     }
 
-    /// TODO: Add DOC
+    /// Inspect the macros in a series of [`RawOp`] and declare them in the assembler.
     pub fn inspect_macros<I, O>(&mut self, nodes: I) -> Result<(), Error>
     where
         I: IntoIterator<Item = O>,
@@ -289,7 +300,9 @@ impl Assembler {
                             return error::UndeclaredInstructionMacro { name }.fail();
                         }
 
-                        UndefinedVariable { name, .. } => todo!("undefined variable {}", name),
+                        UndefinedVariable { name, .. } => {
+                            return error::UndeclaredVariableMacro { var: name }.fail();
+                        }
                     },
                     Err(_) => unreachable!("all ops should be concretizable"),
                 }
@@ -362,7 +375,6 @@ impl Assembler {
         O: Into<RawOp>,
     {
         let rop = rop.into();
-        println!("pushing {:?}", rop);
 
         self.declare_label(&rop)?;
 
@@ -454,8 +466,6 @@ impl Assembler {
                                     dynamic_push = true;
                                 }
                             };
-                            //let size = op.size().unwrap_or(2); // %push(label) with min size (to be updated)
-                            //self.concrete_len += size;
 
                             self.undefined_labels.push(PendingLabel {
                                 label: _label.to_owned(),
@@ -467,7 +477,9 @@ impl Assembler {
                         UnknownMacro { name, .. } => {
                             return error::UndeclaredInstructionMacro { name }.fail()
                         }
-                        UndefinedVariable { name, .. } => todo!("undefined variable {}", name),
+                        UndefinedVariable { name, .. } => {
+                            return error::UndeclaredVariableMacro { var: name }.fail()
+                        }
                     },
                 }
 
@@ -1023,8 +1035,6 @@ mod tests {
         let mut asm = Assembler::new();
         asm.inspect_macros(ops.clone())?;
         let err = asm.push_all(ops).unwrap_err();
-        //let err = asm.finish().unwrap_err();
-        println!("{:?}", err);
         assert_matches!(err, Error::UndeclaredInstructionMacro { name, .. } if name == "my_macro");
 
         Ok(())
@@ -1048,7 +1058,6 @@ mod tests {
         ];
         let mut asm = Assembler::new();
         let err = asm.inspect_macros(ops.clone()).unwrap_err();
-        //let err = asm.push_all(ops).unwrap_err();
         assert_matches!(err, Error::DuplicateMacro { name, .. } if name == "my_macro");
 
         Ok(())
@@ -1253,5 +1262,30 @@ mod tests {
         assert_eq!(out, hex!("6002"));
 
         Ok(())
+    }
+
+    #[test]
+    fn assemble_instruction_macro_with_undeclared_variables() {
+        let ops = vec![
+            InstructionMacroDefinition {
+                name: "my_macro".into(),
+                parameters: vec!["foo".into()],
+                contents: vec![AbstractOp::new(Push1(Imm::with_variable("bar")))],
+            }
+            .into(),
+            AbstractOp::Label("b".into()),
+            AbstractOp::new(JumpDest),
+            AbstractOp::new(Push1(Imm::with_label("b"))),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "my_macro".into(),
+                parameters: vec![BigInt::from_bytes_be(Sign::Plus, &vec![0x42]).into()],
+            }),
+        ];
+
+        let mut asm = Assembler::new();
+        asm.inspect_macros(ops.clone()).unwrap();
+        let err = asm.push_all(ops).unwrap_err();
+
+        assert_matches!(err, Error::UndeclaredVariableMacro { var, .. } if var == "bar");
     }
 }

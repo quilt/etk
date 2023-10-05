@@ -310,7 +310,6 @@ where
         let nodes = parse_asm(src)?;
         let mut raws = Vec::new();
         for node in nodes {
-            println!("{:?}", node);
             match node {
                 Node::Op(op) => {
                     raws.push(RawOp::Op(op));
