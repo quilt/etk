@@ -294,9 +294,7 @@ where
         let mut program = Program::new(path.into());
         let nodes = self.preprocess(&mut program, text)?;
         let mut asm = Assembler::new();
-        Self::run(nodes, &mut asm)?;
-
-        let raw = asm.take();
+        let raw = asm.assemble(nodes)?;
 
         self.output.write_all(&raw).context(error::Io {
             message: "writing output",
@@ -362,31 +360,6 @@ where
         let new_raws = self.preprocess(program, &code)?;
         program.pop_path();
         Ok(new_raws)
-    }
-
-    fn run(ops: Vec<RawOp>, asm: &mut Assembler) -> Result<(), Error> {
-        asm.inspect_macros(ops.clone())?;
-
-        for rawop in ops {
-            match rawop {
-                RawOp::Op(op) => {
-                    asm.push(RawOp::Op(op))?;
-                }
-                RawOp::Scope(scope_ops) => {
-                    let mut new_asm = Assembler::new();
-                    Self::run(scope_ops, &mut new_asm)?;
-                    let raw = new_asm.take();
-                    asm.push(RawOp::Raw(raw))?;
-                }
-                RawOp::Raw(hex) => {
-                    asm.push(RawOp::Raw(hex))?;
-                }
-            }
-        }
-
-        asm.finish()?;
-
-        Ok(())
     }
 }
 
