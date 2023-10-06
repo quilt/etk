@@ -373,7 +373,7 @@ where
                     asm.push(RawOp::Op(op))?;
                 }
                 RawOp::Scope(scope_ops) => {
-                    let mut new_asm = Assembler::new_internal(asm.concrete_len());
+                    let mut new_asm = Assembler::new();
                     Self::run(scope_ops, &mut new_asm)?;
                     let raw = new_asm.take();
                     asm.push(RawOp::Raw(raw))?;
@@ -459,7 +459,7 @@ mod tests {
         let mut ingest = Ingest::new(&mut output);
         ingest.ingest(root, &text)?;
 
-        assert_eq!(output, hex!("60015b586002566002"));
+        assert_eq!(output, hex!("60015b586000566002"));
 
         Ok(())
     }
@@ -651,7 +651,7 @@ mod tests {
         let mut ingest = Ingest::new(&mut output);
         ingest.ingest(root, &text)?;
 
-        let expected = hex!("620000155b5860105b5b6100106100085b600860095b62000004");
+        let expected = hex!("620000155b58600b5b5b61000b6100035b600360045b62000004");
         assert_eq!(output, expected);
 
         Ok(())

@@ -128,7 +128,7 @@ mod error {
         },
 
         /// An instruction macro was used without being defined.
-        #[snafu(display("variable {} inside macro, was never defined", var))]
+        #[snafu(display("variable `{}` inside macro, was never defined", var))]
         #[non_exhaustive]
         UndeclaredVariableMacro {
             /// The variable that was used without being defined.
@@ -197,26 +197,26 @@ impl From<Vec<u8>> for RawOp {
 /// ```
 #[derive(Debug, Default)]
 pub struct Assembler {
-    /// Assembled ops, not yet ready to be taken.
+    /// Assembled ops.
     ready: Vec<RawOp>,
 
-    /// Number of bytes in 'ready' that are ready to be taken.
+    /// Number of bytes used by the operations in ready.
     concrete_len: usize,
 
-    /// Labels, in `pending`, associated with an `AbstractOp::Label`.
+    /// Labels associated with an `AbstractOp::Label`.
     declared_labels: HashMap<String, Option<usize>>,
 
-    /// Macros, in `pending`, associated with an `AbstractOp::Macro`.
+    /// Macros associated with an `AbstractOp::Macro`.
     declared_macros: HashMap<String, MacroDefinition>,
 
-    /// Labels, in `pending`, that have been referred to (ex. with push) but
+    /// Labels that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
-    undefined_labels: Vec<PendingLabel>,
+    undeclared_labels: Vec<PendingLabel>,
 }
 
 /// Struct used to keep track of pending label invocations and their positions in code.
 #[derive(Debug, Clone)]
-pub struct PendingLabel {
+struct PendingLabel {
     /// The name of the label.
     label: String,
 
@@ -231,19 +231,6 @@ impl Assembler {
     /// Create a new `Assembler`.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Create a new `Assembler` with a known length.
-    pub fn new_internal(actual_len: usize) -> Self {
-        Self {
-            concrete_len: actual_len,
-            ..Self::default()
-        }
-    }
-
-    /// Get the number of bytes that can be collected with [`Assembler::take`].
-    pub fn concrete_len(&self) -> usize {
-        self.concrete_len
     }
 
     /// Inspect the macros in a series of [`RawOp`] and declare them in the assembler.
@@ -284,26 +271,30 @@ impl Assembler {
                     .concretize((&self.declared_labels, &self.declared_macros).into())
                 {
                     Ok(cop) => cop.assemble(&mut output),
-                    Err(ops::Error::ContextIncomplete { source }) => match source {
-                        UnknownLabel { label: _label, .. } => {
-                            let undefined_names: Vec<_> = self
-                                .undefined_labels
-                                .iter()
-                                .map(|PendingLabel { label, .. }| label.clone())
-                                .collect();
-                            return error::UndeclaredLabels {
-                                labels: undefined_names,
-                            }
-                            .fail();
+                    Err(ops::Error::ContextIncomplete {
+                        source: UnknownLabel { label: _label, .. },
+                    }) => {
+                        let undefined_names: Vec<_> = self
+                            .undeclared_labels
+                            .iter()
+                            .map(|PendingLabel { label, .. }| label.clone())
+                            .collect();
+                        return error::UndeclaredLabels {
+                            labels: undefined_names,
                         }
-                        UnknownMacro { name, .. } => {
-                            return error::UndeclaredInstructionMacro { name }.fail();
-                        }
+                        .fail();
+                    }
+                    Err(ops::Error::ContextIncomplete {
+                        source: UnknownMacro { name, .. },
+                    }) => {
+                        return error::UndeclaredInstructionMacro { name }.fail();
+                    }
+                    Err(ops::Error::ContextIncomplete {
+                        source: UndefinedVariable { name, .. },
+                    }) => {
+                        return error::UndeclaredVariableMacro { var: name }.fail();
+                    }
 
-                        UndefinedVariable { name, .. } => {
-                            return error::UndeclaredVariableMacro { var: name }.fail();
-                        }
-                    },
                     Err(_) => unreachable!("all ops should be concretizable"),
                 }
             } else if let RawOp::Raw(raw) = op {
@@ -317,10 +308,10 @@ impl Assembler {
     /// Indicate that the input sequence is complete. Returns any errors that
     /// may remain.
     pub fn finish(&mut self) -> Result<(), Error> {
-        if !self.undefined_labels.is_empty() {
+        if !self.undeclared_labels.is_empty() {
             return error::UndeclaredLabels {
                 labels: self
-                    .undefined_labels
+                    .undeclared_labels
                     .iter()
                     .map(|l| l.label.to_owned())
                     .collect::<Vec<String>>(),
@@ -406,7 +397,7 @@ impl Assembler {
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
                 let mut dst = 0;
-                for ul in self.undefined_labels.iter() {
+                for ul in self.undeclared_labels.iter() {
                     if (ul.label == label) & ul.dynamic_push {
                         // Compensation in case label was dynamically pushed.
                         let mut tmp =
@@ -420,7 +411,7 @@ impl Assembler {
                     }
                 }
 
-                self.undefined_labels.retain(|l| l.label != *label);
+                self.undeclared_labels.retain(|l| l.label != *label);
                 self.concrete_len += dst;
 
                 let old = self
@@ -456,31 +447,31 @@ impl Assembler {
                         }
                         .fail()
                     }
-                    Err(ops::Error::ContextIncomplete { source }) => match source {
-                        UnknownLabel { label: _label, .. } => {
-                            let mut dynamic_push = false;
-                            match op.size() {
-                                Some(size) => self.concrete_len += size,
-                                None => {
-                                    self.concrete_len += 2;
-                                    dynamic_push = true;
-                                }
-                            };
+                    Err(ops::Error::ContextIncomplete {
+                        source: UnknownLabel { label: _label, .. },
+                    }) => {
+                        let mut dynamic_push = false;
+                        match op.size() {
+                            Some(size) => self.concrete_len += size,
+                            None => {
+                                self.concrete_len += 2;
+                                dynamic_push = true;
+                            }
+                        };
 
-                            self.undefined_labels.push(PendingLabel {
-                                label: _label.to_owned(),
-                                position: self.ready.len(),
-                                dynamic_push,
-                            });
-                            self.ready.push(rop);
-                        }
-                        UnknownMacro { name, .. } => {
-                            return error::UndeclaredInstructionMacro { name }.fail()
-                        }
-                        UndefinedVariable { name, .. } => {
-                            return error::UndeclaredVariableMacro { var: name }.fail()
-                        }
-                    },
+                        self.undeclared_labels.push(PendingLabel {
+                            label: _label.to_owned(),
+                            position: self.ready.len(),
+                            dynamic_push,
+                        });
+                        self.ready.push(rop);
+                    }
+                    Err(ops::Error::ContextIncomplete {
+                        source: UnknownMacro { name, .. },
+                    }) => return error::UndeclaredInstructionMacro { name }.fail(),
+                    Err(ops::Error::ContextIncomplete {
+                        source: UndefinedVariable { name, .. },
+                    }) => return error::UndeclaredVariableMacro { var: name }.fail(),
                 }
 
                 Ok(())
