@@ -154,7 +154,7 @@ pub enum RawOp {
     /// An instruction to be assembled.
     Op(AbstractOp),
 
-    /// A new scope to be included.
+    /// A new scope to be created with its corresponding list of operations.
     Scope(Vec<RawOp>),
 
     /// Raw bytes, for example from `%include_hex`, to be included verbatim in
@@ -198,7 +198,7 @@ pub struct Assembler {
     /// Assembled ops.
     ready: Vec<RawOp>,
 
-    /// Number of bytes used by the operations in ready.
+    /// Number of bytes used by the operations in `ready``.
     concrete_len: usize,
 
     /// Labels associated with an `AbstractOp::Label`.
@@ -360,8 +360,6 @@ impl Assembler {
     }
 
     /// Feed a single instruction into the `Assembler`.
-    ///
-    /// Returns the number of bytes that can be collected with [`Assembler::take`]
     fn push<O>(&mut self, rop: O) -> Result<usize, Error>
     where
         O: Into<RawOp>,
