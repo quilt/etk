@@ -1240,4 +1240,70 @@ mod tests {
 
         assert_matches!(err, Error::UndeclaredVariableMacro { var, .. } if var == "bar");
     }
+
+    #[test]
+    fn assemble_instruction_macro_two_delayed_definitions_mirrored() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::new(GetPc),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "macro1".into(),
+                parameters: vec![],
+            }),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "macro0".into(),
+                parameters: vec![],
+            }),
+            InstructionMacroDefinition {
+                name: "macro0".into(),
+                parameters: vec![],
+                contents: vec![AbstractOp::new(JumpDest)],
+            }
+            .into(),
+            InstructionMacroDefinition {
+                name: "macro1".into(),
+                parameters: vec![],
+                contents: vec![AbstractOp::new(Caller)],
+            }
+            .into(),
+        ];
+
+        let mut asm = Assembler::new();
+        let result = asm.assemble(ops)?;
+        assert_eq!(result, hex!("58335b"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn assemble_instruction_macro_two_delayed_definitions() -> Result<(), Error> {
+        let ops = vec![
+            AbstractOp::new(GetPc),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "macro0".into(),
+                parameters: vec![],
+            }),
+            AbstractOp::Macro(InstructionMacroInvocation {
+                name: "macro1".into(),
+                parameters: vec![],
+            }),
+            InstructionMacroDefinition {
+                name: "macro0".into(),
+                parameters: vec![],
+                contents: vec![AbstractOp::new(JumpDest)],
+            }
+            .into(),
+            InstructionMacroDefinition {
+                name: "macro1".into(),
+                parameters: vec![],
+                contents: vec![AbstractOp::new(Caller)],
+            }
+            .into(),
+        ];
+
+        let mut asm = Assembler::new();
+        let result = asm.assemble(ops)?;
+        assert_eq!(result, hex!("585b33"));
+
+        Ok(())
+    }
 }
