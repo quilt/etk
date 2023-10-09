@@ -40,12 +40,14 @@ instruction_macro_variable = @{ "$" ~ function_parameter }
 instruction_macro = !{ "%" ~ function_invocation }
 
 local_macro = { !builtin ~ (instruction_macro_definition | instruction_macro  | expression_macro_definition) }
-builtin = ${ "%" ~ ( import | include | include_hex | push_macro ) }
+builtin = ${ "%" ~ ( import | include | include_hex | push_macro | inline_hex | inline_string ) }
 
 import = !{ "import" ~ arguments }
 include = !{ "include" ~ arguments }
 include_hex = !{ "include_hex" ~ arguments }
 push_macro = !{ "push" ~ arguments }
+inline_hex = !{ "hex" ~ arguments }
+inline_string = !{ "string" ~ arguments }
 
 arguments = _{ "(" ~ arguments_list? ~ ")" }
 arguments_list = _{ ( argument ~ "," )* ~ argument? }
