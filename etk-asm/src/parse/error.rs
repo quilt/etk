@@ -77,12 +77,23 @@ pub enum ParseError {
     /// An included fail failed to parse as hexadecimal.
     #[snafu(display("included file `{}` is invalid hex: {}", path.to_string_lossy(), source))]
     #[non_exhaustive]
-    InvalidHex {
+    InvalidHexFile {
         /// Path to the offending file.
         path: PathBuf,
 
         /// The underlying source of this error.
         source: Box<dyn std::error::Error>,
+
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Failed to parse an hexadecimal value.
+    #[snafu(display("error decoding hexadecimal: {}", value))]
+    #[non_exhaustive]
+    InvalidHex {
+        /// Path to the offending file.
+        value: String,
 
         /// The location of the error.
         backtrace: Backtrace,

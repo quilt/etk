@@ -7,6 +7,7 @@ use crate::ops::{
     AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation,
     InstructionMacroDefinition, InstructionMacroInvocation,
 };
+use crate::parse::error;
 use pest::iterators::Pair;
 use std::path::PathBuf;
 
@@ -44,6 +45,25 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
         Rule::push_macro => {
             let expr = expression::parse(pair.into_inner().next().unwrap())?;
             Node::Op(AbstractOp::Push(expr.into()))
+        }
+        Rule::inline_hex => {
+            let args = <(String,)>::parse_arguments(pair.into_inner())?;
+            let bytes = hex::decode(args.0).map_err(|e| e.to_string());
+
+            match bytes {
+                Ok(bytes) => Node::Raw(bytes),
+                Err(e) => {
+                    return error::InvalidHex { value: e }.fail();
+                }
+            }
+        }
+        Rule::inline_string => {
+            let args = <(String,)>::parse_arguments(pair.into_inner())?;
+            let raw_string = args.0;
+
+            let bytes = raw_string.as_bytes().to_vec();
+
+            Node::Raw(bytes)
         }
         _ => unreachable!(),
     };

@@ -157,7 +157,7 @@ pub enum RawOp {
     /// A new scope to be created with its corresponding list of operations.
     Scope(Vec<RawOp>),
 
-    /// Raw bytes, for example from `%include_hex`, to be included verbatim in
+    /// Raw bytes, for example from `%include_hex` or %string, to be included verbatim in
     /// the output.
     Raw(Vec<u8>),
 }

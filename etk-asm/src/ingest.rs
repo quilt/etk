@@ -337,6 +337,7 @@ where
 
                     raws.push(RawOp::Raw(raw))
                 }
+                Node::Raw(raw) => raws.push(RawOp::Raw(raw)),
             }
         }
 
@@ -373,6 +374,7 @@ mod tests {
 
     use std::fmt::Display;
     use std::io::Write;
+    use std::path;
 
     use super::*;
 
@@ -667,5 +669,47 @@ mod tests {
         let err = ingest.ingest(root, &text).unwrap_err();
 
         assert_matches!(err, Error::RecursionLimit { .. });
+    }
+
+    #[test]
+    fn ingest_hex_builtin() -> Result<(), Error> {
+        let text = format!(
+            r#"
+                jumpdest
+                %hex("7FAB")
+                invalid
+            "#
+        );
+        let (mut _f, root) = new_file(text.clone());
+
+        let mut output = Vec::new();
+        let mut ingest = Ingest::new(&mut output);
+        ingest.ingest(root, &text)?;
+
+        let expected = hex!("5b7fabfe");
+        assert_eq!(output, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ingest_string_builtin() -> Result<(), Error> {
+        let text = format!(
+            r#"
+                jumpdest
+                %string("hello world")
+                invalid
+            "#
+        );
+        let (mut _f, root) = new_file(text.clone());
+
+        let mut output = Vec::new();
+        let mut ingest = Ingest::new(&mut output);
+        ingest.ingest(root, &text)?;
+
+        let expected = hex!("5b68656c6c6f20776f726c64fe");
+        assert_eq!(output, expected);
+
+        Ok(())
     }
 }
