@@ -51,13 +51,15 @@ mod error {
         },
 
         /// An error that occurred while parsing a file.
-        #[snafu(context(false))]
         #[non_exhaustive]
-        #[snafu(display("parsing failed"))]
+        #[snafu(display("parsing failed on path `{}`", path.to_string_lossy()))]
         Parse {
             /// The underlying source of this error.
             #[snafu(backtrace)]
             source: ParseError,
+
+            /// The location of the error.
+            path: PathBuf,
         },
 
         /// An error that occurred while assembling a file.
@@ -305,7 +307,9 @@ where
     }
 
     fn preprocess(&mut self, program: &mut Program, src: &str) -> Result<Vec<RawOp>, Error> {
-        let nodes = parse_asm(src)?;
+        let nodes = parse_asm(src).context(error::Parse {
+            path: program.sources.last().unwrap().clone(),
+        })?;
         let mut raws = Vec::new();
         for node in nodes {
             match node {
