@@ -102,6 +102,7 @@ use crate::parse::parse_asm;
 
 pub use self::error::Error;
 
+use etk_ops::HardFork;
 use snafu::{ensure, ResultExt};
 
 use std::fs::{read_to_string, File};
@@ -243,7 +244,7 @@ impl Program {
 /// "#;
 ///
 /// let mut output = Vec::new();
-/// let mut ingest = Ingest::new(&mut output);
+/// let mut ingest = Ingest::new(&mut output, HardFork::default());
 /// ingest.ingest("./example.etk", &text)?;
 ///
 /// # let expected = hex!("6100035b");
@@ -253,12 +254,13 @@ impl Program {
 #[derive(Debug)]
 pub struct Ingest<W> {
     output: W,
+    hardfork: HardFork,
 }
 
 impl<W> Ingest<W> {
     /// Make a new `Ingest` that writes assembled bytes to `output`.
-    pub fn new(output: W) -> Self {
-        Self { output }
+    pub fn new(output: W, hardfork: HardFork) -> Self {
+        Self { output, hardfork }
     }
 }
 
@@ -404,7 +406,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         ingest.ingest(root, &text)?;
         assert_eq!(output, hex!("6001602a6002"));
 
@@ -433,7 +435,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         ingest.ingest(root, &text)?;
 
         assert_eq!(output, hex!("60015b586000566002"));
@@ -462,7 +464,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         let err = ingest.ingest(root, &text).unwrap_err();
 
         assert_matches!(
@@ -487,7 +489,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         ingest.ingest(root, &text)?;
         assert_eq!(output, hex!("6001deadbeef0102f66002"));
 
@@ -511,7 +513,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         ingest.ingest(root, &text)?;
         assert_eq!(output, hex!("6001deadbeef0102f65b600960ff"));
 
@@ -533,7 +535,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         ingest.ingest(root, &text)?;
 
         let expected = hex!("61001caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5b");
@@ -576,7 +578,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         ingest.ingest(root, &text)?;
 
         let expected = hex!("620000096200000e5b5b6008600e5b610008610009");
@@ -625,7 +627,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         ingest.ingest(root, &text)?;
 
         let expected = hex!("620000155b58600b5b5b61000b6100035b600360045b62000004");
@@ -646,7 +648,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         let root = std::env::current_exe().unwrap();
         let err = ingest.ingest(root, &text).unwrap_err();
 
@@ -667,7 +669,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::default());
         let err = ingest.ingest(root, &text).unwrap_err();
 
         assert_matches!(err, Error::RecursionLimit { .. });

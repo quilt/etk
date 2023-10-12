@@ -2,6 +2,7 @@ use etk_cli::errors::WithSources;
 use etk_cli::io::HexWrite;
 
 use etk_asm::ingest::{Error, Ingest};
+use etk_ops::HardFork;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -16,6 +17,9 @@ struct Opt {
     input: PathBuf,
     #[structopt(parse(from_os_str))]
     out: Option<PathBuf>,
+
+    #[structopt(long, parse(from_os_str))]
+    hardfork: Option<HardFork>,
 }
 
 fn create(path: PathBuf) -> File {
@@ -43,9 +47,17 @@ fn run() -> Result<(), Error> {
         None => Box::new(std::io::stdout()),
     };
 
+    let opthard = opt.hardfork.clone();
+    let mut hardfork = match opt.hardfork {
+        Some(h) => h,
+        None => HardFork::default(),
+    };
+
+    println!("Hardfork: {:?}.", hardfork);
+
     let hex_out = HexWrite::new(&mut out);
 
-    let mut ingest = Ingest::new(hex_out);
+    let mut ingest = Ingest::new(hex_out, hardfork);
     ingest.ingest_file(opt.input)?;
 
     out.write_all(b"\n").unwrap();

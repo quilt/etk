@@ -12,7 +12,10 @@
 
 use snafu::{Backtrace, Snafu};
 
-use std::borrow::{Borrow, BorrowMut};
+use std::{
+    borrow::{Borrow, BorrowMut},
+    ffi::OsStr,
+};
 
 pub mod london {
     //! Instructions available in the London hard fork.
@@ -27,6 +30,41 @@ pub mod shanghai {
 pub mod cancun {
     //! Instructions available in the Cancun hard fork.
     include!(concat!(env!("OUT_DIR"), "/cancun.rs"));
+}
+
+/// Hard forks of the Ethereum Virtual Machine.
+#[derive(Debug, Clone)]
+pub enum HardFork {
+    /// The Cancun hard fork.
+    Cancun,
+
+    /// The Shanghai hard fork.
+    Shanghai,
+
+    /// The London hard fork.
+    London,
+
+    /// The Prague hard fork.
+    Prague,
+}
+
+impl Default for HardFork {
+    fn default() -> Self {
+        Self::Prague
+    }
+}
+
+impl From<&OsStr> for HardFork {
+    fn from(s: &OsStr) -> Self {
+        let s = s.to_string_lossy().to_lowercase();
+        match s.as_str() {
+            "cancun" => Self::Cancun,
+            "shanghai" => Self::Shanghai,
+            "london" => Self::London,
+            "prague" => Self::Prague,
+            _ => Self::default(),
+        }
+    }
 }
 
 /// Error that can occur when parsing an operation from a string.
