@@ -143,6 +143,7 @@ mod error {
 pub use self::error::Error;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
 use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
+use etk_ops::HardFork;
 use rand::Rng;
 use std::cmp;
 use std::collections::{hash_map, HashMap};

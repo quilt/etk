@@ -17,6 +17,63 @@ use std::{
     ffi::OsStr,
 };
 
+/// Trait for types that represent an EVM instruction.
+pub trait Operation {
+    /// The return type of [`Operation::code`].
+    type Code: Operation<Code = Self::Code> + Into<u8>;
+
+    /// The return root type of [`Operation::immediate_mut`] and
+    /// [`Operation::immediate`].
+    type ImmediateRef: ?Sized;
+
+    /// The type of the immediate argument for this operation.
+    type Immediate: std::borrow::Borrow<Self::ImmediateRef>
+        + std::borrow::BorrowMut<Self::ImmediateRef>;
+
+    /// Get a shared reference to the immediate argument of this operation,
+    /// if one exists.
+    fn immediate(&self) -> Option<&Self::ImmediateRef>;
+
+    /// Get a mutable reference to the immediate argument of this operation,
+    /// if one exists.
+    fn immediate_mut(&mut self) -> Option<&mut Self::ImmediateRef>;
+
+    /// Consume this operation and return its immediate argument, if one
+    /// exists.
+    fn into_immediate(self) -> Option<Self::Immediate>;
+
+    /// Length of immediate argument.
+    fn extra_len(&self) -> usize;
+
+    /// The action (opcode) of this operation, without any immediates.
+    fn code(&self) -> Self::Code;
+
+    /// The byte (opcode) that indicates this operation.
+    fn code_byte(&self) -> u8 {
+        self.code().into()
+    }
+
+    /// Human-readable name for this operation.
+    fn mnemonic(&self) -> &str;
+
+    /// Returns true if the current instruction changes the program counter (other
+    /// than incrementing it.)
+    fn is_jump(&self) -> bool;
+
+    /// Returns true if the current instruction is a valid destination for jumps.
+    fn is_jump_target(&self) -> bool;
+
+    /// Returns true if the current instruction causes the EVM to stop executing
+    /// the contract.
+    fn is_exit(&self) -> bool;
+
+    /// How many stack elements this instruction pops.
+    fn pops(&self) -> usize;
+
+    /// How many stack elements this instruction pushes.
+    fn pushes(&self) -> usize;
+}
+
 pub mod london {
     //! Instructions available in the London hard fork.
     include!(concat!(env!("OUT_DIR"), "/london.rs"));
@@ -30,6 +87,153 @@ pub mod shanghai {
 pub mod cancun {
     //! Instructions available in the Cancun hard fork.
     include!(concat!(env!("OUT_DIR"), "/cancun.rs"));
+}
+
+pub mod prague {
+    //! Instructions available in the Prague hard fork.
+    include!(concat!(env!("OUT_DIR"), "/prague.rs"));
+}
+
+/// An operation that can be executed by the EVM.
+#[derive(Debug, Clone)]
+pub enum HardForkOp<T>
+where
+    T: Immediates + ?Sized,
+{
+    /// Cancun hard fork operations.
+    Cancun(cancun::Op<T>),
+
+    /// Shanghai hard fork operations.
+    Shanghai(shanghai::Op<T>),
+
+    /// London hard fork operations.
+    London(london::Op<T>),
+
+    /// Prague hard fork operations.
+    Prague(prague::Op<T>),
+}
+
+impl<T> HardForkOp<T>
+where
+    T: Immediates + ?Sized,
+{
+    /// Get an operation from a [`HardForkOp`] enum.
+    pub fn new_op(code: HardForkOp<()>) -> Option<HardForkOp<T>> {
+        match code {
+            HardForkOp::Cancun(op) => cancun::Op::new(op).map(HardForkOp::Cancun),
+            HardForkOp::Shanghai(op) => shanghai::Op::new(op).map(HardForkOp::Shanghai),
+            HardForkOp::London(op) => london::Op::new(op).map(HardForkOp::London),
+            HardForkOp::Prague(op) => prague::Op::new(op).map(HardForkOp::Prague),
+        }
+    }
+}
+
+impl<T> Operation for HardForkOp<T>
+where
+    T: Immediates + ?Sized,
+{
+    type Code = HardForkOp<()>;
+    type Immediate = T::Immediate;
+    type ImmediateRef = T::ImmediateRef;
+    fn immediate(&self) -> Option<&Self::ImmediateRef> {
+        match self {
+            HardForkOp::Cancun(op) => op.immediate(),
+            HardForkOp::Shanghai(op) => op.immediate(),
+            HardForkOp::London(op) => op.immediate(),
+            HardForkOp::Prague(op) => op.immediate(),
+        }
+    }
+    fn immediate_mut(&mut self) -> Option<&mut Self::ImmediateRef> {
+        match self {
+            HardForkOp::Cancun(op) => op.immediate_mut(),
+            HardForkOp::Shanghai(op) => op.immediate_mut(),
+            HardForkOp::London(op) => op.immediate_mut(),
+            HardForkOp::Prague(op) => op.immediate_mut(),
+        }
+    }
+    fn into_immediate(self) -> Option<Self::Immediate> {
+        match self {
+            HardForkOp::Cancun(op) => op.into_immediate(),
+            HardForkOp::Shanghai(op) => op.into_immediate(),
+            HardForkOp::London(op) => op.into_immediate(),
+            HardForkOp::Prague(op) => op.into_immediate(),
+        }
+    }
+    fn extra_len(&self) -> usize {
+        match self {
+            HardForkOp::Cancun(op) => op.extra_len(),
+            HardForkOp::Shanghai(op) => op.extra_len(),
+            HardForkOp::London(op) => op.extra_len(),
+            HardForkOp::Prague(op) => op.extra_len(),
+        }
+    }
+    fn code(&self) -> Self::Code {
+        match self {
+            HardForkOp::Cancun(op) => HardForkOp::Cancun(op.code()),
+            HardForkOp::Shanghai(op) => HardForkOp::Shanghai(op.code()),
+            HardForkOp::London(op) => HardForkOp::London(op.code()),
+            HardForkOp::Prague(op) => HardForkOp::Prague(op.code()),
+        }
+    }
+    fn mnemonic(&self) -> &str {
+        match self {
+            HardForkOp::Cancun(op) => op.mnemonic(),
+            HardForkOp::Shanghai(op) => op.mnemonic(),
+            HardForkOp::London(op) => op.mnemonic(),
+            HardForkOp::Prague(op) => op.mnemonic(),
+        }
+    }
+    fn is_jump(&self) -> bool {
+        match self {
+            HardForkOp::Cancun(op) => op.is_jump(),
+            HardForkOp::Shanghai(op) => op.is_jump(),
+            HardForkOp::London(op) => op.is_jump(),
+            HardForkOp::Prague(op) => op.is_jump(),
+        }
+    }
+    fn is_jump_target(&self) -> bool {
+        match self {
+            HardForkOp::Cancun(op) => op.is_jump_target(),
+            HardForkOp::Shanghai(op) => op.is_jump_target(),
+            HardForkOp::London(op) => op.is_jump_target(),
+            HardForkOp::Prague(op) => op.is_jump_target(),
+        }
+    }
+    fn is_exit(&self) -> bool {
+        match self {
+            HardForkOp::Cancun(op) => op.is_exit(),
+            HardForkOp::Shanghai(op) => op.is_exit(),
+            HardForkOp::London(op) => op.is_exit(),
+            HardForkOp::Prague(op) => op.is_exit(),
+        }
+    }
+    fn pops(&self) -> usize {
+        match self {
+            HardForkOp::Cancun(op) => op.pops(),
+            HardForkOp::Shanghai(op) => op.pops(),
+            HardForkOp::London(op) => op.pops(),
+            HardForkOp::Prague(op) => op.pops(),
+        }
+    }
+    fn pushes(&self) -> usize {
+        match self {
+            HardForkOp::Cancun(op) => op.pushes(),
+            HardForkOp::Shanghai(op) => op.pushes(),
+            HardForkOp::London(op) => op.pushes(),
+            HardForkOp::Prague(op) => op.pushes(),
+        }
+    }
+}
+
+impl From<HardForkOp<()>> for u8 {
+    fn from(op: HardForkOp<()>) -> u8 {
+        match op {
+            HardForkOp::Cancun(op) => op.code_byte(),
+            HardForkOp::Shanghai(op) => op.code_byte(),
+            HardForkOp::London(op) => op.code_byte(),
+            HardForkOp::Prague(op) => op.code_byte(),
+        }
+    }
 }
 
 /// Hard forks of the Ethereum Virtual Machine.
