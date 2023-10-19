@@ -95,7 +95,7 @@ pub mod prague {
 }
 
 /// An operation that can be executed by the EVM.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum HardForkOp<T>
 where
     T: Immediates + ?Sized,
@@ -113,6 +113,137 @@ where
     Prague(prague::Op<T>),
 }
 
+impl<T> Clone for HardForkOp<T>
+where
+    T: Immediates + ?Sized,
+    T::P1: Clone,
+    T::P2: Clone,
+    T::P3: Clone,
+    T::P4: Clone,
+    T::P5: Clone,
+    T::P6: Clone,
+    T::P7: Clone,
+    T::P8: Clone,
+    T::P9: Clone,
+    T::P10: Clone,
+    T::P11: Clone,
+    T::P12: Clone,
+    T::P13: Clone,
+    T::P14: Clone,
+    T::P15: Clone,
+    T::P16: Clone,
+    T::P17: Clone,
+    T::P18: Clone,
+    T::P19: Clone,
+    T::P20: Clone,
+    T::P21: Clone,
+    T::P22: Clone,
+    T::P23: Clone,
+    T::P24: Clone,
+    T::P25: Clone,
+    T::P26: Clone,
+    T::P27: Clone,
+    T::P28: Clone,
+    T::P29: Clone,
+    T::P30: Clone,
+    T::P31: Clone,
+    T::P32: Clone,
+{
+    fn clone(&self) -> Self {
+        match *self {
+            Self::Cancun(ref op) => Self::Cancun(op.clone()),
+            Self::Shanghai(ref op) => Self::Shanghai(op.clone()),
+            Self::London(ref op) => Self::London(op.clone()),
+            Self::Prague(ref op) => Self::Prague(op.clone()),
+        }
+    }
+}
+
+impl<T> PartialEq<HardForkOp<T>> for HardForkOp<T>
+where
+    T: Immediates + ?Sized,
+    T::P1: PartialEq,
+    T::P2: PartialEq,
+    T::P3: PartialEq,
+    T::P4: PartialEq,
+    T::P5: PartialEq,
+    T::P6: PartialEq,
+    T::P7: PartialEq,
+    T::P8: PartialEq,
+    T::P9: PartialEq,
+    T::P10: PartialEq,
+    T::P11: PartialEq,
+    T::P12: PartialEq,
+    T::P13: PartialEq,
+    T::P14: PartialEq,
+    T::P15: PartialEq,
+    T::P16: PartialEq,
+    T::P17: PartialEq,
+    T::P18: PartialEq,
+    T::P19: PartialEq,
+    T::P20: PartialEq,
+    T::P21: PartialEq,
+    T::P22: PartialEq,
+    T::P23: PartialEq,
+    T::P24: PartialEq,
+    T::P25: PartialEq,
+    T::P26: PartialEq,
+    T::P27: PartialEq,
+    T::P28: PartialEq,
+    T::P29: PartialEq,
+    T::P30: PartialEq,
+    T::P31: PartialEq,
+    T::P32: PartialEq,
+{
+    fn eq(&self, other: &HardForkOp<T>) -> bool {
+        match (self, other) {
+            (Self::Cancun(op1), HardForkOp::Cancun(op2)) => op1 == op2,
+            (Self::Shanghai(op1), HardForkOp::Shanghai(op2)) => op1 == op2,
+            (Self::London(op1), HardForkOp::London(op2)) => op1 == op2,
+            (Self::Prague(op1), HardForkOp::Prague(op2)) => op1 == op2,
+            _ => false,
+        }
+    }
+}
+
+impl<T> Eq for HardForkOp<T>
+where
+    T: Immediates + ?Sized,
+    T::P1: Eq,
+    T::P2: Eq,
+    T::P3: Eq,
+    T::P4: Eq,
+    T::P5: Eq,
+    T::P6: Eq,
+    T::P7: Eq,
+    T::P8: Eq,
+    T::P9: Eq,
+    T::P10: Eq,
+    T::P11: Eq,
+    T::P12: Eq,
+    T::P13: Eq,
+    T::P14: Eq,
+    T::P15: Eq,
+    T::P16: Eq,
+    T::P17: Eq,
+    T::P18: Eq,
+    T::P19: Eq,
+    T::P20: Eq,
+    T::P21: Eq,
+    T::P22: Eq,
+    T::P23: Eq,
+    T::P24: Eq,
+    T::P25: Eq,
+    T::P26: Eq,
+    T::P27: Eq,
+    T::P28: Eq,
+    T::P29: Eq,
+    T::P30: Eq,
+    T::P31: Eq,
+    T::P32: Eq,
+{
+}
+
 impl<T> HardForkOp<T>
 where
     T: Immediates + ?Sized,
@@ -124,6 +255,65 @@ where
             HardForkOp::Shanghai(op) => shanghai::Op::new(op).map(HardForkOp::Shanghai),
             HardForkOp::London(op) => london::Op::new(op).map(HardForkOp::London),
             HardForkOp::Prague(op) => prague::Op::new(op).map(HardForkOp::Prague),
+        }
+    }
+
+    /// Returns the total length of this operation, including its immediate.
+    pub fn size(&self) -> usize {
+        match self {
+            HardForkOp::Cancun(op) => op.size(),
+            HardForkOp::Shanghai(op) => op.size(),
+            HardForkOp::London(op) => op.size(),
+            HardForkOp::Prague(op) => op.size(),
+        }
+    }
+}
+
+impl HardForkOp<()> {
+    /// Join this opcode with an immediate argument.
+    ///
+    /// Panics if this opcode does not take an immediate argument.
+    pub fn with<T, I, E>(self, immediate: I) -> Result<HardForkOp<T>, E>
+    where
+        T: ?Sized + Immediates,
+        I: TryInto<T::P1, Error = E>,
+        I: TryInto<T::P2, Error = E>,
+        I: TryInto<T::P3, Error = E>,
+        I: TryInto<T::P4, Error = E>,
+        I: TryInto<T::P5, Error = E>,
+        I: TryInto<T::P6, Error = E>,
+        I: TryInto<T::P7, Error = E>,
+        I: TryInto<T::P8, Error = E>,
+        I: TryInto<T::P9, Error = E>,
+        I: TryInto<T::P10, Error = E>,
+        I: TryInto<T::P11, Error = E>,
+        I: TryInto<T::P12, Error = E>,
+        I: TryInto<T::P13, Error = E>,
+        I: TryInto<T::P14, Error = E>,
+        I: TryInto<T::P15, Error = E>,
+        I: TryInto<T::P16, Error = E>,
+        I: TryInto<T::P17, Error = E>,
+        I: TryInto<T::P18, Error = E>,
+        I: TryInto<T::P19, Error = E>,
+        I: TryInto<T::P20, Error = E>,
+        I: TryInto<T::P21, Error = E>,
+        I: TryInto<T::P22, Error = E>,
+        I: TryInto<T::P23, Error = E>,
+        I: TryInto<T::P24, Error = E>,
+        I: TryInto<T::P25, Error = E>,
+        I: TryInto<T::P26, Error = E>,
+        I: TryInto<T::P27, Error = E>,
+        I: TryInto<T::P28, Error = E>,
+        I: TryInto<T::P29, Error = E>,
+        I: TryInto<T::P30, Error = E>,
+        I: TryInto<T::P31, Error = E>,
+        I: TryInto<T::P32, Error = E>,
+    {
+        match self {
+            HardForkOp::Cancun(op) => Ok(HardForkOp::Cancun(op.with(immediate)?)),
+            HardForkOp::Shanghai(op) => Ok(HardForkOp::Shanghai(op.with(immediate)?)),
+            HardForkOp::London(op) => Ok(HardForkOp::London(op.with(immediate)?)),
+            HardForkOp::Prague(op) => Ok(HardForkOp::Prague(op.with(immediate)?)),
         }
     }
 }
@@ -232,6 +422,17 @@ impl From<HardForkOp<()>> for u8 {
             HardForkOp::Shanghai(op) => op.code_byte(),
             HardForkOp::London(op) => op.code_byte(),
             HardForkOp::Prague(op) => op.code_byte(),
+        }
+    }
+}
+
+impl std::fmt::Display for HardForkOp<()> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            HardForkOp::Cancun(op) => op.fmt(f),
+            HardForkOp::Shanghai(op) => op.fmt(f),
+            HardForkOp::London(op) => op.fmt(f),
+            HardForkOp::Prague(op) => op.fmt(f),
         }
     }
 }

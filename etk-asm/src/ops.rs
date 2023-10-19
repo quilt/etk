@@ -43,7 +43,11 @@ mod types;
 
 pub(crate) use self::error::Error;
 
-use etk_ops::cancun::Push32;
+use etk_ops::cancun::Push32 as CancunPush32;
+use etk_ops::london::Push32 as LondonPush32;
+use etk_ops::prague::Push32 as PraguePush32;
+use etk_ops::shanghai::Push32 as ShanghaiPush32;
+use etk_ops::HardFork;
 use etk_ops::HardForkOp;
 use etk_ops::Operation;
 
@@ -233,7 +237,11 @@ impl AbstractOp {
         Self::Op(op.into())
     }
 
-    pub(crate) fn concretize(self, ctx: Context) -> Result<HardForkOp<[u8]>, error::Error> {
+    pub(crate) fn concretize(
+        self,
+        ctx: Context,
+        hardfork: HardFork,
+    ) -> Result<HardForkOp<[u8]>, error::Error> {
         match self {
             Self::Op(op) => op.concretize(ctx),
             Self::Push(imm) => {
@@ -250,21 +258,50 @@ impl AbstractOp {
                 );
 
                 if bytes.len() > 32 {
+                    let push32 = match hardfork {
+                        HardFork::Cancun => {
+                            HardForkOp::Cancun(etk_ops::cancun::Op::Push32(CancunPush32(())))
+                        }
+                        HardFork::Shanghai => {
+                            HardForkOp::Shanghai(etk_ops::shanghai::Op::Push32(ShanghaiPush32(())))
+                        }
+                        HardFork::London => {
+                            HardForkOp::London(etk_ops::london::Op::Push32(LondonPush32(())))
+                        }
+                        HardFork::Prague => {
+                            HardForkOp::Prague(etk_ops::prague::Op::Push32(PraguePush32(())))
+                        }
+                    };
                     // TODO: Fix hack to get a TryFromSliceError.
                     let err = <[u8; 32]>::try_from(bytes.as_slice())
                         .context(error::ExpressionTooLarge {
                             value,
-                            spec: Push32(()),
+                            spec: push32,
                         })
                         .unwrap_err();
                     return Err(err);
                 }
 
                 let size = std::cmp::max(1, (value.bits() + 8 - 1) / 8);
-                let spec = Op::<()>::push(size.try_into().unwrap()).unwrap();
+                //let spec = Op::<()>::push(size.try_into().unwrap()).unwrap();
+
+                let spec = match hardfork {
+                    HardFork::Cancun => HardForkOp::Cancun(
+                        etk_ops::cancun::Op::<()>::push(size.try_into().unwrap()).unwrap(),
+                    ),
+                    HardFork::Shanghai => HardForkOp::Shanghai(
+                        etk_ops::shanghai::Op::<()>::push(size.try_into().unwrap()).unwrap(),
+                    ),
+                    HardFork::London => HardForkOp::London(
+                        etk_ops::london::Op::<()>::push(size.try_into().unwrap()).unwrap(),
+                    ),
+                    HardFork::Prague => HardForkOp::Prague(
+                        etk_ops::prague::Op::<()>::push(size.try_into().unwrap()).unwrap(),
+                    ),
+                };
 
                 let start = bytes.len() + 1 - spec.size();
-                AbstractOp::new(spec.with(&bytes[start..]).unwrap()).concretize(ctx)
+                AbstractOp::new(spec.with(&bytes[start..]).unwrap()).concretize(ctx, hardfork)
             }
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),

@@ -366,6 +366,7 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         #[educe(
             PartialEq(bound = #partial_eq_bound),
             Eq(bound = #eq_bound),
+            //Clone(bound = #clone_bound),
             Ord(bound = #ord_bound),
             PartialOrd(bound = #partial_ord_bound),
             Hash(bound = #hash_bound),
@@ -383,12 +384,11 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         }
 
         // TODO: For some reason deriving Debug with educe didn't work.
-        use std::fmt;
-        impl<T> fmt::Debug for Op<T>
+        impl<T> std::fmt::Debug for Op<T>
         where
             T: super::Immediates + ?Sized,
         {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, "Op<T> variant")
             }
         }
@@ -397,11 +397,12 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         impl<T> Clone for Op<T>
         where
             T: super::Immediates + ?Sized,
+            #(T::#bounds: Clone,)*
         {
             fn clone(&self) -> Self {
                 match self {
                     #(
-                    Self::#names(n) => Self::#names(n),
+                    Self::#names(n) => Self::#names(n.clone()),
                     )*
                 }
             }

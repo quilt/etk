@@ -22,7 +22,6 @@ use self::{
 
 use crate::ast::Node;
 use crate::ops::AbstractOp;
-use etk_ops::cancun::Op;
 use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
 
