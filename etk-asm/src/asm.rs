@@ -230,11 +230,12 @@ struct PendingLabel {
 }
 
 impl Assembler {
-    /// Create a new `Assembler`.
+    /// Create a new `Assembler` for the last hardfork.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Create a new `Assembler` for an specific hardfork.
     pub fn new_with_hardfork(hardfork: HardFork) -> Self {
         Self {
             hardfork,
@@ -277,7 +278,7 @@ impl Assembler {
             if let RawOp::Op(ref op) = op {
                 match op.clone().concretize(
                     (&self.declared_labels, &self.declared_macros).into(),
-                    self.hardfork,
+                    self.hardfork.clone(),
                 ) {
                     Ok(cop) => cop.assemble(&mut output),
                     Err(ops::Error::ContextIncomplete {
@@ -436,7 +437,7 @@ impl Assembler {
             RawOp::Op(ref op) => {
                 match op.clone().concretize(
                     (&self.declared_labels, &self.declared_macros).into(),
-                    self.hardfork,
+                    self.hardfork.clone(),
                 ) {
                     Ok(cop) => {
                         self.concrete_len += cop.size();

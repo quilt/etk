@@ -309,7 +309,7 @@ where
     }
 
     fn preprocess(&mut self, program: &mut Program, src: &str) -> Result<Vec<RawOp>, Error> {
-        let nodes = parse_asm(src).context(error::Parse {
+        let nodes = parse_asm(src, self.hardfork.clone()).context(error::Parse {
             path: program.sources.last().unwrap().clone(),
         })?;
         let mut raws = Vec::new();

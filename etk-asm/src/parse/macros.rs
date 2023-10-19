@@ -7,15 +7,16 @@ use crate::ops::{
     AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation,
     InstructionMacroDefinition, InstructionMacroInvocation,
 };
+use etk_ops::HardFork;
 use pest::iterators::Pair;
 use std::path::PathBuf;
 
-pub(crate) fn parse(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+pub(crate) fn parse(pair: Pair<Rule>, hardfork: HardFork) -> Result<AbstractOp, ParseError> {
     let mut pairs = pair.into_inner();
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
-        Rule::instruction_macro_definition => parse_instruction_macro_defn(pair),
+        Rule::instruction_macro_definition => parse_instruction_macro_defn(pair, hardfork),
         Rule::instruction_macro => parse_instruction_macro(pair),
         Rule::expression_macro_definition => parse_expression_macro_defn(pair),
         _ => unreachable!(),
@@ -51,7 +52,10 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
     Ok(node)
 }
 
-fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+fn parse_instruction_macro_defn(
+    pair: Pair<Rule>,
+    hardfork: HardFork,
+) -> Result<AbstractOp, ParseError> {
     let mut pairs = pair.into_inner();
 
     let mut macro_defn = pairs.next().unwrap().into_inner();
@@ -68,7 +72,7 @@ fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<AbstractOp, ParseErr
             let expr = expression::parse(pair.into_inner().next().unwrap())?;
             contents.push(AbstractOp::Push(expr.into()));
         } else {
-            contents.push(super::parse_abstract_op(pair)?);
+            contents.push(super::parse_abstract_op(pair, hardfork.clone())?);
         }
     }
 
