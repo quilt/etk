@@ -18,7 +18,7 @@ struct Opt {
     #[structopt(parse(from_os_str))]
     out: Option<PathBuf>,
 
-    #[structopt(long, parse(from_os_str))]
+    #[structopt(long)]
     hardfork: Option<HardFork>,
 }
 

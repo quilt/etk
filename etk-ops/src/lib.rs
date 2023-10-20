@@ -12,10 +12,7 @@
 
 use snafu::{Backtrace, Snafu};
 
-use std::{
-    borrow::{Borrow, BorrowMut},
-    ffi::OsStr,
-};
+use std::borrow::{Borrow, BorrowMut};
 
 /// Trait for types that represent an EVM instruction.
 pub trait Operation {
@@ -430,14 +427,18 @@ impl Default for HardFork {
     }
 }
 
-impl From<&OsStr> for HardFork {
-    fn from(s: &OsStr) -> Self {
-        let s = s.to_string_lossy().to_lowercase();
+use std::str::FromStr;
+
+impl FromStr for HardFork {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.to_lowercase();
         match s.as_str() {
-            "cancun" => Self::Cancun,
-            "shanghai" => Self::Shanghai,
-            "london" => Self::London,
-            _ => Self::default(),
+            "cancun" => Ok(Self::Cancun),
+            "shanghai" => Ok(Self::Shanghai),
+            "london" => Ok(Self::London),
+            _ => Err(format!("Invalid hardfork: {}", s)),
         }
     }
 }
