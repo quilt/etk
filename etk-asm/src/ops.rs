@@ -45,7 +45,6 @@ pub(crate) use self::error::Error;
 
 use etk_ops::cancun::Push32 as CancunPush32;
 use etk_ops::london::Push32 as LondonPush32;
-use etk_ops::prague::Push32 as PraguePush32;
 use etk_ops::shanghai::Push32 as ShanghaiPush32;
 use etk_ops::HardFork;
 use etk_ops::HardForkOp;
@@ -146,16 +145,6 @@ impl Concretize for HardForkOp<Abstract> {
                             spec: self.code(),
                         })?;
                 HardForkOp::London(op_context)
-            }
-            HardForkOp::Prague(op) => {
-                let op_context =
-                    op.code()
-                        .with(bytes.as_slice())
-                        .context(error::ExpressionTooLarge {
-                            value,
-                            spec: self.code(),
-                        })?;
-                HardForkOp::Prague(op_context)
             }
         };
 
@@ -268,9 +257,6 @@ impl AbstractOp {
                         HardFork::London => {
                             HardForkOp::London(etk_ops::london::Op::Push32(LondonPush32(())))
                         }
-                        HardFork::Prague => {
-                            HardForkOp::Prague(etk_ops::prague::Op::Push32(PraguePush32(())))
-                        }
                     };
                     // TODO: Fix hack to get a TryFromSliceError.
                     let err = <[u8; 32]>::try_from(bytes.as_slice())
@@ -294,9 +280,6 @@ impl AbstractOp {
                     ),
                     HardFork::London => HardForkOp::London(
                         etk_ops::london::Op::<()>::push(size.try_into().unwrap()).unwrap(),
-                    ),
-                    HardFork::Prague => HardForkOp::Prague(
-                        etk_ops::prague::Op::<()>::push(size.try_into().unwrap()).unwrap(),
                     ),
                 };
 

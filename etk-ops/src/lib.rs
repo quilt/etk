@@ -89,11 +89,6 @@ pub mod cancun {
     include!(concat!(env!("OUT_DIR"), "/cancun.rs"));
 }
 
-pub mod prague {
-    //! Instructions available in the Prague hard fork.
-    include!(concat!(env!("OUT_DIR"), "/prague.rs"));
-}
-
 /// An operation that can be executed by the EVM.
 #[derive(Debug)]
 pub enum HardForkOp<T>
@@ -108,9 +103,6 @@ where
 
     /// London hard fork operations.
     London(london::Op<T>),
-
-    /// Prague hard fork operations.
-    Prague(prague::Op<T>),
 }
 
 impl<T> Clone for HardForkOp<T>
@@ -154,7 +146,6 @@ where
             Self::Cancun(ref op) => Self::Cancun(op.clone()),
             Self::Shanghai(ref op) => Self::Shanghai(op.clone()),
             Self::London(ref op) => Self::London(op.clone()),
-            Self::Prague(ref op) => Self::Prague(op.clone()),
         }
     }
 }
@@ -200,7 +191,6 @@ where
             (Self::Cancun(op1), HardForkOp::Cancun(op2)) => op1 == op2,
             (Self::Shanghai(op1), HardForkOp::Shanghai(op2)) => op1 == op2,
             (Self::London(op1), HardForkOp::London(op2)) => op1 == op2,
-            (Self::Prague(op1), HardForkOp::Prague(op2)) => op1 == op2,
             _ => false,
         }
     }
@@ -254,7 +244,6 @@ where
             HardForkOp::Cancun(op) => cancun::Op::new(op).map(HardForkOp::Cancun),
             HardForkOp::Shanghai(op) => shanghai::Op::new(op).map(HardForkOp::Shanghai),
             HardForkOp::London(op) => london::Op::new(op).map(HardForkOp::London),
-            HardForkOp::Prague(op) => prague::Op::new(op).map(HardForkOp::Prague),
         }
     }
 
@@ -264,7 +253,6 @@ where
             HardForkOp::Cancun(op) => op.size(),
             HardForkOp::Shanghai(op) => op.size(),
             HardForkOp::London(op) => op.size(),
-            HardForkOp::Prague(op) => op.size(),
         }
     }
 }
@@ -313,7 +301,6 @@ impl HardForkOp<()> {
             HardForkOp::Cancun(op) => Ok(HardForkOp::Cancun(op.with(immediate)?)),
             HardForkOp::Shanghai(op) => Ok(HardForkOp::Shanghai(op.with(immediate)?)),
             HardForkOp::London(op) => Ok(HardForkOp::London(op.with(immediate)?)),
-            HardForkOp::Prague(op) => Ok(HardForkOp::Prague(op.with(immediate)?)),
         }
     }
 }
@@ -330,7 +317,6 @@ where
             HardForkOp::Cancun(op) => op.immediate(),
             HardForkOp::Shanghai(op) => op.immediate(),
             HardForkOp::London(op) => op.immediate(),
-            HardForkOp::Prague(op) => op.immediate(),
         }
     }
     fn immediate_mut(&mut self) -> Option<&mut Self::ImmediateRef> {
@@ -338,7 +324,6 @@ where
             HardForkOp::Cancun(op) => op.immediate_mut(),
             HardForkOp::Shanghai(op) => op.immediate_mut(),
             HardForkOp::London(op) => op.immediate_mut(),
-            HardForkOp::Prague(op) => op.immediate_mut(),
         }
     }
     fn into_immediate(self) -> Option<Self::Immediate> {
@@ -346,7 +331,6 @@ where
             HardForkOp::Cancun(op) => op.into_immediate(),
             HardForkOp::Shanghai(op) => op.into_immediate(),
             HardForkOp::London(op) => op.into_immediate(),
-            HardForkOp::Prague(op) => op.into_immediate(),
         }
     }
     fn extra_len(&self) -> usize {
@@ -354,7 +338,6 @@ where
             HardForkOp::Cancun(op) => op.extra_len(),
             HardForkOp::Shanghai(op) => op.extra_len(),
             HardForkOp::London(op) => op.extra_len(),
-            HardForkOp::Prague(op) => op.extra_len(),
         }
     }
     fn code(&self) -> Self::Code {
@@ -362,7 +345,6 @@ where
             HardForkOp::Cancun(op) => HardForkOp::Cancun(op.code()),
             HardForkOp::Shanghai(op) => HardForkOp::Shanghai(op.code()),
             HardForkOp::London(op) => HardForkOp::London(op.code()),
-            HardForkOp::Prague(op) => HardForkOp::Prague(op.code()),
         }
     }
     fn mnemonic(&self) -> &str {
@@ -370,7 +352,6 @@ where
             HardForkOp::Cancun(op) => op.mnemonic(),
             HardForkOp::Shanghai(op) => op.mnemonic(),
             HardForkOp::London(op) => op.mnemonic(),
-            HardForkOp::Prague(op) => op.mnemonic(),
         }
     }
     fn is_jump(&self) -> bool {
@@ -378,7 +359,6 @@ where
             HardForkOp::Cancun(op) => op.is_jump(),
             HardForkOp::Shanghai(op) => op.is_jump(),
             HardForkOp::London(op) => op.is_jump(),
-            HardForkOp::Prague(op) => op.is_jump(),
         }
     }
     fn is_jump_target(&self) -> bool {
@@ -386,7 +366,6 @@ where
             HardForkOp::Cancun(op) => op.is_jump_target(),
             HardForkOp::Shanghai(op) => op.is_jump_target(),
             HardForkOp::London(op) => op.is_jump_target(),
-            HardForkOp::Prague(op) => op.is_jump_target(),
         }
     }
     fn is_exit(&self) -> bool {
@@ -394,7 +373,6 @@ where
             HardForkOp::Cancun(op) => op.is_exit(),
             HardForkOp::Shanghai(op) => op.is_exit(),
             HardForkOp::London(op) => op.is_exit(),
-            HardForkOp::Prague(op) => op.is_exit(),
         }
     }
     fn pops(&self) -> usize {
@@ -402,7 +380,6 @@ where
             HardForkOp::Cancun(op) => op.pops(),
             HardForkOp::Shanghai(op) => op.pops(),
             HardForkOp::London(op) => op.pops(),
-            HardForkOp::Prague(op) => op.pops(),
         }
     }
     fn pushes(&self) -> usize {
@@ -410,7 +387,6 @@ where
             HardForkOp::Cancun(op) => op.pushes(),
             HardForkOp::Shanghai(op) => op.pushes(),
             HardForkOp::London(op) => op.pushes(),
-            HardForkOp::Prague(op) => op.pushes(),
         }
     }
 }
@@ -421,7 +397,6 @@ impl From<HardForkOp<()>> for u8 {
             HardForkOp::Cancun(op) => op.code_byte(),
             HardForkOp::Shanghai(op) => op.code_byte(),
             HardForkOp::London(op) => op.code_byte(),
-            HardForkOp::Prague(op) => op.code_byte(),
         }
     }
 }
@@ -432,7 +407,6 @@ impl std::fmt::Display for HardForkOp<()> {
             HardForkOp::Cancun(op) => op.fmt(f),
             HardForkOp::Shanghai(op) => op.fmt(f),
             HardForkOp::London(op) => op.fmt(f),
-            HardForkOp::Prague(op) => op.fmt(f),
         }
     }
 }
@@ -448,14 +422,11 @@ pub enum HardFork {
 
     /// The London hard fork.
     London,
-
-    /// The Prague hard fork.
-    Prague,
 }
 
 impl Default for HardFork {
     fn default() -> Self {
-        Self::Prague
+        Self::Cancun
     }
 }
 
@@ -466,7 +437,6 @@ impl From<&OsStr> for HardFork {
             "cancun" => Self::Cancun,
             "shanghai" => Self::Shanghai,
             "london" => Self::London,
-            "prague" => Self::Prague,
             _ => Self::default(),
         }
     }

@@ -819,5 +819,4 @@ fn main() {
     generate_fork("london").unwrap();
     generate_fork("shanghai").unwrap();
     generate_fork("cancun").unwrap();
-    generate_fork("prague").unwrap();
 }

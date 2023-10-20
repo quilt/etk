@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use crate::ops::{Abstract, AbstractOp, ExpressionMacroDefinition, InstructionMacroDefinition};
 use etk_ops::cancun::Op as CancunOp;
 use etk_ops::london::Op as LondonOp;
-use etk_ops::prague::Op as PragueOp;
 use etk_ops::shanghai::Op as ShanghaiOp;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,12 +21,6 @@ impl From<CancunOp<Abstract>> for Node {
 impl From<ShanghaiOp<Abstract>> for Node {
     fn from(op: ShanghaiOp<Abstract>) -> Self {
         Node::Op(AbstractOp::Op(etk_ops::HardForkOp::Shanghai(op)))
-    }
-}
-
-impl From<PragueOp<Abstract>> for Node {
-    fn from(op: PragueOp<Abstract>) -> Self {
-        Node::Op(AbstractOp::Op(etk_ops::HardForkOp::Prague(op)))
     }
 }
 

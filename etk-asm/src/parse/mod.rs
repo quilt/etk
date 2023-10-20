@@ -22,7 +22,6 @@ use self::{
 
 use etk_ops::cancun::Op as CancunOp;
 use etk_ops::london::Op as LondonOp;
-use etk_ops::prague::Op as PragueOp;
 use etk_ops::shanghai::Op as ShanghaiOp;
 
 use crate::ast::Node;
@@ -62,9 +61,6 @@ fn parse_abstract_op(pair: Pair<Rule>, hardfork: HardFork) -> Result<AbstractOp,
                 HardFork::Shanghai => {
                     HardForkOp::Shanghai(ShanghaiOp::new(pair.as_str().parse().unwrap()).unwrap())
                 }
-                HardFork::Prague => {
-                    HardForkOp::Prague(PragueOp::new(pair.as_str().parse().unwrap()).unwrap())
-                }
                 HardFork::London => {
                     HardForkOp::London(LondonOp::new(pair.as_str().parse().unwrap()).unwrap())
                 }
@@ -87,11 +83,9 @@ fn parse_push(pair: Pair<Rule>, hardfork: HardFork) -> Result<AbstractOp, ParseE
     let spec = match hardfork {
         HardFork::Cancun => HardForkOp::Cancun(CancunOp::<()>::push(size).unwrap()),
         HardFork::Shanghai => HardForkOp::Shanghai(ShanghaiOp::<()>::push(size).unwrap()),
-        HardFork::Prague => HardForkOp::Prague(PragueOp::<()>::push(size).unwrap()),
         HardFork::London => HardForkOp::London(LondonOp::<()>::push(size).unwrap()),
     };
 
-    //let spec = Op::<()>::push(size).unwrap();
     let expr = expression::parse(operand)?;
 
     if let Ok(val) = expr.eval() {
