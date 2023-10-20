@@ -1,7 +1,6 @@
 use crate::blocks::annotated::ExitExt;
 
 use etk_dasm::blocks::annotated::{AnnotatedBlock, Exit};
-use etk_ops::HardFork;
 
 use petgraph::dot::Dot;
 use petgraph::graph::{Graph, NodeIndex};
@@ -296,6 +295,7 @@ mod tests {
 
     use etk_asm::disasm::Disassembler;
     use etk_asm::ingest::Ingest;
+    use etk_ops::HardFork;
 
     use etk_dasm::blocks::basic::Separator;
 
