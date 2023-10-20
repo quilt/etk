@@ -53,7 +53,7 @@ fn run() -> Result<(), Error> {
         None => HardFork::default(),
     };
 
-    println!("Hardfork: {:?}.", hardfork);
+    println!("Hardfork selected: {:?}.", hardfork);
 
     let hex_out = HexWrite::new(&mut out);
 

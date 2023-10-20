@@ -6,7 +6,7 @@
 mod error {
     use crate::ops::Expression;
     use crate::ParseError;
-    use etk_ops::{cancun::Op, HardForkOp};
+    use etk_ops::HardForkOp;
     use num_bigint::BigInt;
     use snafu::{Backtrace, Snafu};
 
