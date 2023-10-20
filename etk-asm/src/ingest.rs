@@ -232,6 +232,7 @@ impl Program {
 ///
 /// ```rust
 /// use etk_asm::ingest::Ingest;
+/// use etk_ops::HardFork;
 /// #
 /// # use etk_asm::ingest::Error;
 /// #

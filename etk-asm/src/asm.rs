@@ -184,6 +184,7 @@ impl From<Vec<u8>> for RawOp {
 /// use etk_asm::asm::Assembler;
 /// use etk_asm::ops::AbstractOp;
 /// use etk_ops::cancun::{Op, GetPc};
+/// use etk_ops::{HardFork, HardForkOp};
 /// # use etk_asm::asm::Error;
 /// #
 /// # use hex_literal::hex;
@@ -577,7 +578,7 @@ mod tests {
         InstructionMacroDefinition, InstructionMacroInvocation, Terminal,
     };
     use assert_matches::assert_matches;
-    use etk_ops::{cancun::*, HardForkOp};
+    use etk_ops::{cancun::*, HardFork, HardForkOp};
     use hex_literal::hex;
     use num_bigint::{BigInt, Sign};
 
