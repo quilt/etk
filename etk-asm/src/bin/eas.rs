@@ -47,8 +47,7 @@ fn run() -> Result<(), Error> {
         None => Box::new(std::io::stdout()),
     };
 
-    let opthard = opt.hardfork.clone();
-    let mut hardfork = match opt.hardfork {
+    let hardfork = match opt.hardfork {
         Some(h) => h,
         None => HardFork::default(),
     };

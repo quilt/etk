@@ -1,6 +1,7 @@
 use crate::blocks::annotated::ExitExt;
 
 use etk_dasm::blocks::annotated::{AnnotatedBlock, Exit};
+use etk_ops::HardFork;
 
 use petgraph::dot::Dot;
 use petgraph::graph::{Graph, NodeIndex};
@@ -328,7 +329,7 @@ mod tests {
     {
         fn compile(&self) -> Disassembler {
             let mut output = Disassembler::new();
-            Ingest::new(&mut output)
+            Ingest::new(&mut output, HardFork::Cancun)
                 .ingest("./test", self.source)
                 .unwrap();
             output
