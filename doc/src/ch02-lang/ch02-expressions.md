@@ -10,7 +10,7 @@ While an assembled `push` must have a concrete value, it is often useful when de
 
 ```rust
 # extern crate etk_asm;
-# extern crate etk_ops
+# extern crate etk_ops;
 # let src = r#"
 push1 1+(2*3)/4
 # "#;
