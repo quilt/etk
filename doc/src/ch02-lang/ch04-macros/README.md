@@ -12,6 +12,7 @@ An instruction macro looks like this:
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 %macro push_sum(a, b)
     push1 $a + $b
@@ -20,7 +21,7 @@ An instruction macro looks like this:
 %push_sum(4, 2)
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x60, 0x06]);
 ```
@@ -37,6 +38,7 @@ Expression macros _do not_ begin with `%`, and cannot replace instructions. Inst
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 %def add_one(num)
     $num+1
@@ -45,7 +47,7 @@ Expression macros _do not_ begin with `%`, and cannot replace instructions. Inst
 push1 add_one(41)
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x60, 0x2a]);
 ```

@@ -4,6 +4,7 @@ Manually counting out jump destination addresses would be a monumentally pointle
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 label0:             # <- This is a label called "label0",
                     ##    and it has the value 0, since it is
@@ -16,7 +17,7 @@ label0:             # <- This is a label called "label0",
     jump            # Now we jump to zero, which is a
                     ## `jumpdest` instruction, looping forever.
 # "#;
-# let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
+# let mut ingest = etk_asm::ingest::Ingest::new(Vec::new(), etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 ```
 
@@ -34,6 +35,7 @@ That's not all! You can also use labels to calculate lengths:
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 push1 start
 push1 end
@@ -46,7 +48,7 @@ start:
     pc
 end:
 # "#;
-# let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
+# let mut ingest = etk_asm::ingest::Ingest::new(Vec::new(), etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 ```
 

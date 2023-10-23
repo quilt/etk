@@ -8,6 +8,7 @@ Instruction macros can accept an arbitrary number of parameters. Parameters are 
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 %macro my_macro()
     push1 42
@@ -17,7 +18,7 @@ Instruction macros can accept an arbitrary number of parameters. Parameters are 
     push1 $x+$y+$z
 %end
 # "#;
-# let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
+# let mut ingest = etk_asm::ingest::Ingest::new(Vec::new(), etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 ```
 
@@ -27,6 +28,7 @@ Expression macros can be invoked anywhere an instruction is expected.
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 # %macro my_macro()
 #    push1 42
@@ -38,7 +40,7 @@ Expression macros can be invoked anywhere an instruction is expected.
 %sum(1, 2, 3)
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x60, 0x2a, 0x60, 0x06]);
 ```

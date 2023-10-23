@@ -79,6 +79,7 @@ For example:
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 %push(hello)
 
@@ -86,7 +87,7 @@ hello:
     jumpdest
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x60, 0x02, 0x5b]);
 ```
@@ -108,11 +109,12 @@ For example:
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 push4 selector("transfer(address,uint256)")    # <- expands to 0x63a9059cbb
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x63, 0xa9, 0x05, 0x9c, 0xbb]);
 ```
@@ -131,11 +133,12 @@ For example:
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 push32 topic("transfer(address,uint256)")
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x7f, 169, 5, 156, 187, 42, 176, 158, 178, 25, 88, 63, 74, 89, 165, 208, 98, 58, 222, 52, 109, 150, 43, 205, 78, 70, 177, 29, 160, 71, 201, 4, 155]);
 ```
