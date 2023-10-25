@@ -4,6 +4,7 @@ use crate::ops::{Abstract, AbstractOp, ExpressionMacroDefinition, InstructionMac
 use etk_ops::cancun::Op as CancunOp;
 use etk_ops::london::Op as LondonOp;
 use etk_ops::shanghai::Op as ShanghaiOp;
+use etk_ops::HardForkDirective;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Node {
@@ -11,6 +12,7 @@ pub(crate) enum Node {
     Import(PathBuf),
     Include(PathBuf),
     IncludeHex(PathBuf),
+    HardforkMacro((HardForkDirective, Option<HardForkDirective>)),
 }
 impl From<CancunOp<Abstract>> for Node {
     fn from(op: CancunOp<Abstract>) -> Self {

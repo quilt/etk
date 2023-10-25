@@ -14,6 +14,9 @@ use snafu::{Backtrace, Snafu};
 
 use std::borrow::{Borrow, BorrowMut};
 
+use std::fmt::Display;
+use std::str::FromStr;
+
 /// Trait for types that represent an EVM instruction.
 pub trait Operation {
     /// The return type of [`Operation::code`].
@@ -409,16 +412,37 @@ impl std::fmt::Display for HardForkOp<()> {
 }
 
 /// Hard forks of the Ethereum Virtual Machine.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum HardFork {
-    /// The Cancun hard fork.
-    Cancun,
+    /// The London hard fork.
+    London,
 
     /// The Shanghai hard fork.
     Shanghai,
 
-    /// The London hard fork.
-    London,
+    /// The Cancun hard fork.
+    Cancun,
+}
+
+impl HardFork {
+    /// Returns true if the given hardfork directive is valid for this hardfork.
+    pub fn is_valid(&self, hfd: &HardForkDirective) -> bool {
+        match self {
+            HardFork::London => self.check_hardfork_operator(Self::London, hfd),
+            HardFork::Shanghai => self.check_hardfork_operator(Self::London, hfd),
+            HardFork::Cancun => self.check_hardfork_operator(Self::London, hfd),
+        }
+    }
+
+    fn check_hardfork_operator(&self, hardfork: HardFork, directive: &HardForkDirective) -> bool {
+        match directive.operator {
+            Some(OperatorDirective::GreaterThan) => directive.hardfork > hardfork,
+            Some(OperatorDirective::GreaterThanOrEqual) => directive.hardfork >= hardfork,
+            Some(OperatorDirective::LessThan) => directive.hardfork < hardfork,
+            Some(OperatorDirective::LessThanOrEqual) => directive.hardfork <= hardfork,
+            None => directive.hardfork == hardfork,
+        }
+    }
 }
 
 impl Default for HardFork {
@@ -427,18 +451,125 @@ impl Default for HardFork {
     }
 }
 
-use std::str::FromStr;
+impl Display for HardFork {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::London => write!(f, "london"),
+            Self::Shanghai => write!(f, "shanghai"),
+            Self::Cancun => write!(f, "cancun"),
+        }
+    }
+}
+
+impl From<&str> for HardFork {
+    fn from(s: &str) -> Self {
+        match s {
+            "london" => Self::London,
+            "shanghai" => Self::Shanghai,
+            "cancun" => Self::Cancun,
+            _ => panic!("Invalid hardfork: {}", s),
+        }
+    }
+}
 
 impl FromStr for HardFork {
-    type Err = String;
+    type Err = FromStrError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.to_lowercase();
-        match s.as_str() {
-            "cancun" => Ok(Self::Cancun),
-            "shanghai" => Ok(Self::Shanghai),
-            "london" => Ok(Self::London),
-            _ => Err(format!("Invalid hardfork: {}", s)),
+        Ok(Self::from(s))
+    }
+}
+
+/// A directive that specifies a hardfork.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HardForkDirective {
+    /// The operator used to define a range of hardforks.
+    pub operator: Option<OperatorDirective>,
+
+    /// The hardfork.
+    pub hardfork: HardFork,
+}
+
+impl Display for HardForkDirective {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match &self.operator {
+            Some(op) => write!(f, "{}{}", op, self.hardfork),
+            None => write!(f, "{}", self.hardfork),
+        }
+    }
+}
+
+impl PartialOrd<Option<HardForkDirective>> for HardForkDirective {
+    fn partial_cmp(&self, other: &Option<HardForkDirective>) -> Option<std::cmp::Ordering> {
+        match other {
+            Some(_) => self.partial_cmp(other),
+            None => Some(std::cmp::Ordering::Greater),
+        }
+    }
+}
+
+impl PartialEq<Option<HardForkDirective>> for HardForkDirective {
+    fn eq(&self, other: &Option<HardForkDirective>) -> bool {
+        match other {
+            Some(hfd) => self.eq(hfd),
+            None => false,
+        }
+    }
+}
+
+impl PartialOrd<HardForkDirective> for Option<HardForkDirective> {
+    fn partial_cmp(&self, other: &HardForkDirective) -> Option<std::cmp::Ordering> {
+        match self {
+            Some(hfd) => hfd.partial_cmp(&Some(other.to_owned())),
+            None => Some(std::cmp::Ordering::Less),
+        }
+    }
+}
+
+impl PartialEq<HardForkDirective> for Option<HardForkDirective> {
+    fn eq(&self, other: &HardForkDirective) -> bool {
+        match self {
+            Some(hfd) => hfd.eq(other),
+            None => false,
+        }
+    }
+}
+
+/// An operator used to define a range of hardforks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OperatorDirective {
+    /// The `>=` operator.
+    GreaterThan,
+
+    /// The `<=` operator.
+    GreaterThanOrEqual,
+
+    /// The `>` operator.
+    LessThan,
+
+    /// The `<` operator.
+    LessThanOrEqual,
+}
+
+impl From<&str> for OperatorDirective {
+    fn from(s: &str) -> Self {
+        match s {
+            ">=" => Self::GreaterThanOrEqual,
+            "<=" => Self::LessThanOrEqual,
+            ">" => Self::GreaterThan,
+            "<" => Self::LessThan,
+            _ => panic!("Invalid operator: {}", s),
+        }
+    }
+}
+
+impl Display for OperatorDirective {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::GreaterThanOrEqual => write!(f, ">="),
+            Self::LessThanOrEqual => write!(f, "<="),
+            Self::GreaterThan => write!(f, ">"),
+            Self::LessThan => write!(f, "<"),
         }
     }
 }

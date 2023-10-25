@@ -304,3 +304,36 @@ fn test_dynamic_push_and_include() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_valid_hardfork() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
+    ingester.ingest_file(source(&["hardfork", "valid-hardfork.etk"]))?;
+
+    assert_eq!(output, hex!(""));
+
+    Ok(())
+}
+
+#[test]
+fn test_invalid_hardfork() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
+    ingester.ingest_file(source(&["hardfork", "invalid-hardfork.etk"]))?;
+
+    assert_eq!(output, hex!(""));
+
+    Ok(())
+}
+
+#[test]
+fn test_invalid_range_hardfork() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
+    ingester.ingest_file(source(&["hardfork", "invalid-range.etk"]))?;
+
+    assert_eq!(output, hex!(""));
+
+    Ok(())
+}

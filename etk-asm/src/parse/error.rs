@@ -87,6 +87,27 @@ pub enum ParseError {
         /// The location of the error.
         backtrace: Backtrace,
     },
+
+    /// Hardfork defined inside macro is invalid.
+    #[snafu(display("hardfork `{}` is invalid", hardfork))]
+    #[non_exhaustive]
+    InvalidHardfork {
+        /// Name of the invalid hardfork.
+        hardfork: String,
+
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Range of Hardforks define inside macro is invalid.
+    #[snafu(display("Expected range of two hardfork max, but got {}.", parsed))]
+    #[non_exhaustive]
+    InvalidRangeHardfork {
+        /// Number of hardforks parsed.
+        parsed: usize,
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
 }
 
 impl From<Error<Rule>> for ParseError {

@@ -7,7 +7,8 @@ use crate::ops::{
     AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation,
     InstructionMacroDefinition, InstructionMacroInvocation,
 };
-use etk_ops::HardFork;
+use crate::parse::error::InvalidRangeHardfork;
+use etk_ops::{HardFork, HardForkDirective};
 use pest::iterators::Pair;
 use std::path::PathBuf;
 
@@ -45,6 +46,34 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
         Rule::push_macro => {
             let expr = expression::parse(pair.into_inner().next().unwrap())?;
             Node::Op(AbstractOp::Push(expr.into()))
+        }
+        Rule::hardfork => {
+            let mut directives = Vec::new();
+            for inner in pair.into_inner() {
+                let mut directive = inner.into_inner();
+                let operator = match directive.next() {
+                    Some(operator) => {
+                        let operator = operator.as_str().into();
+                        Some(operator)
+                    }
+                    None => None,
+                };
+
+                let hardfork = directive.next().unwrap().as_str().into();
+                println!("hardfork: {:?}", hardfork);
+                println!("operator: {:?}", operator);
+                directives.push(HardForkDirective { operator, hardfork });
+                if directives.len() > 2 {
+                    return InvalidRangeHardfork {
+                        parsed: directives.len(),
+                    }
+                    .fail();
+                }
+            }
+
+            directives.reverse();
+            let tuple = (directives.pop().unwrap(), directives.pop());
+            Node::HardforkMacro(tuple)
         }
         _ => unreachable!(),
     };

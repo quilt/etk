@@ -5,6 +5,8 @@ mod error {
     use crate::asm::Error as AssembleError;
     use crate::ParseError;
 
+    use etk_ops::HardFork;
+    use etk_ops::HardForkDirective;
     use snafu::{Backtrace, Snafu};
 
     use std::path::PathBuf;
@@ -90,6 +92,22 @@ mod error {
         #[snafu(display("too many levels of recursion/includes"))]
         #[non_exhaustive]
         RecursionLimit {
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
+
+        /// Hardfork set for compilation is out of range.
+        #[snafu(display(
+            "Hardfork set for compilation was `{}` but `{}` is required.",
+            hardfork,
+            directive
+        ))]
+        #[non_exhaustive]
+        OutOfRangeHardfork {
+            /// Hardfork set for compilation.
+            hardfork: HardFork,
+            /// Directive that breaks the compilation.
+            directive: HardForkDirective,
             /// The location of the error.
             backtrace: Backtrace,
         },
@@ -343,6 +361,30 @@ where
                         })?;
 
                     raws.push(RawOp::Raw(raw))
+                }
+                Node::HardforkMacro(directive) => {
+                    // Here, directive is always a valid range.
+                    let (hfd1, ophfd2) = directive;
+                    ensure!(
+                        self.hardfork.is_valid(&hfd1),
+                        error::OutOfRangeHardfork {
+                            hardfork: self.hardfork.clone(),
+                            directive: hfd1,
+                        }
+                    );
+
+                    match ophfd2 {
+                        Some(hfd2) => {
+                            ensure!(
+                                self.hardfork.is_valid(&hfd2),
+                                error::OutOfRangeHardfork {
+                                    hardfork: self.hardfork.clone(),
+                                    directive: hfd2,
+                                }
+                            );
+                        }
+                        None => {}
+                    }
                 }
             }
         }
