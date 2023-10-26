@@ -53,8 +53,8 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
                 let mut directive = inner.into_inner();
                 let operator = match directive.next() {
                     Some(operator) => {
-                        let operator = operator.as_str().into();
-                        Some(operator)
+                        let op = operator.as_str().into();
+                        Some(op)
                     }
                     None => None,
                 };

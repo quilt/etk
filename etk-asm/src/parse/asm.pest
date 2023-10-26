@@ -60,7 +60,7 @@ gt = { ">" }
 lt = { "<" }
 gte = { ">=" }
 lte = { "<=" }
-hardfork_name = { string_char* }
+hardfork_name = { ASCII_ALPHA* }
 
 string = @{ "\"" ~ string_char* ~ "\"" }
 string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }
