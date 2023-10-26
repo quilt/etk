@@ -426,21 +426,13 @@ pub enum HardFork {
 
 impl HardFork {
     /// Returns true if the given hardfork directive is valid for this hardfork.
-    pub fn is_valid(&self, hfd: &HardForkDirective) -> bool {
-        match self {
-            HardFork::London => self.check_hardfork_operator(Self::London, hfd),
-            HardFork::Shanghai => self.check_hardfork_operator(Self::London, hfd),
-            HardFork::Cancun => self.check_hardfork_operator(Self::London, hfd),
-        }
-    }
-
-    fn check_hardfork_operator(&self, hardfork: HardFork, directive: &HardForkDirective) -> bool {
+    pub fn is_valid(&self, directive: &HardForkDirective) -> bool {
         match directive.operator {
-            Some(OperatorDirective::GreaterThan) => directive.hardfork > hardfork,
-            Some(OperatorDirective::GreaterThanOrEqual) => directive.hardfork >= hardfork,
-            Some(OperatorDirective::LessThan) => directive.hardfork < hardfork,
-            Some(OperatorDirective::LessThanOrEqual) => directive.hardfork <= hardfork,
-            None => directive.hardfork == hardfork,
+            Some(OperatorDirective::GreaterThan) => self > &directive.hardfork,
+            Some(OperatorDirective::GreaterThanOrEqual) => self >= &directive.hardfork,
+            Some(OperatorDirective::LessThan) => self < &directive.hardfork,
+            Some(OperatorDirective::LessThanOrEqual) => self <= &directive.hardfork,
+            None => self == &directive.hardfork,
         }
     }
 }
@@ -461,22 +453,16 @@ impl Display for HardFork {
     }
 }
 
-impl From<&str> for HardFork {
-    fn from(s: &str) -> Self {
-        match s {
-            "london" => Self::London,
-            "shanghai" => Self::Shanghai,
-            "cancun" => Self::Cancun,
-            _ => panic!("Invalid hardfork: {}", s),
-        }
-    }
-}
-
 impl FromStr for HardFork {
     type Err = FromStrError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::from(s))
+        match s {
+            "london" => Ok(HardFork::London),
+            "shanghai" => Ok(HardFork::Shanghai),
+            "cancun" => Ok(HardFork::Cancun),
+            _ => FromStrSnafu { mnemonic: s }.fail(),
+        }
     }
 }
 
@@ -495,6 +481,15 @@ impl Display for HardForkDirective {
         match &self.operator {
             Some(op) => write!(f, "{}{}", op, self.hardfork),
             None => write!(f, "{}", self.hardfork),
+        }
+    }
+}
+
+impl Into<HardForkDirective> for Option<&HardForkDirective> {
+    fn into(self) -> HardForkDirective {
+        match self {
+            Some(hfd) => hfd.to_owned(),
+            None => panic!("Cannot convert None into HardForkDirective"),
         }
     }
 }

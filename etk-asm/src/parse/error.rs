@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use etk_ops::HardForkDirective;
 use pest::error::Error;
 
 use snafu::{Backtrace, IntoError, Snafu};
@@ -99,12 +100,56 @@ pub enum ParseError {
         backtrace: Backtrace,
     },
 
-    /// Range of Hardforks define inside macro is invalid.
+    /// Range of Hardforks exceeded max amout.
     #[snafu(display("Expected range of two hardfork max, but got {}.", parsed))]
     #[non_exhaustive]
-    InvalidRangeHardfork {
+    ExceededRangeHardfork {
         /// Number of hardforks parsed.
         parsed: usize,
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Range of hardforks is invalid
+    #[snafu(display(
+        "For a range, both hardforks needs to have operators: {},{}.",
+        directive0,
+        directive1
+    ))]
+    #[non_exhaustive]
+    InvalidRangeHardfork {
+        /// Directive with invalid range.
+        directive0: HardForkDirective,
+        /// Directive with invalid range.
+        directive1: HardForkDirective,
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Range of hardforks overlap and should be simplified.
+    #[snafu(display(
+        "Range of hardforks overlap and should be simplified: {},{}.",
+        directive0,
+        directive1
+    ))]
+    #[non_exhaustive]
+    OverlappingRangeHardfork {
+        /// Directive with invalid range.
+        directive0: HardForkDirective,
+        /// Directive with invalid range.
+        directive1: HardForkDirective,
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Range of hardforks is empty.
+    #[snafu(display("Range of hardforks is empty: {},{}.", directive0, directive1))]
+    #[non_exhaustive]
+    EmptyRangeHardfork {
+        /// Directive with invalid range.
+        directive0: HardForkDirective,
+        /// Directive with invalid range.
+        directive1: HardForkDirective,
         /// The location of the error.
         backtrace: Backtrace,
     },

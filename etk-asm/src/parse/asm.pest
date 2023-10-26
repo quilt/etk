@@ -60,7 +60,7 @@ gt = { ">" }
 lt = { "<" }
 gte = { ">=" }
 lte = { "<=" }
-hardfork_name = { "london" | "cancun" }
+hardfork_name = { string_char* }
 
 string = @{ "\"" ~ string_char* ~ "\"" }
 string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }

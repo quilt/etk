@@ -1,5 +1,5 @@
 use super::args::Signature;
-use super::error::ParseError;
+use super::error::{EmptyRangeHardfork, OverlappingRangeHardfork, ParseError};
 use super::expression;
 use super::parser::Rule;
 use crate::ast::Node;
@@ -7,8 +7,8 @@ use crate::ops::{
     AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation,
     InstructionMacroDefinition, InstructionMacroInvocation,
 };
-use crate::parse::error::InvalidRangeHardfork;
-use etk_ops::{HardFork, HardForkDirective};
+use crate::parse::error::{ExceededRangeHardfork, InvalidHardfork, InvalidRangeHardfork};
+use etk_ops::{HardFork, HardForkDirective, OperatorDirective};
 use pest::iterators::Pair;
 use std::path::PathBuf;
 
@@ -59,12 +59,26 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
                     None => None,
                 };
 
-                let hardfork = directive.next().unwrap().as_str().into();
-                println!("hardfork: {:?}", hardfork);
-                println!("operator: {:?}", operator);
-                directives.push(HardForkDirective { operator, hardfork });
+                // Tried moving this to into() but can't manage invalid hardforks.
+                let hardforkstr = directive.next().unwrap().as_str();
+                let hardfork = match hardforkstr {
+                    "london" => HardFork::London,
+                    "shanghai" => HardFork::Shanghai,
+                    "cancun" => HardFork::Cancun,
+                    _ => {
+                        return InvalidHardfork {
+                            hardfork: hardforkstr,
+                        }
+                        .fail()
+                    }
+                };
+
+                directives.push(HardForkDirective {
+                    operator,
+                    hardfork: hardfork,
+                });
                 if directives.len() > 2 {
-                    return InvalidRangeHardfork {
+                    return ExceededRangeHardfork {
                         parsed: directives.len(),
                     }
                     .fail();
@@ -72,6 +86,7 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
             }
 
             directives.reverse();
+            hardfork_in_valid_range(&directives)?;
             let tuple = (directives.pop().unwrap(), directives.pop());
             Node::HardforkMacro(tuple)
         }
@@ -79,6 +94,65 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
     };
 
     Ok(node)
+}
+
+fn hardfork_in_valid_range(directives: &[HardForkDirective]) -> Result<(), ParseError> {
+    if directives.len() == 1 {
+        return Ok(());
+    }
+
+    let mut decresing_bound: Option<HardForkDirective> = None;
+    let mut incresing_bound: Option<HardForkDirective> = None;
+
+    for directive in directives {
+        match directive.operator {
+            Some(OperatorDirective::LessThan) | Some(OperatorDirective::LessThanOrEqual) => {
+                match decresing_bound {
+                    Some(_) => {
+                        return OverlappingRangeHardfork {
+                            directive0: directives.get(0),
+                            directive1: directives.get(1),
+                        }
+                        .fail();
+                    }
+                    None => {
+                        decresing_bound = Some(directive.clone());
+                    }
+                }
+            }
+            Some(OperatorDirective::GreaterThan) | Some(OperatorDirective::GreaterThanOrEqual) => {
+                match incresing_bound {
+                    Some(_) => {
+                        return OverlappingRangeHardfork {
+                            directive0: directives.get(0),
+                            directive1: directives.get(1),
+                        }
+                        .fail();
+                    }
+                    None => {
+                        incresing_bound = Some(directive.clone());
+                    }
+                }
+            }
+            None => {
+                return InvalidRangeHardfork {
+                    directive0: directives.get(0),
+                    directive1: directives.get(1),
+                }
+                .fail();
+            }
+        }
+    }
+
+    if incresing_bound.unwrap().hardfork > decresing_bound.unwrap().hardfork {
+        return EmptyRangeHardfork {
+            directive0: directives.get(0),
+            directive1: directives.get(1),
+        }
+        .fail();
+    }
+
+    Ok(())
 }
 
 fn parse_instruction_macro_defn(

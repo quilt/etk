@@ -317,23 +317,33 @@ fn test_valid_hardfork() -> Result<(), Error> {
 }
 
 #[test]
-fn test_invalid_hardfork() -> Result<(), Error> {
+fn test_invalid_hardfork() {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
-    ingester.ingest_file(source(&["hardfork", "invalid-hardfork.etk"]))?;
+    let err = ingester
+        .ingest_file(source(&["hardfork", "invalid-hardfork.etk"]))
+        .unwrap_err();
 
-    assert_eq!(output, hex!(""));
+    println!("{:?}", err);
 
-    Ok(())
+    assert_matches!(err, etk_asm::ingest::Error::Parse { source:
+        etk_asm::ParseError::InvalidHardfork { hardfork, .. }, .. }
+    if hardfork == "buenosaires".to_string());
 }
 
 #[test]
-fn test_invalid_range_hardfork() -> Result<(), Error> {
+fn test_invalid_range_hardfork() {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
-    ingester.ingest_file(source(&["hardfork", "invalid-range.etk"]))?;
+    let err = ingester
+        .ingest_file(source(&["hardfork", "invalid-range.etk"]))
+        .unwrap_err();
 
-    assert_eq!(output, hex!(""));
-
-    Ok(())
+    assert_matches!(
+        err,
+        etk_asm::ingest::Error::Parse {
+            source: etk_asm::ParseError::EmptyRangeHardfork { .. },
+            ..
+        }
+    );
 }
