@@ -363,7 +363,7 @@ where
                     raws.push(RawOp::Raw(raw))
                 }
                 Node::HardforkMacro(directive) => {
-                    // Here, directive is always a valid range.
+                    // Here, `directive`` is always a valid range.
                     let (hfd1, ophfd2) = directive;
                     ensure!(
                         self.hardfork.is_valid(&hfd1),

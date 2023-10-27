@@ -51,13 +51,22 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
             let mut directives = Vec::new();
             for inner in pair.into_inner() {
                 let mut directive = inner.into_inner();
-                let operator = match directive.next() {
-                    Some(operator) => {
-                        let op = operator.as_str().into();
-                        Some(op)
-                    }
-                    None => None,
-                };
+                let operator =
+                    match directive
+                        .peek()
+                        .and_then(|operator| match operator.as_rule() {
+                            Rule::lt => Some(OperatorDirective::LessThan),
+                            Rule::lte => Some(OperatorDirective::LessThanOrEqual),
+                            Rule::gt => Some(OperatorDirective::GreaterThan),
+                            Rule::gte => Some(OperatorDirective::GreaterThanOrEqual),
+                            _ => None,
+                        }) {
+                        Some(op) => {
+                            directive.next();
+                            Some(op)
+                        }
+                        None => None,
+                    };
 
                 // Tried moving this to into() but can't manage invalid hardforks.
                 let hardforkstr = directive.next().unwrap().as_str();
