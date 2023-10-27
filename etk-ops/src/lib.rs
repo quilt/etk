@@ -485,9 +485,9 @@ impl Display for HardForkDirective {
     }
 }
 
-impl Into<HardForkDirective> for Option<&HardForkDirective> {
-    fn into(self) -> HardForkDirective {
-        match self {
+impl From<Option<&HardForkDirective>> for HardForkDirective {
+    fn from(option: Option<&HardForkDirective>) -> Self {
+        match option {
             Some(hfd) => hfd.to_owned(),
             None => panic!("Cannot convert None into HardForkDirective"),
         }
