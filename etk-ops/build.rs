@@ -309,8 +309,6 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         });
     }
 
-    let mut debug_bound = quote! {};
-    let mut clone_bound = quote! {};
     let mut partial_eq_bound = quote! {};
     let mut eq_bound = quote! {};
     let mut ord_bound = quote! {};
@@ -320,14 +318,6 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
 
     for ii in 1..=32usize {
         let ident = format_ident!("P{}", ii);
-
-        debug_bound.extend(quote! {
-            T::#ident: std::fmt::Debug,
-        });
-
-        clone_bound.extend(quote! {
-            T::#ident: Clone,
-        });
 
         partial_eq_bound.extend(quote! {
             T::#ident: std::cmp::PartialEq,
@@ -352,8 +342,6 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         bounds.push(quote! { #ident });
     }
 
-    //let debug_bound = debug_bound.to_string();
-    //let clone_bound = clone_bound.to_string();
     let partial_eq_bound = partial_eq_bound.to_string();
     let eq_bound = eq_bound.to_string();
     let ord_bound = ord_bound.to_string();
@@ -366,7 +354,6 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         #[educe(
             PartialEq(bound = #partial_eq_bound),
             Eq(bound = #eq_bound),
-            //Clone(bound = #clone_bound),
             Ord(bound = #ord_bound),
             PartialOrd(bound = #partial_ord_bound),
             Hash(bound = #hash_bound),
