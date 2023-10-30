@@ -176,7 +176,7 @@ impl From<Vec<u8>> for RawOp {
 
 impl<O: Into<RawOp>> From<&O> for RawOp {
     fn from(item: &O) -> Self {
-        item.clone().into()
+        item.into()
     }
 }
 
@@ -319,7 +319,7 @@ impl Assembler {
     where
         O: Into<RawOp>,
     {
-        self.inspect_macros(&ops)?;
+        self.inspect_macros(ops)?;
 
         for op in ops {
             self.push(op)?;
