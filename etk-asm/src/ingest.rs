@@ -292,7 +292,7 @@ where
         let mut program = Program::new(path.into());
         let nodes = self.preprocess(&mut program, src)?;
         let mut asm = Assembler::new();
-        let raw = asm.assemble(nodes)?;
+        let raw = asm.assemble(&nodes)?;
 
         self.output.write_all(&raw).context(error::Io {
             message: "writing output",

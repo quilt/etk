@@ -174,6 +174,12 @@ impl From<Vec<u8>> for RawOp {
     }
 }
 
+impl<O: Into<RawOp>> From<&O> for RawOp {
+    fn from(item: &O) -> Self {
+        item.clone().into()
+    }
+}
+
 /// Assembles a series of [`RawOp`] into raw bytes, tracking and resolving macros and labels,
 /// and handling dynamic pushes.
 ///
@@ -187,9 +193,8 @@ impl From<Vec<u8>> for RawOp {
 /// #
 /// # use hex_literal::hex;
 /// let mut asm = Assembler::new();
-/// let result = asm.assemble(vec![
-///     AbstractOp::new(GetPc),
-/// ])?;
+/// let code = ec![AbstractOp::new(GetPc)]
+/// let result = asm.assemble(&code)?;
 /// # assert_eq!(result, hex!("58"));
 /// # Result::<(), Error>::Ok(())
 /// ```
@@ -232,12 +237,11 @@ impl Assembler {
     }
 
     /// Inspect the macros in a series of [`RawOp`] and declare them in the assembler.
-    fn inspect_macros<I, O>(&mut self, nodes: &I) -> Result<(), Error>
+    fn inspect_macros<O>(&mut self, nodes: &[O]) -> Result<(), Error>
     where
-        I: IntoIterator<Item = O> + Clone,
         O: Into<RawOp>,
     {
-        for op in nodes.clone() {
+        for op in nodes {
             let op = op.into();
             if let RawOp::Op(AbstractOp::MacroDefinition(_)) = op {
                 self.declare_macro(op)?
@@ -245,18 +249,6 @@ impl Assembler {
         }
 
         Ok(())
-    }
-
-    /// Collect any assembled instructions that are ready to be output.
-    fn take(&mut self) -> Vec<u8> {
-        let output = self.concretize_ops();
-        match output {
-            Ok(v) => {
-                self.ready.clear();
-                v
-            }
-            Err(_) => Vec::new(),
-        }
     }
 
     /// Concretize all assembled instructions.
@@ -270,7 +262,7 @@ impl Assembler {
                 {
                     Ok(cop) => cop.assemble(&mut output),
                     Err(ops::Error::ContextIncomplete {
-                        source: UnknownLabel { label: _label, .. },
+                        source: UnknownLabel { .. },
                     }) => {
                         let undeclared_names: Vec<_> = self
                             .undeclared_labels
@@ -323,9 +315,8 @@ impl Assembler {
     /// Feed instructions into the `Assembler`.
     ///
     /// Returns the code of the assembled program.
-    pub fn assemble<I, O>(&mut self, ops: I) -> Result<Vec<u8>, Error>
+    pub fn assemble<O>(&mut self, ops: &[O]) -> Result<Vec<u8>, Error>
     where
-        I: IntoIterator<Item = O> + Clone,
         O: Into<RawOp>,
     {
         self.inspect_macros(&ops)?;
@@ -336,7 +327,9 @@ impl Assembler {
 
         self.finish()?;
 
-        Ok(self.take())
+        let output = self.concretize_ops()?;
+        self.ready.clear();
+        Ok(output)
     }
 
     /// Insert explicitly declared macros, via `AbstractOp`, into the `Assembler`.
@@ -360,7 +353,7 @@ impl Assembler {
     }
 
     /// Feed a single instruction into the `Assembler`.
-    fn push<O>(&mut self, rop: O) -> Result<usize, Error>
+    fn push<O>(&mut self, rop: &O) -> Result<usize, Error>
     where
         O: Into<RawOp>,
     {
@@ -368,31 +361,6 @@ impl Assembler {
 
         self.declare_label(&rop)?;
 
-        // Expand instruction macros immediately.
-        if let RawOp::Op(AbstractOp::Macro(ref m)) = rop {
-            self.expand_macro(&m.name, &m.parameters)?;
-            return Ok(self.concrete_len);
-        }
-
-        self.push_rawop(rop)?;
-        Ok(self.concrete_len)
-    }
-
-    fn declare_label(&mut self, rop: &RawOp) -> Result<(), Error> {
-        if let RawOp::Op(AbstractOp::Label(ref label)) = *rop {
-            match self.declared_labels.entry(label.to_owned()) {
-                hash_map::Entry::Occupied(_) => {
-                    return error::DuplicateLabel { label }.fail();
-                }
-                hash_map::Entry::Vacant(v) => {
-                    v.insert(None);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn push_rawop(&mut self, rop: RawOp) -> Result<(), Error> {
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
                 let mut dst = 0;
@@ -418,10 +386,11 @@ impl Assembler {
                     .insert(label, Some(self.concrete_len))
                     .expect("label should exist");
                 assert_eq!(old, None, "label should have been undefined");
-                Ok(())
             }
-            RawOp::Op(AbstractOp::MacroDefinition(_)) => Ok(()),
-            RawOp::Op(AbstractOp::Macro(_)) => Ok(()),
+            RawOp::Op(AbstractOp::MacroDefinition(_)) => {}
+            RawOp::Op(AbstractOp::Macro(ref m)) => {
+                self.expand_macro(&m.name, &m.parameters)?;
+            }
             RawOp::Op(ref op) => {
                 match op
                     .clone()
@@ -450,13 +419,12 @@ impl Assembler {
                         source: UnknownLabel { label: _label, .. },
                     }) => {
                         let mut dynamic_push = false;
-                        match op.size() {
-                            Some(size) => self.concrete_len += size,
-                            None => {
-                                self.concrete_len += 2;
-                                dynamic_push = true;
-                            }
-                        };
+                        if let AbstractOp::Push(_) = op {
+                            dynamic_push = true;
+                            self.concrete_len += 2;
+                        } else {
+                            self.concrete_len += op.size().unwrap();
+                        }
 
                         self.undeclared_labels.push(PendingLabel {
                             label: _label.to_owned(),
@@ -472,22 +440,34 @@ impl Assembler {
                         source: UndefinedVariable { name, .. },
                     }) => return error::UndeclaredVariableMacro { var: name }.fail(),
                 }
-
-                Ok(())
             }
             RawOp::Raw(raw) => {
                 self.concrete_len += raw.len();
                 self.ready.push(RawOp::Raw(raw));
-                Ok(())
             }
             RawOp::Scope(scope) => {
                 let mut asm = Self::new();
-                let scope_result = asm.assemble(scope)?;
+                let scope_result = asm.assemble(&scope)?;
                 self.concrete_len += scope_result.len();
                 self.ready.push(RawOp::Raw(scope_result));
-                Ok(())
             }
         }
+
+        Ok(self.concrete_len)
+    }
+
+    fn declare_label(&mut self, rop: &RawOp) -> Result<(), Error> {
+        if let RawOp::Op(AbstractOp::Label(ref label)) = *rop {
+            match self.declared_labels.entry(label.to_owned()) {
+                hash_map::Entry::Occupied(_) => {
+                    return error::DuplicateLabel { label }.fail();
+                }
+                hash_map::Entry::Vacant(v) => {
+                    v.insert(None);
+                }
+            }
+        }
+        Ok(())
     }
 
     fn expand_macro(
@@ -548,7 +528,7 @@ impl Assembler {
                 }
 
                 for op in m.contents.iter() {
-                    self.push(op.clone())?;
+                    self.push(op)?;
                 }
                 Ok(Some(self.concrete_len))
             }
@@ -572,11 +552,12 @@ mod tests {
     #[test]
     fn assemble_variable_push_const_while_pending() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![
+        let code = vec![
             AbstractOp::Op(Push1(Imm::with_label("label1")).into()),
             AbstractOp::Push(Terminal::Number(0xaabb.into()).into()),
             AbstractOp::Label("label1".into()),
-        ])?;
+        ];
+        let result = asm.assemble(&code)?;
         assert_eq!(result, hex!("600561aabb"));
         Ok(())
     }
@@ -584,7 +565,7 @@ mod tests {
     #[test]
     fn assemble_variable_pushes_abab() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![
+        let code = vec![
             AbstractOp::new(JumpDest),
             AbstractOp::Push(Imm::with_label("label1")),
             AbstractOp::Push(Imm::with_label("label2")),
@@ -592,7 +573,8 @@ mod tests {
             AbstractOp::new(GetPc),
             AbstractOp::Label("label2".into()),
             AbstractOp::new(GetPc),
-        ])?;
+        ];
+        let result = asm.assemble(&code)?;
         assert_eq!(result, hex!("5b600560065858"));
         Ok(())
     }
@@ -600,7 +582,7 @@ mod tests {
     #[test]
     fn assemble_variable_pushes_abba() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![
+        let code = vec![
             AbstractOp::new(JumpDest),
             AbstractOp::Push(Imm::with_label("label1")),
             AbstractOp::Push(Imm::with_label("label2")),
@@ -608,7 +590,8 @@ mod tests {
             AbstractOp::new(GetPc),
             AbstractOp::Label("label1".into()),
             AbstractOp::new(GetPc),
-        ])?;
+        ];
+        let result = asm.assemble(&code)?;
         assert_eq!(result, hex!("5b600660055858"));
         Ok(())
     }
@@ -616,12 +599,13 @@ mod tests {
     #[test]
     fn assemble_variable_push1_multiple() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![
+        let code = vec![
             AbstractOp::new(JumpDest),
             AbstractOp::Push(Imm::with_label("auto")),
             AbstractOp::Push(Imm::with_label("auto")),
             AbstractOp::Label("auto".into()),
-        ])?;
+        ];
+        let result = asm.assemble(&code)?;
         assert_eq!(result, hex!("5b60056005"));
         Ok(())
     }
@@ -629,9 +613,10 @@ mod tests {
     #[test]
     fn assemble_variable_push_const() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![AbstractOp::Push(
+        let code = vec![AbstractOp::Push(
             Terminal::Number((0x00aaaaaaaaaaaaaaaaaaaaaaaa as u128).into()).into(),
-        )])?;
+        )];
+        let result = asm.assemble(&code)?;
         assert_eq!(result, hex!("6baaaaaaaaaaaaaaaaaaaaaaaa"));
         Ok(())
     }
@@ -641,9 +626,8 @@ mod tests {
         let v = BigInt::from_bytes_be(Sign::Plus, &[1u8; 33]);
 
         let mut asm = Assembler::new();
-        let err = asm
-            .assemble(vec![AbstractOp::Push(Terminal::Number(v).into())])
-            .unwrap_err();
+        let code = vec![AbstractOp::Push(Terminal::Number(v).into())];
+        let err = asm.assemble(&code).unwrap_err();
 
         assert_matches!(err, Error::ExpressionTooLarge { .. });
     }
@@ -651,9 +635,8 @@ mod tests {
     #[test]
     fn assemble_variable_push_negative() {
         let mut asm = Assembler::new();
-        let err = asm
-            .assemble(vec![AbstractOp::Push(Terminal::Number((-1).into()).into())])
-            .unwrap_err();
+        let code = vec![AbstractOp::Push(Terminal::Number((-1).into()).into())];
+        let err = asm.assemble(&code).unwrap_err();
 
         assert_matches!(err, Error::ExpressionNegative { .. });
     }
@@ -661,9 +644,10 @@ mod tests {
     #[test]
     fn assemble_variable_push_const0() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![AbstractOp::Push(
+        let code = vec![AbstractOp::Push(
             Terminal::Number((0x00 as u128).into()).into(),
-        )])?;
+        )];
+        let result = asm.assemble(&code)?;
         assert_eq!(result, hex!("6000"));
         Ok(())
     }
@@ -671,11 +655,12 @@ mod tests {
     #[test]
     fn assemble_variable_push1_known() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![
+        let code = vec![
             AbstractOp::new(JumpDest),
             AbstractOp::Label("auto".into()),
             AbstractOp::Push(Imm::with_label("auto")),
-        ])?;
+        ];
+        let result = asm.assemble(&code)?;
         assert_eq!(result, hex!("5b6001"));
         Ok(())
     }
@@ -683,11 +668,12 @@ mod tests {
     #[test]
     fn assemble_variable_push1() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![
+        let code = vec![
             AbstractOp::Push(Imm::with_label("auto")),
             AbstractOp::Label("auto".into()),
             AbstractOp::new(JumpDest),
-        ])?;
+        ];
+        let result = asm.assemble(&code)?;
         assert_eq!(result, hex!("60025b"));
         Ok(())
     }
@@ -695,12 +681,13 @@ mod tests {
     #[test]
     fn assemble_variable_push1_reuse() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![
+        let code = vec![
             AbstractOp::Push(Imm::with_label("auto")),
             AbstractOp::Label("auto".into()),
             AbstractOp::new(JumpDest),
             AbstractOp::new(Push1(Imm::with_label("auto"))),
-        ])?;
+        ];
+        let result = asm.assemble(&code)?;
         assert_eq!(result, hex!("60025b6002"));
         Ok(())
     }
@@ -717,7 +704,7 @@ mod tests {
         code.push(AbstractOp::new(JumpDest));
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(code)?;
+        let result = asm.assemble(&code)?;
 
         let mut expected = vec![0x61, 0x01, 0x02];
         expected.extend_from_slice(&[0x58; 255]);
@@ -730,9 +717,8 @@ mod tests {
     #[test]
     fn assemble_undeclared_label() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let err = asm
-            .assemble(vec![AbstractOp::new(Push1(Imm::with_label("hi")))])
-            .unwrap_err();
+        let code = vec![AbstractOp::new(Push1(Imm::with_label("hi")))];
+        let err = asm.assemble(&code).unwrap_err();
         assert_matches!(err, Error::UndeclaredLabels { labels, .. } if labels == vec!["hi"]);
         Ok(())
     }
@@ -740,7 +726,8 @@ mod tests {
     #[test]
     fn assemble_jumpdest_no_label() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![AbstractOp::new(JumpDest)])?;
+        let code = vec![AbstractOp::new(JumpDest)];
+        let result = asm.assemble(&code)?;
         assert!(asm.declared_labels.is_empty());
         assert_eq!(result, hex!("5b"));
         Ok(())
@@ -751,7 +738,7 @@ mod tests {
         let mut asm = Assembler::new();
         let ops = vec![AbstractOp::Label("lbl".into()), AbstractOp::new(JumpDest)];
 
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(asm.declared_labels.len(), 1);
         assert_eq!(asm.declared_labels.get("lbl"), Some(&Some(0)));
         assert_eq!(result, hex!("5b"));
@@ -767,7 +754,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("5b6000"));
 
         Ok(())
@@ -782,7 +769,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("600258"));
 
         Ok(())
@@ -797,7 +784,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("60025b"));
 
         Ok(())
@@ -812,7 +799,7 @@ mod tests {
         ops.push(AbstractOp::new(JumpDest));
         ops.push(AbstractOp::new(Push1(Imm::with_label("a"))));
         let mut asm = Assembler::new();
-        let err = asm.assemble(ops).unwrap_err();
+        let err = asm.assemble(&ops).unwrap_err();
         assert_matches!(err, Error::ExpressionTooLarge { expr: Expression::Terminal(Terminal::Label(label)), .. } if label == "a");
     }
 
@@ -825,7 +812,7 @@ mod tests {
         ops.push(AbstractOp::new(JumpDest));
         ops.push(AbstractOp::new(Push1(Imm::with_label("b"))));
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
 
         let mut expected = vec![0x58; 255];
         expected.push(0x5b);
@@ -864,7 +851,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, []);
 
         Ok(())
@@ -898,7 +885,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("5b60005b600360005b60086000"));
 
         Ok(())
@@ -928,7 +915,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("5b60005b60036000"));
 
         Ok(())
@@ -958,7 +945,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("5b60005b60036000"));
 
         Ok(())
@@ -988,7 +975,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("5b600560065858"));
 
         Ok(())
@@ -1000,7 +987,7 @@ mod tests {
             InstructionMacroInvocation::with_zero_parameters("my_macro".into()),
         )];
         let mut asm = Assembler::new();
-        let err = asm.assemble(ops).unwrap_err();
+        let err = asm.assemble(&ops).unwrap_err();
         assert_matches!(err, Error::UndeclaredInstructionMacro { name, .. } if name == "my_macro");
 
         Ok(())
@@ -1023,7 +1010,7 @@ mod tests {
             .into(),
         ];
         let mut asm = Assembler::new();
-        let err = asm.assemble(ops).unwrap_err();
+        let err = asm.assemble(&ops).unwrap_err();
         assert_matches!(err, Error::DuplicateMacro { name, .. } if name == "my_macro");
 
         Ok(())
@@ -1043,7 +1030,7 @@ mod tests {
             )),
         ];
         let mut asm = Assembler::new();
-        let err = asm.assemble(ops).unwrap_err();
+        let err = asm.assemble(&ops).unwrap_err();
         assert_matches!(err, Error::DuplicateLabel { label, .. } if label == "a");
 
         Ok(())
@@ -1070,7 +1057,7 @@ mod tests {
             AbstractOp::new(Push1(Imm::with_label("a"))),
         ];
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
 
         assert_eq!(result, hex!("3360016000"));
 
@@ -1102,7 +1089,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("5b600060426000"));
 
         Ok(())
@@ -1115,7 +1102,7 @@ mod tests {
         )))];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("6002"));
 
         Ok(())
@@ -1127,7 +1114,7 @@ mod tests {
             BigInt::from(-1).into(),
         )))];
         let mut asm = Assembler::new();
-        let err = asm.assemble(ops).unwrap_err();
+        let err = asm.assemble(&ops).unwrap_err();
         assert_matches!(err, Error::ExpressionNegative { value, .. } if value == BigInt::from(-1));
 
         Ok(())
@@ -1136,11 +1123,10 @@ mod tests {
     #[test]
     fn assemble_expression_undeclared_label() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let err = asm
-            .assemble(vec![AbstractOp::new(Push1(Imm::with_expression(
-                Terminal::Label(String::from("hi")).into(),
-            )))])
-            .unwrap_err();
+        let ops = vec![AbstractOp::new(Push1(Imm::with_expression(
+            Terminal::Label(String::from("hi")).into(),
+        )))];
+        let err = asm.assemble(&ops).unwrap_err();
         assert_matches!(err, Error::UndeclaredLabels { labels, .. } if labels == vec!["hi"]);
         Ok(())
     }
@@ -1148,16 +1134,15 @@ mod tests {
     #[test]
     fn assemble_variable_push_expression_with_undeclared_labels() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let err = asm
-            .assemble(vec![
-                AbstractOp::new(JumpDest),
-                AbstractOp::Push(Imm::with_expression(Expression::Plus(
-                    Terminal::Label("foo".into()).into(),
-                    Terminal::Label("bar".into()).into(),
-                ))),
-                AbstractOp::new(Gas),
-            ])
-            .unwrap_err();
+        let ops = vec![
+            AbstractOp::new(JumpDest),
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(
+                Terminal::Label("foo".into()).into(),
+                Terminal::Label("bar".into()).into(),
+            ))),
+            AbstractOp::new(Gas),
+        ];
+        let err = asm.assemble(&ops).unwrap_err();
         // The expressions have short-circuit evaluation, so only the first label is caught in the error.
         assert_matches!(err, Error::UndeclaredLabels { labels, .. } if (labels.contains(&"foo".to_string())));
         Ok(())
@@ -1166,14 +1151,15 @@ mod tests {
     #[test]
     fn assemble_variable_push1_expression() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![
+        let ops = vec![
             AbstractOp::new(JumpDest),
             AbstractOp::Label("auto".into()),
             AbstractOp::Push(Imm::with_expression(Expression::Plus(
                 1.into(),
                 Terminal::Label(String::from("auto")).into(),
             ))),
-        ])?;
+        ];
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("5b6002"));
         Ok(())
     }
@@ -1181,7 +1167,7 @@ mod tests {
     #[test]
     fn assemble_expression_with_labels() -> Result<(), Error> {
         let mut asm = Assembler::new();
-        let result = asm.assemble(vec![
+        let ops = vec![
             AbstractOp::new(JumpDest),
             AbstractOp::Push(Imm::with_expression(Expression::Plus(
                 Terminal::Label(String::from("foo")).into(),
@@ -1190,7 +1176,8 @@ mod tests {
             AbstractOp::new(Gas),
             AbstractOp::Label("foo".into()),
             AbstractOp::Label("bar".into()),
-        ])?;
+        ];
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("5b60085a"));
         Ok(())
     }
@@ -1211,7 +1198,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("6002"));
 
         Ok(())
@@ -1236,7 +1223,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let err = asm.assemble(ops).unwrap_err();
+        let err = asm.assemble(&ops).unwrap_err();
 
         assert_matches!(err, Error::UndeclaredVariableMacro { var, .. } if var == "bar");
     }
@@ -1268,7 +1255,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("58335b"));
 
         Ok(())
@@ -1301,7 +1288,7 @@ mod tests {
         ];
 
         let mut asm = Assembler::new();
-        let result = asm.assemble(ops)?;
+        let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("585b33"));
 
         Ok(())
