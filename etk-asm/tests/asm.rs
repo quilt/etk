@@ -303,3 +303,14 @@ fn test_dynamic_push_and_include() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_dynamic_push2() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["variable-push2", "main.etk"]))?;
+
+    assert_eq!(output, hex!("61010158"));
+
+    Ok(())
+}
