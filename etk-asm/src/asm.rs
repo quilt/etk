@@ -220,9 +220,6 @@ struct PendingLabel {
     /// Position where the label was invoked.
     position: usize,
 
-    /// The immediate value of the label invocation.
-    imm: Option<Imm>,
-
     /// Whether the label was invoked with a dynamic push or not.
     dynamic_push: bool,
 }
@@ -416,11 +413,9 @@ impl Assembler {
                         source: UnknownLabel { label: _label, .. },
                     }) => {
                         let mut dynamic_push = false;
-                        let mut imm: Option<Imm> = None;
-                        if let AbstractOp::Push(inner) = op {
+                        if let AbstractOp::Push(_) = op {
                             dynamic_push = true;
                             self.concrete_len += 2;
-                            imm = Some(inner.clone());
                         } else {
                             self.concrete_len += op.size().unwrap();
                         }
@@ -428,7 +423,6 @@ impl Assembler {
                         self.undeclared_labels.push(PendingLabel {
                             label: _label.to_owned(),
                             position: self.ready.len(),
-                            imm,
                             dynamic_push,
                         });
                         self.ready.push(rop);
