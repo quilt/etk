@@ -142,7 +142,7 @@ mod error {
 
 pub use self::error::Error;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
-use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
+use crate::ops::{self, AbstractOp, Assemble, Expression, Imm, MacroDefinition};
 use rand::Rng;
 use std::cmp;
 use std::collections::{hash_map, HashMap};
@@ -171,12 +171,6 @@ impl From<AbstractOp> for RawOp {
 impl From<Vec<u8>> for RawOp {
     fn from(vec: Vec<u8>) -> Self {
         Self::Raw(vec)
-    }
-}
-
-impl<O: Into<RawOp>> From<&O> for RawOp {
-    fn from(item: &O) -> Self {
-        item.into()
     }
 }
 
@@ -226,6 +220,9 @@ struct PendingLabel {
     /// Position where the label was invoked.
     position: usize,
 
+    /// The immediate value of the label invocation.
+    imm: Option<Imm>,
+
     /// Whether the label was invoked with a dynamic push or not.
     dynamic_push: bool,
 }
@@ -239,12 +236,12 @@ impl Assembler {
     /// Inspect the macros in a series of [`RawOp`] and declare them in the assembler.
     fn inspect_macros<O>(&mut self, nodes: &[O]) -> Result<(), Error>
     where
-        O: Into<RawOp>,
+        O: Into<RawOp> + Clone, //TODO: Remove clone and fix code
     {
-        for op in nodes {
-            let op = op.into();
-            if let RawOp::Op(AbstractOp::MacroDefinition(_)) = op {
-                self.declare_macro(op)?
+        for op in nodes.iter() {
+            let raw_op: RawOp = (*op).clone().into();
+            if let RawOp::Op(AbstractOp::MacroDefinition(_)) = raw_op {
+                self.declare_macro(raw_op)?
             }
         }
 
@@ -317,7 +314,7 @@ impl Assembler {
     /// Returns the code of the assembled program.
     pub fn assemble<O>(&mut self, ops: &[O]) -> Result<Vec<u8>, Error>
     where
-        O: Into<RawOp>,
+        O: Into<RawOp> + Clone, //TODO: Remove clone and fix code
     {
         self.inspect_macros(ops)?;
 
@@ -355,9 +352,10 @@ impl Assembler {
     /// Feed a single instruction into the `Assembler`.
     fn push<O>(&mut self, rop: &O) -> Result<usize, Error>
     where
-        O: Into<RawOp>,
+        O: Into<RawOp> + Clone,
     {
-        let rop = rop.into();
+        //let rop = rop.into();
+        let rop = rop.clone().into();
 
         self.declare_label(&rop)?;
 
@@ -367,17 +365,16 @@ impl Assembler {
                 for ul in self.undeclared_labels.iter() {
                     if (ul.label == label) & ul.dynamic_push {
                         // Compensation in case label was dynamically pushed.
-                        let mut tmp =
-                            ((self.concrete_len as f32 - ul.position as f32) / 256.0).floor();
+                        let mut dst_tmp = (self.concrete_len - ul.position) / 256;
 
                         // Size already accounted for %push(label) was 2.
-                        if tmp > 1.0 {
-                            tmp -= 1.0;
+                        if dst_tmp > 1 {
+                            dst_tmp -= 1;
                         }
-                        dst = cmp::max(tmp as usize, dst);
+
+                        dst = cmp::max(dst_tmp, dst);
                     }
                 }
-
                 self.undeclared_labels.retain(|l| l.label != *label);
                 self.concrete_len += dst;
 
@@ -419,9 +416,11 @@ impl Assembler {
                         source: UnknownLabel { label: _label, .. },
                     }) => {
                         let mut dynamic_push = false;
-                        if let AbstractOp::Push(_) = op {
+                        let mut imm: Option<Imm> = None;
+                        if let AbstractOp::Push(inner) = op {
                             dynamic_push = true;
                             self.concrete_len += 2;
+                            imm = Some(inner.clone());
                         } else {
                             self.concrete_len += op.size().unwrap();
                         }
@@ -429,6 +428,7 @@ impl Assembler {
                         self.undeclared_labels.push(PendingLabel {
                             label: _label.to_owned(),
                             position: self.ready.len(),
+                            imm,
                             dynamic_push,
                         });
                         self.ready.push(rop);
