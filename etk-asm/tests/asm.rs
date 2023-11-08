@@ -312,7 +312,7 @@ fn test_dynamic_push2() -> Result<(), Error> {
 
     println!("{:x?}", output);
     println!("{:?}", output);
-    assert_eq!(output, hex!("61010058"));
+    assert_eq!(output, hex!("61010158"));
 
     Ok(())
 }

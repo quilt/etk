@@ -142,7 +142,7 @@ mod error {
 
 pub use self::error::Error;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
-use crate::ops::{self, AbstractOp, Assemble, Expression, Imm, MacroDefinition};
+use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
 use rand::Rng;
 use std::cmp;
 use std::collections::{hash_map, HashMap};
@@ -187,7 +187,7 @@ impl From<Vec<u8>> for RawOp {
 /// #
 /// # use hex_literal::hex;
 /// let mut asm = Assembler::new();
-/// let code = ec![AbstractOp::new(GetPc)]
+/// let code = vec![AbstractOp::new(GetPc)];
 /// let result = asm.assemble(&code)?;
 /// # assert_eq!(result, hex!("58"));
 /// # Result::<(), Error>::Ok(())
@@ -349,7 +349,7 @@ impl Assembler {
     /// Feed a single instruction into the `Assembler`.
     fn push<O>(&mut self, rop: &O) -> Result<usize, Error>
     where
-        O: Into<RawOp> + Clone,
+        O: Into<RawOp> + Clone, //TODO: Remove clone and fix code
     {
         //let rop = rop.into();
         let rop = rop.clone().into();
@@ -410,7 +410,7 @@ impl Assembler {
                         .fail()
                     }
                     Err(ops::Error::ContextIncomplete {
-                        source: UnknownLabel { label: _label, .. },
+                        source: UnknownLabel { label, .. },
                     }) => {
                         let mut dynamic_push = false;
                         if let AbstractOp::Push(_) = op {
@@ -421,7 +421,7 @@ impl Assembler {
                         }
 
                         self.undeclared_labels.push(PendingLabel {
-                            label: _label.to_owned(),
+                            label,
                             position: self.ready.len(),
                             dynamic_push,
                         });
