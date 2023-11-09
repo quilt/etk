@@ -145,7 +145,6 @@ use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacr
 use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
 use num_traits::ToPrimitive;
 use rand::Rng;
-use std::cmp;
 use std::collections::{hash_map, HashMap, HashSet};
 
 /// An item to be assembled, which can be either an [`AbstractOp`],
@@ -172,6 +171,12 @@ impl From<AbstractOp> for RawOp {
 impl From<Vec<u8>> for RawOp {
     fn from(vec: Vec<u8>) -> Self {
         Self::Raw(vec)
+    }
+}
+
+impl Into<RawOp> for &AbstractOp {
+    fn into(self) -> RawOp {
+        RawOp::Op(self.clone())
     }
 }
 
@@ -217,12 +222,6 @@ pub struct Assembler {
 struct PendingLabel {
     /// The name of the label.
     label: String,
-
-    /// Position where the label was invoked.
-    position: usize,
-
-    /// Whether the label was invoked with a dynamic push or not.
-    dynamic_push: bool,
 }
 
 impl Assembler {
@@ -234,10 +233,10 @@ impl Assembler {
     /// Inspect the macros in a series of [`RawOp`] and declare them in the assembler.
     fn inspect_macros<O>(&mut self, nodes: &[O]) -> Result<(), Error>
     where
-        O: Into<RawOp> + Clone, //TODO: Remove clone and fix code
+        O: Into<RawOp> + Clone,
     {
         for op in nodes.iter() {
-            let raw_op: RawOp = (*op).clone().into();
+            let raw_op: RawOp = op.clone().into();
             if let RawOp::Op(AbstractOp::MacroDefinition(_)) = raw_op {
                 self.declare_macro(raw_op)?
             }
@@ -347,12 +346,12 @@ impl Assembler {
     /// Returns the code of the assembled program.
     pub fn assemble<O>(&mut self, ops: &[O]) -> Result<Vec<u8>, Error>
     where
-        O: Into<RawOp> + Clone, //TODO: Remove clone and fix code
+        O: Into<RawOp> + Clone,
     {
         self.inspect_macros(ops)?;
 
         for op in ops {
-            self.push(op)?;
+            self.push(op.clone().into())?;
         }
 
         self.finish()?;
@@ -363,11 +362,8 @@ impl Assembler {
     }
 
     /// Insert explicitly declared macros, via `AbstractOp`, into the `Assembler`.
-    fn declare_macro<O>(&mut self, rop: O) -> Result<(), Error>
-    where
-        O: Into<RawOp>,
-    {
-        let rop = rop.into();
+    fn declare_macro(&mut self, rop: RawOp) -> Result<(), Error> {
+        //let rop = rop.into();
         if let RawOp::Op(AbstractOp::MacroDefinition(ref defn)) = rop {
             match self.declared_macros.entry(defn.name().to_owned()) {
                 hash_map::Entry::Occupied(_) => {
@@ -383,13 +379,11 @@ impl Assembler {
     }
 
     /// Feed a single instruction into the `Assembler`.
-    fn push<O>(&mut self, rop: &O) -> Result<usize, Error>
+    fn push<O>(&mut self, rop: O) -> Result<usize, Error>
     where
-        O: Into<RawOp> + Clone, //TODO: Remove clone and fix code
+        O: Into<RawOp>,
     {
-        //let rop = rop.into();
-        let rop = rop.clone().into();
-
+        let rop = rop.into();
         self.declare_label(&rop)?;
 
         match rop {
@@ -413,7 +407,7 @@ impl Assembler {
                 {
                     Ok(cop) => {
                         self.concrete_len += cop.size();
-                        self.ready.push(rop)
+                        self.ready.push(rop.clone())
                     }
                     Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
                         return error::ExpressionTooLarge {
@@ -433,20 +427,14 @@ impl Assembler {
                     Err(ops::Error::ContextIncomplete {
                         source: UnknownLabel { label, .. },
                     }) => {
-                        let mut dynamic_push = false;
                         if let AbstractOp::Push(_) = op {
-                            dynamic_push = true;
                             self.concrete_len += 2;
                         } else {
                             self.concrete_len += op.size().unwrap();
                         }
 
-                        self.undeclared_labels.push(PendingLabel {
-                            label,
-                            position: self.ready.len(),
-                            dynamic_push,
-                        });
-                        self.ready.push(rop);
+                        self.undeclared_labels.push(PendingLabel { label });
+                        self.ready.push(rop.clone());
                     }
                     Err(ops::Error::ContextIncomplete {
                         source: UnknownMacro { name, .. },
@@ -458,7 +446,7 @@ impl Assembler {
             }
             RawOp::Raw(raw) => {
                 self.concrete_len += raw.len();
-                self.ready.push(RawOp::Raw(raw));
+                self.ready.push(RawOp::Raw(raw.to_vec()));
             }
             RawOp::Scope(scope) => {
                 let mut asm = Self::new();
@@ -472,15 +460,14 @@ impl Assembler {
     }
 
     fn declare_label(&mut self, rop: &RawOp) -> Result<(), Error> {
-        if let RawOp::Op(AbstractOp::Label(ref label)) = *rop {
-            match self.declared_labels.entry(label.to_owned()) {
-                hash_map::Entry::Occupied(_) => {
-                    return error::DuplicateLabel { label }.fail();
+        if let RawOp::Op(AbstractOp::Label(label)) = rop {
+            if self.declared_labels.contains_key(label) {
+                return error::DuplicateLabel {
+                    label: label.to_owned(),
                 }
-                hash_map::Entry::Vacant(v) => {
-                    v.insert(None);
-                }
+                .fail();
             }
+            self.declared_labels.insert(label.to_owned(), None);
         }
         Ok(())
     }
