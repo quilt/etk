@@ -267,11 +267,11 @@ impl Assembler {
                                 .unwrap()
                                 .into_iter()
                                 .collect();
-                            if labels.len() > 0 {
+                            if !labels.is_empty() {
                                 if let Ok(val) = exp {
                                     let extra = val.to_usize().unwrap() / 256;
                                     if extra > 0 {
-                                        self.concrete_len += extra as usize;
+                                        self.concrete_len += extra;
 
                                         for label in labels {
                                             if let Some(position) =
