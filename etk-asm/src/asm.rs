@@ -223,6 +223,129 @@ impl Assembler {
         Self::default()
     }
 
+    /// Feed instructions into the `Assembler`.
+    ///
+    /// Returns the code of the assembled program.
+    pub fn assemble<O>(&mut self, ops: &[O]) -> Result<Vec<u8>, Error>
+    where
+        O: Into<RawOp> + Clone,
+    {
+        self.declare_macros(ops)?;
+
+        for op in ops {
+            self.push(op.clone().into())?;
+        }
+
+        let output = self.backpatch_and_emit()?;
+        self.ready.clear();
+        Ok(output)
+    }
+
+    /// Pre-define macros, via `AbstractOp`, into the `Assembler`.
+    ///
+    /// This is used to define macros that are used in the same scope.
+    fn declare_macros<O>(&mut self, ops: &[O]) -> Result<(), Error>
+    where
+        O: Into<RawOp> + Clone,
+    {
+        for op in ops {
+            let rop = op.clone().into();
+            if let RawOp::Op(AbstractOp::MacroDefinition(ref defn)) = rop {
+                match self.declared_macros.entry(defn.name().to_owned()) {
+                    hash_map::Entry::Occupied(_) => {
+                        return error::DuplicateMacro { name: defn.name() }.fail()
+                    }
+                    hash_map::Entry::Vacant(v) => {
+                        v.insert(defn.to_owned());
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Feed a single instruction into the `Assembler`.
+    fn push<O>(&mut self, rop: O) -> Result<usize, Error>
+    where
+        O: Into<RawOp>,
+    {
+        let rop = rop.into();
+        self.declare_label(&rop)?;
+
+        match rop {
+            RawOp::Op(AbstractOp::Label(label)) => {
+                self.undeclared_labels.retain(|l| *l != label);
+
+                let old = self
+                    .declared_labels
+                    .insert(label, Some(self.concrete_len))
+                    .expect("label should exist");
+                assert_eq!(old, None, "label should have been undefined");
+            }
+            RawOp::Op(AbstractOp::MacroDefinition(_)) => {}
+            RawOp::Op(AbstractOp::Macro(ref m)) => {
+                self.expand_macro(&m.name, &m.parameters)?;
+            }
+            RawOp::Op(ref op) => {
+                match op
+                    .clone()
+                    .concretize((&self.declared_labels, &self.declared_macros).into())
+                {
+                    Ok(cop) => {
+                        self.concrete_len += cop.size();
+                        self.ready.push(rop.clone())
+                    }
+                    Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
+                        return error::ExpressionTooLarge {
+                            expr: op.expr().unwrap().clone(),
+                            value,
+                            spec,
+                        }
+                        .fail()
+                    }
+                    Err(ops::Error::ExpressionNegative { value, .. }) => {
+                        return error::ExpressionNegative {
+                            expr: op.expr().unwrap().clone(),
+                            value,
+                        }
+                        .fail()
+                    }
+                    Err(ops::Error::ContextIncomplete {
+                        source: UnknownLabel { label, .. },
+                    }) => {
+                        if let AbstractOp::Push(_) = op {
+                            self.concrete_len += 2;
+                        } else {
+                            self.concrete_len += op.size().unwrap();
+                        }
+
+                        self.undeclared_labels.push(label);
+                        self.ready.push(rop.clone());
+                    }
+                    Err(ops::Error::ContextIncomplete {
+                        source: UnknownMacro { name, .. },
+                    }) => return error::UndeclaredInstructionMacro { name }.fail(),
+                    Err(ops::Error::ContextIncomplete {
+                        source: UndefinedVariable { name, .. },
+                    }) => return error::UndeclaredVariableMacro { var: name }.fail(),
+                }
+            }
+            RawOp::Raw(raw) => {
+                self.concrete_len += raw.len();
+                self.ready.push(RawOp::Raw(raw.to_vec()));
+            }
+            RawOp::Scope(scope) => {
+                let mut asm = Self::new();
+                let scope_result = asm.assemble(&scope)?;
+                self.concrete_len += scope_result.len();
+                self.ready.push(RawOp::Raw(scope_result));
+            }
+        }
+
+        Ok(self.concrete_len)
+    }
+
     /// Backpatch dynamic operations and emit the assembled program.
     ///
     /// Errors if there are any undeclared labels.
@@ -307,129 +430,6 @@ impl Assembler {
         }
 
         Ok(output)
-    }
-
-    /// Pre-define macros, via `AbstractOp`, into the `Assembler`.
-    ///
-    /// This is used to define macros that are used in the same scope.
-    fn declare_macros<O>(&mut self, ops: &[O]) -> Result<(), Error>
-    where
-        O: Into<RawOp> + Clone,
-    {
-        for op in ops {
-            let rop = op.clone().into();
-            if let RawOp::Op(AbstractOp::MacroDefinition(ref defn)) = rop {
-                match self.declared_macros.entry(defn.name().to_owned()) {
-                    hash_map::Entry::Occupied(_) => {
-                        return error::DuplicateMacro { name: defn.name() }.fail()
-                    }
-                    hash_map::Entry::Vacant(v) => {
-                        v.insert(defn.to_owned());
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Feed instructions into the `Assembler`.
-    ///
-    /// Returns the code of the assembled program.
-    pub fn assemble<O>(&mut self, ops: &[O]) -> Result<Vec<u8>, Error>
-    where
-        O: Into<RawOp> + Clone,
-    {
-        self.declare_macros(ops)?;
-
-        for op in ops {
-            self.push(op.clone().into())?;
-        }
-
-        let output = self.backpatch_and_emit()?;
-        self.ready.clear();
-        Ok(output)
-    }
-
-    /// Feed a single instruction into the `Assembler`.
-    fn push<O>(&mut self, rop: O) -> Result<usize, Error>
-    where
-        O: Into<RawOp>,
-    {
-        let rop = rop.into();
-        self.declare_label(&rop)?;
-
-        match rop {
-            RawOp::Op(AbstractOp::Label(label)) => {
-                self.undeclared_labels.retain(|l| *l != label);
-
-                let old = self
-                    .declared_labels
-                    .insert(label, Some(self.concrete_len))
-                    .expect("label should exist");
-                assert_eq!(old, None, "label should have been undefined");
-            }
-            RawOp::Op(AbstractOp::MacroDefinition(_)) => {}
-            RawOp::Op(AbstractOp::Macro(ref m)) => {
-                self.expand_macro(&m.name, &m.parameters)?;
-            }
-            RawOp::Op(ref op) => {
-                match op
-                    .clone()
-                    .concretize((&self.declared_labels, &self.declared_macros).into())
-                {
-                    Ok(cop) => {
-                        self.concrete_len += cop.size();
-                        self.ready.push(rop.clone())
-                    }
-                    Err(ops::Error::ExpressionTooLarge { value, spec, .. }) => {
-                        return error::ExpressionTooLarge {
-                            expr: op.expr().unwrap().clone(),
-                            value,
-                            spec,
-                        }
-                        .fail()
-                    }
-                    Err(ops::Error::ExpressionNegative { value, .. }) => {
-                        return error::ExpressionNegative {
-                            expr: op.expr().unwrap().clone(),
-                            value,
-                        }
-                        .fail()
-                    }
-                    Err(ops::Error::ContextIncomplete {
-                        source: UnknownLabel { label, .. },
-                    }) => {
-                        if let AbstractOp::Push(_) = op {
-                            self.concrete_len += 2;
-                        } else {
-                            self.concrete_len += op.size().unwrap();
-                        }
-
-                        self.undeclared_labels.push(label);
-                        self.ready.push(rop.clone());
-                    }
-                    Err(ops::Error::ContextIncomplete {
-                        source: UnknownMacro { name, .. },
-                    }) => return error::UndeclaredInstructionMacro { name }.fail(),
-                    Err(ops::Error::ContextIncomplete {
-                        source: UndefinedVariable { name, .. },
-                    }) => return error::UndeclaredVariableMacro { var: name }.fail(),
-                }
-            }
-            RawOp::Raw(raw) => {
-                self.concrete_len += raw.len();
-                self.ready.push(RawOp::Raw(raw.to_vec()));
-            }
-            RawOp::Scope(scope) => {
-                let mut asm = Self::new();
-                let scope_result = asm.assemble(&scope)?;
-                self.concrete_len += scope_result.len();
-                self.ready.push(RawOp::Raw(scope_result));
-            }
-        }
-
-        Ok(self.concrete_len)
     }
 
     fn declare_label(&mut self, rop: &RawOp) -> Result<(), Error> {
