@@ -174,9 +174,9 @@ impl From<Vec<u8>> for RawOp {
     }
 }
 
-impl Into<RawOp> for &AbstractOp {
-    fn into(self) -> RawOp {
-        RawOp::Op(self.clone())
+impl From<&AbstractOp> for RawOp {
+    fn from(op: &AbstractOp) -> Self {
+        Self::Op(op.clone())
     }
 }
 
