@@ -283,13 +283,8 @@ impl Assembler {
                     Err(ops::Error::ContextIncomplete {
                         source: UnknownLabel { .. },
                     }) => {
-                        let undeclared_names: Vec<_> = self
-                            .undeclared_labels
-                            .iter()
-                            .map(|label| label.clone())
-                            .collect();
                         return error::UndeclaredLabels {
-                            labels: undeclared_names,
+                            labels: self.undeclared_labels.to_vec(),
                         }
                         .fail();
                     }
