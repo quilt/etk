@@ -223,23 +223,20 @@ impl Assembler {
         Self::default()
     }
 
-    /// Inspect the macros in a series of [`RawOp`] and declare them in the assembler.
-    fn inspect_macros<O>(&mut self, nodes: &[O]) -> Result<(), Error>
-    where
-        O: Into<RawOp> + Clone,
-    {
-        for op in nodes.iter() {
-            let raw_op: RawOp = op.clone().into();
-            if let RawOp::Op(AbstractOp::MacroDefinition(_)) = raw_op {
-                self.declare_macro(raw_op)?
+    /// Backpatch dynamic operations and emit the assembled program.
+    ///
+    /// Errors if there are any undeclared labels.
+    fn backpatch_and_emit(&mut self) -> Result<Vec<u8>, Error> {
+        if !self.undeclared_labels.is_empty() {
+            return error::UndeclaredLabels {
+                labels: self
+                    .undeclared_labels
+                    .iter()
+                    .map(|l| l.to_owned())
+                    .collect::<Vec<String>>(),
             }
+            .fail();
         }
-
-        Ok(())
-    }
-
-    /// Concretize all assembled instructions.
-    fn concretize_ops(&mut self) -> Result<Vec<u8>, Error> {
         let mut output = Vec::new();
         for op in self.ready.iter() {
             if let RawOp::Op(ref op) = op {
@@ -317,18 +314,25 @@ impl Assembler {
         Ok(output)
     }
 
-    /// Check if the input sequence is complete. Returns any errors that
-    /// may remain.
-    fn finish(&mut self) -> Result<(), Error> {
-        if !self.undeclared_labels.is_empty() {
-            return error::UndeclaredLabels {
-                labels: self
-                    .undeclared_labels
-                    .iter()
-                    .map(|l| l.to_owned())
-                    .collect::<Vec<String>>(),
+    /// Pre-define macros, via `AbstractOp`, into the `Assembler`.
+    ///
+    /// This is used to define macros that are used in the same scope.
+    fn pre_define_macros<O>(&mut self, ops: &[O]) -> Result<(), Error>
+    where
+        O: Into<RawOp> + Clone,
+    {
+        for op in ops {
+            let rop = op.clone().into();
+            if let RawOp::Op(AbstractOp::MacroDefinition(ref defn)) = rop {
+                match self.declared_macros.entry(defn.name().to_owned()) {
+                    hash_map::Entry::Occupied(_) => {
+                        return error::DuplicateMacro { name: defn.name() }.fail()
+                    }
+                    hash_map::Entry::Vacant(v) => {
+                        v.insert(defn.to_owned());
+                    }
+                }
             }
-            .fail();
         }
 
         Ok(())
@@ -341,34 +345,16 @@ impl Assembler {
     where
         O: Into<RawOp> + Clone,
     {
-        self.inspect_macros(ops)?;
+        //self.inspect_macros(ops)?;
+        self.pre_define_macros(ops)?;
 
         for op in ops {
             self.push(op.clone().into())?;
         }
 
-        self.finish()?;
-
-        let output = self.concretize_ops()?;
+        let output = self.backpatch_and_emit()?;
         self.ready.clear();
         Ok(output)
-    }
-
-    /// Insert explicitly declared macros, via `AbstractOp`, into the `Assembler`.
-    fn declare_macro(&mut self, rop: RawOp) -> Result<(), Error> {
-        //let rop = rop.into();
-        if let RawOp::Op(AbstractOp::MacroDefinition(ref defn)) = rop {
-            match self.declared_macros.entry(defn.name().to_owned()) {
-                hash_map::Entry::Occupied(_) => {
-                    return error::DuplicateMacro { name: defn.name() }.fail()
-                }
-                hash_map::Entry::Vacant(v) => {
-                    v.insert(defn.to_owned());
-                }
-            }
-        }
-
-        Ok(())
     }
 
     /// Feed a single instruction into the `Assembler`.
