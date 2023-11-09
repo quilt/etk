@@ -214,14 +214,7 @@ pub struct Assembler {
 
     /// Labels that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
-    undeclared_labels: Vec<PendingLabel>,
-}
-
-/// Struct used to keep track of pending label invocations and their positions in code.
-#[derive(Debug, Clone)]
-struct PendingLabel {
-    /// The name of the label.
-    label: String,
+    undeclared_labels: Vec<String>,
 }
 
 impl Assembler {
@@ -296,7 +289,7 @@ impl Assembler {
                         let undeclared_names: Vec<_> = self
                             .undeclared_labels
                             .iter()
-                            .map(|PendingLabel { label, .. }| label.clone())
+                            .map(|label| label.clone())
                             .collect();
                         return error::UndeclaredLabels {
                             labels: undeclared_names,
@@ -332,7 +325,7 @@ impl Assembler {
                 labels: self
                     .undeclared_labels
                     .iter()
-                    .map(|l| l.label.to_owned())
+                    .map(|l| l.to_owned())
                     .collect::<Vec<String>>(),
             }
             .fail();
@@ -388,7 +381,7 @@ impl Assembler {
 
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
-                self.undeclared_labels.retain(|l| l.label != *label);
+                self.undeclared_labels.retain(|l| *l != label);
 
                 let old = self
                     .declared_labels
@@ -433,7 +426,7 @@ impl Assembler {
                             self.concrete_len += op.size().unwrap();
                         }
 
-                        self.undeclared_labels.push(PendingLabel { label });
+                        self.undeclared_labels.push(label);
                         self.ready.push(rop.clone());
                     }
                     Err(ops::Error::ContextIncomplete {
