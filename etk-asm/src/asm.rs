@@ -317,7 +317,7 @@ impl Assembler {
     /// Pre-define macros, via `AbstractOp`, into the `Assembler`.
     ///
     /// This is used to define macros that are used in the same scope.
-    fn pre_define_macros<O>(&mut self, ops: &[O]) -> Result<(), Error>
+    fn declare_macros<O>(&mut self, ops: &[O]) -> Result<(), Error>
     where
         O: Into<RawOp> + Clone,
     {
@@ -345,8 +345,7 @@ impl Assembler {
     where
         O: Into<RawOp> + Clone,
     {
-        //self.inspect_macros(ops)?;
-        self.pre_define_macros(ops)?;
+        self.declare_macros(ops)?;
 
         for op in ops {
             self.push(op.clone().into())?;
