@@ -143,9 +143,10 @@ mod error {
 pub use self::error::Error;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
 use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
+use num_traits::ToPrimitive;
 use rand::Rng;
 use std::cmp;
-use std::collections::{hash_map, HashMap};
+use std::collections::{hash_map, HashMap, HashSet};
 
 /// An item to be assembled, which can be either an [`AbstractOp`],
 /// the inclusion of a new scope or a raw byte sequence.
@@ -254,7 +255,42 @@ impl Assembler {
                     .clone()
                     .concretize((&self.declared_labels, &self.declared_macros).into())
                 {
-                    Ok(cop) => cop.assemble(&mut output),
+                    Ok(mut cop) => {
+                        if let AbstractOp::Push(imm) = op {
+                            let exp = imm.tree.eval_with_context(
+                                (&self.declared_labels, &self.declared_macros).into(),
+                            );
+
+                            let labels: HashSet<String> = imm
+                                .tree
+                                .labels(&self.declared_macros)
+                                .unwrap()
+                                .into_iter()
+                                .collect();
+                            if labels.len() > 0 {
+                                if let Ok(val) = exp {
+                                    let extra = val.to_usize().unwrap() / 256;
+                                    if extra > 0 {
+                                        self.concrete_len += extra as usize;
+
+                                        for label in labels {
+                                            if let Some(position) =
+                                                self.declared_labels.get_mut(&label)
+                                            {
+                                                *position = position.map(|v| v + 1);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            cop = op
+                                .clone()
+                                .concretize((&self.declared_labels, &self.declared_macros).into())
+                                .unwrap();
+                        }
+                        cop.assemble(&mut output)
+                    }
                     Err(ops::Error::ContextIncomplete {
                         source: UnknownLabel { .. },
                     }) => {
@@ -358,22 +394,7 @@ impl Assembler {
 
         match rop {
             RawOp::Op(AbstractOp::Label(label)) => {
-                let mut dst = 0;
-                for ul in self.undeclared_labels.iter() {
-                    if (ul.label == label) & ul.dynamic_push {
-                        // Compensation in case label was dynamically pushed.
-                        let mut dst_tmp = (self.concrete_len - ul.position) / 256;
-
-                        // Size already accounted for %push(label) was 2.
-                        if dst_tmp > 1 {
-                            dst_tmp -= 1;
-                        }
-
-                        dst = cmp::max(dst_tmp, dst);
-                    }
-                }
                 self.undeclared_labels.retain(|l| l.label != *label);
-                self.concrete_len += dst;
 
                 let old = self
                     .declared_labels
