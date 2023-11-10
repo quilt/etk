@@ -8,6 +8,7 @@ pub(crate) enum Node {
     Op(AbstractOp),
     Import(PathBuf),
     Include(PathBuf),
+    Raw(Vec<u8>),
     IncludeHex(PathBuf),
 }
 impl From<Op<Abstract>> for Node {

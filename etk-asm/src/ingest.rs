@@ -367,7 +367,6 @@ mod tests {
 
     use std::fmt::Display;
     use std::io::Write;
-    use std::path;
 
     use super::*;
 
