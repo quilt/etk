@@ -348,6 +348,7 @@ fn test_invalid_range_hardfork() {
         }
     );
 }
+#[test]
 fn test_dynamic_push2() -> Result<(), Error> {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
