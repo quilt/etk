@@ -297,7 +297,7 @@ fn every_op() -> Result<(), Error> {
 #[test]
 fn test_dynamic_push_and_include() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["variable-push", "main.etk"]))?;
 
     let tmp: Vec<String> = output.iter().map(|&num| format!("{:x?}", num)).collect();
@@ -350,17 +350,17 @@ fn test_invalid_range_hardfork() {
 }
 fn test_dynamic_push2() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["variable-push2", "main1.etk"]))?;
     assert_eq!(output, hex!("61010158"));
 
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["variable-push2", "main2.etk"]))?;
     assert_eq!(output, hex!("61010158"));
 
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["variable-push2", "main3.etk"]))?;
     assert_eq!(output, hex!("610107015801"));
 
