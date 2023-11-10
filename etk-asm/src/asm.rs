@@ -273,26 +273,6 @@ impl Assembler {
         Ok(())
     }
 
-    /// Insert explicitly declared macros, via `AbstractOp`, into the `Assembler`.
-    fn declare_macro<O>(&mut self, rop: O) -> Result<(), Error>
-    where
-        O: Into<RawOp>,
-    {
-        let rop = rop.into();
-        if let RawOp::Op(AbstractOp::MacroDefinition(ref defn)) = rop {
-            match self.declared_macros.entry(defn.name().to_owned()) {
-                hash_map::Entry::Occupied(_) => {
-                    return error::DuplicateMacro { name: defn.name() }.fail()
-                }
-                hash_map::Entry::Vacant(v) => {
-                    v.insert(defn.to_owned());
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Feed a single instruction into the `Assembler`.
     fn push<O>(&mut self, rop: O) -> Result<usize, Error>
     where
