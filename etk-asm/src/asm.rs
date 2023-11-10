@@ -175,6 +175,12 @@ impl From<Vec<u8>> for RawOp {
     }
 }
 
+impl From<&AbstractOp> for RawOp {
+    fn from(op: &AbstractOp) -> Self {
+        Self::Op(op.clone())
+    }
+}
+
 /// Assembles a series of [`RawOp`] into raw bytes, tracking and resolving macros and labels,
 /// and handling dynamic pushes.
 ///
@@ -189,9 +195,8 @@ impl From<Vec<u8>> for RawOp {
 /// #
 /// # use hex_literal::hex;
 /// let mut asm = Assembler::new_with_hardfork(HardFork::Cancun);
-/// let result = asm.assemble(vec![
-///     AbstractOp::new(HardForkOp::Cancun(GetPc.into())),
-/// ])?;
+/// let code = vec![AbstractOp::new(HardForkOp::Cancun(GetPc.into()))]
+/// let result = asm.assemble(&code)?;
 /// # assert_eq!(result, hex!("58"));
 /// # Result::<(), Error>::Ok(())
 /// ```
@@ -514,7 +519,7 @@ impl Assembler {
                 }
 
                 for op in m.contents.iter() {
-                    self.push(op.clone())?;
+                    self.push(op)?;
                 }
                 Ok(Some(self.concrete_len))
             }
