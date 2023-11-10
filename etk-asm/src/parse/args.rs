@@ -21,6 +21,15 @@ impl FromPair for PathBuf {
     }
 }
 
+impl FromPair for String {
+    fn from_pair(pair: Pair<Rule>) -> Result<Self, ParseError> {
+        ensure!(pair.as_rule() == Rule::string, error::ArgumentType);
+
+        let txt = pair.as_str();
+        Ok(txt[1..txt.len() - 1].to_string())
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(super) struct Label(pub(super) String);
 

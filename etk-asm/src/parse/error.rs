@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use pest::error::Error;
 
 use snafu::{Backtrace, IntoError, Snafu};
@@ -57,6 +59,42 @@ pub enum ParseError {
     #[snafu(display("incorrect argument type"))]
     #[non_exhaustive]
     ArgumentType {
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// An argument provided to a macro was of the wrong type.
+    #[snafu(display("File {} does not exist", path.to_string_lossy()))]
+    #[non_exhaustive]
+    FileNotFound {
+        /// Path to the offending file.
+        path: PathBuf,
+
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// An included fail failed to parse as hexadecimal.
+    #[snafu(display("included file `{}` is invalid hex: {}", path.to_string_lossy(), source))]
+    #[non_exhaustive]
+    InvalidHexFile {
+        /// Path to the offending file.
+        path: PathBuf,
+
+        /// The underlying source of this error.
+        source: Box<dyn std::error::Error>,
+
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Failed to parse an hexadecimal value.
+    #[snafu(display("error decoding hexadecimal: {}", value))]
+    #[non_exhaustive]
+    InvalidHex {
+        /// Path to the offending file.
+        value: String,
+
         /// The location of the error.
         backtrace: Backtrace,
     },

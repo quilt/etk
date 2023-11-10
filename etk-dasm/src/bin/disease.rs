@@ -55,10 +55,7 @@ fn run() -> Result<(), Error> {
 
     separator.push_all(disasm.ops());
 
-    let basic_blocks = separator
-        .take()
-        .into_iter()
-        .chain(separator.finish().into_iter());
+    let basic_blocks = separator.take().into_iter().chain(separator.finish());
 
     for block in basic_blocks {
         let mut offset = block.offset;
