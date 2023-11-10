@@ -112,11 +112,7 @@ fn instruction_macro_with_two_instructions_per_line() {
 #[test]
 fn undefined_label_undefined_macro() {
     let mut output = Vec::new();
-<<<<<<< HEAD
     let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
-=======
-    let mut ingester = Ingest::new(&mut output);
->>>>>>> pending_state_removal
     let err = ingester
         .ingest_file(source(&[
             "instruction-macro",
