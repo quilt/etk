@@ -195,7 +195,7 @@ impl From<&AbstractOp> for RawOp {
 /// #
 /// # use hex_literal::hex;
 /// let mut asm = Assembler::new_with_hardfork(HardFork::Cancun);
-/// let code = vec![AbstractOp::new(HardForkOp::Cancun(GetPc.into()))]
+/// let code = vec![AbstractOp::new(HardForkOp::Cancun(GetPc.into()))];
 /// let result = asm.assemble(&code)?;
 /// # assert_eq!(result, hex!("58"));
 /// # Result::<(), Error>::Ok(())
