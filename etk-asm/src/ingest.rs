@@ -51,13 +51,15 @@ mod error {
         },
 
         /// An error that occurred while parsing a file.
-        #[snafu(context(false))]
         #[non_exhaustive]
-        #[snafu(display("parsing failed"))]
+        #[snafu(display("parsing failed on path `{}`", path.to_string_lossy()))]
         Parse {
             /// The underlying source of this error.
             #[snafu(backtrace)]
             source: ParseError,
+
+            /// The location of the error.
+            path: PathBuf,
         },
 
         /// An error that occurred while assembling a file.
@@ -180,7 +182,6 @@ impl Root {
 
 #[derive(Debug)]
 struct Program {
-    depth: usize,
     root: Option<Root>,
     sources: Vec<PathBuf>,
 }
@@ -188,15 +189,13 @@ struct Program {
 impl Program {
     fn new(path: PathBuf) -> Self {
         Self {
-            depth: 0,
             root: Root::new(path.clone()).ok(),
             sources: vec![path],
         }
     }
 
-    fn push_path(&mut self, path: PathBuf) -> Result<PathBuf, Error> {
-        ensure!(self.depth <= 255, error::RecursionLimit);
-        self.depth += 1;
+    fn push_path(&mut self, path: &PathBuf) -> Result<PathBuf, Error> {
+        ensure!(self.sources.len() <= 255, error::RecursionLimit);
 
         let path = if let Some(ref root) = self.root {
             let last = self.sources.last().unwrap();
@@ -210,15 +209,14 @@ impl Program {
             candidate
         } else {
             assert!(self.sources.is_empty());
-            self.root = Some(Root::new(path.clone())?);
-            path
+            self.root = Some(Root::new(path.to_owned())?);
+            path.clone()
         };
 
         Ok(path)
     }
 
     fn pop_path(&mut self) {
-        self.depth -= 1;
         self.sources.pop();
     }
 }
@@ -294,7 +292,7 @@ where
         let mut program = Program::new(path.into());
         let nodes = self.preprocess(&mut program, text)?;
         let mut asm = Assembler::new();
-        let raw = asm.assemble(nodes)?;
+        let raw = asm.assemble(&nodes)?;
 
         self.output.write_all(&raw).context(error::Io {
             message: "writing output",
@@ -305,7 +303,9 @@ where
     }
 
     fn preprocess(&mut self, program: &mut Program, src: &str) -> Result<Vec<RawOp>, Error> {
-        let nodes = parse_asm(src)?;
+        let nodes = parse_asm(src).with_context(|_| error::Parse {
+            path: program.sources.last().unwrap().clone(),
+        })?;
         let mut raws = Vec::new();
         for node in nodes {
             match node {
@@ -321,18 +321,15 @@ where
                     raws.push(RawOp::Scope(inc_raws));
                 }
                 Node::IncludeHex(hex_path) => {
-                    let file =
-                        std::fs::read_to_string::<&PathBuf>(&hex_path).with_context(|_| {
-                            error::Io {
-                                message: "reading hex include",
-                                path: <PathBuf as Into<PathBuf>>::into(hex_path.clone()).to_owned(),
-                            }
-                        })?;
+                    let file = std::fs::read_to_string(&hex_path).with_context(|_| error::Io {
+                        message: "reading hex include",
+                        path: hex_path.to_owned(),
+                    })?;
 
                     let raw = hex::decode(file.trim())
                         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
                         .context(error::InvalidHex {
-                            path: <PathBuf as Into<PathBuf>>::into(hex_path).to_owned(),
+                            path: hex_path.to_owned(),
                         })?;
 
                     raws.push(RawOp::Raw(raw))
@@ -344,17 +341,13 @@ where
         Ok(raws)
     }
 
-    fn resolve_and_ingest<P: AsRef<Path>>(
+    fn resolve_and_ingest(
         &mut self,
         program: &mut Program,
-        path: P,
-    ) -> Result<Vec<RawOp>, Error>
-    where
-        P: Into<PathBuf>,
-    {
-        let path = path.into();
-        let source = program.push_path(path.clone())?;
-        let code = read_to_string::<&PathBuf>(&source).with_context(|_| error::Io {
+        path: PathBuf,
+    ) -> Result<Vec<RawOp>, Error> {
+        let source = program.push_path(&path)?;
+        let code = read_to_string(source).with_context(|_| error::Io {
             message: "reading file before parsing",
             path: path.to_owned(),
         })?;

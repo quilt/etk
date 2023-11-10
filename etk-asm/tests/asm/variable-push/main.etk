@@ -4,4 +4,3 @@ pc
 %include("included.etk")
 label:
 jumpdest
-pc
