@@ -316,11 +316,10 @@ fn test_dynamic_push2() -> Result<(), Error> {
     ingester.ingest_file(source(&["variable-push2", "main2.etk"]))?;
     assert_eq!(output, hex!("61010058"));
 
-    
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);
     ingester.ingest_file(source(&["variable-push2", "main3.etk"]))?;
     assert_eq!(output, hex!("610107015801"));
-    
+
     Ok(())
 }
