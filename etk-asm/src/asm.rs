@@ -1164,6 +1164,23 @@ mod tests {
     }
 
     #[test]
+    fn assemble_variable_push_before_push2() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let ops = vec![
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(
+                Terminal::Label("foo".into()).into(),
+                BigInt::from(256).into(),
+            ))),
+            AbstractOp::new(Push2(Imm::with_label("foo1"))),
+            AbstractOp::Label("foo".into()),
+            AbstractOp::Label("foo1".into()),
+        ];
+        let result = asm.assemble(&ops)?;
+        assert_eq!(result, hex!("610106610006"));
+        Ok(())
+    }
+
+    #[test]
     fn assemble_variable_push_expression_with_undeclared_labels() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let ops = vec![
