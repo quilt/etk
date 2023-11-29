@@ -470,7 +470,7 @@ impl Assembler {
                                             // If the label is used in a dynamic push, we need to
                                             // multiply the final resolved value of the label by
                                             // the number of times the label is used in dynamic
-                                            // pushes.
+                                            // pushes (to update the size of the bytecode accordingly).
                                             self.concrete_len += (push_size - 1) * *value;
                                             *label_value = Some(LabelDef {
                                                 position: labeldef.position
@@ -483,7 +483,7 @@ impl Assembler {
                                             // simply update the size of the push operation.
                                             // Since ´declared_labels' is ordered by insertion
                                             // we can simply add the accumulated size to the
-                                            // position of the label.
+                                            // actual position of the label.
                                             *label_value = Some(LabelDef {
                                                 position: labeldef.position + acum,
                                                 updated: true,
