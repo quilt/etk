@@ -452,7 +452,11 @@ impl Assembler {
                                 if push_size > 1 {
                                     // If the size of the push operation is greater than 1, we need
                                     // to adjust the size to account for the final resolved value of the expression.
-                                    for (label, label_value) in self.declared_labels.iter_mut() {
+                                    for (label, label_value) in self
+                                        .declared_labels
+                                        .iter_mut()
+                                        .filter(|(_, def)| !def.unwrap().updated)
+                                    {
                                         let labeldef = label_value.as_ref().unwrap();
                                         // If the label has already been updated, we skip it.
                                         if labeldef.updated {
