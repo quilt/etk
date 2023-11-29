@@ -1245,6 +1245,29 @@ mod tests {
     }
 
     #[test]
+    fn assemble_variable_push_mixed_labels() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let ops = vec![
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(
+                Terminal::Label("foo".into()).into(),
+                BigInt::from(256).into(),
+            ))),
+            AbstractOp::new(Push2(Imm::with_label("foo"))),
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(
+                Terminal::Label("foo1".into()).into(),
+                BigInt::from(256).into(),
+            ))),
+            AbstractOp::new(Gas),
+            AbstractOp::Label("foo".into()),
+            AbstractOp::new(Gas),
+            AbstractOp::Label("foo1".into()),
+        ];
+        let result = asm.assemble(&ops)?;
+        assert_eq!(result, hex!("61010961000961010a5a5a"));
+        Ok(())
+    }
+
+    #[test]
     fn assemble_double_update_variable_push() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let ops = vec![
