@@ -391,8 +391,7 @@ impl Assembler {
     /// handling variable-sized push instructions, where the actual size of the push may not be known
     /// until all labels and expressions have been evaluated.
     ///
-    /// Handle Variable-sized Pushes: Specifically for push operations, this function plays a
-    /// critical role. The size of a push operation may depend on the value being pushed, especially
+    /// Handle Variable-sized Pushes: The size of a push operation may depend on the value being pushed, especially
     /// when labels are involved. As labels could be resolved to different addresses during the
     /// assembly process, the final value of a label (and thus the size of the push) might only be
     /// known at this stage. This function recalculates the size of each push operation based on the
