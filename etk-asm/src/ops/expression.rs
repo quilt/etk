@@ -1,8 +1,10 @@
+use crate::asm::LabelDef;
+
 use super::macros::{ExpressionMacroInvocation, MacroDefinition};
 use num_bigint::BigInt;
 use snafu::OptionExt;
 use snafu::{Backtrace, Snafu};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{self, Debug};
 
 /// An error that arises when an expression cannot be evaluated.
@@ -22,7 +24,7 @@ pub enum Error {
     UndefinedVariable { name: String, backtrace: Backtrace },
 }
 
-type LabelsMap = HashMap<String, Option<usize>>;
+type LabelsMap = BTreeMap<String, Option<LabelDef>>;
 type VariablesMap = HashMap<String, Expression>;
 type MacrosMap = HashMap<String, MacroDefinition>;
 
@@ -36,7 +38,7 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
     /// Looks up a label in the current context.
-    pub fn get_label(&self, key: &str) -> Option<&Option<usize>> {
+    pub fn get_label(&self, key: &str) -> Option<&Option<LabelDef>> {
         match self.labels {
             Some(labels) => labels.get(key),
             None => None,
@@ -172,6 +174,7 @@ impl Terminal {
                 .get_label(label)
                 .context(UnknownLabel { label })?
                 .context(UnknownLabel { label })?
+                .position()
                 .into(),
             Terminal::Variable(name) => ctx
                 .get_variable(name)
@@ -390,7 +393,9 @@ mod tests {
     fn expr_with_label() {
         // foo + 1 = 42
         let expr = Expression::Plus(Terminal::Label(String::from("foo")).into(), 1.into());
-        let labels: HashMap<_, _> = vec![("foo".to_string(), Some(41))].into_iter().collect();
+        let labels: BTreeMap<_, _> = vec![("foo".to_string(), Some(LabelDef::new(41)))]
+            .into_iter()
+            .collect();
         let out = expr.eval_with_context(Context::from(&labels)).unwrap();
         assert_eq!(out, BigInt::from(42));
     }
@@ -404,7 +409,7 @@ mod tests {
 
         // label w/o defined address
         let expr = Expression::Plus(Terminal::Label(String::from("foo")).into(), 1.into());
-        let labels: HashMap<_, _> = vec![("foo".to_string(), None)].into_iter().collect();
+        let labels: BTreeMap<_, _> = vec![("foo".to_string(), None)].into_iter().collect();
         let err = expr.eval_with_context(Context::from(&labels)).unwrap_err();
         assert_matches!(err, Error::UnknownLabel { label, .. } if label == "foo");
     }
