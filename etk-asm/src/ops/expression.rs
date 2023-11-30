@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 use snafu::OptionExt;
 use snafu::{Backtrace, Snafu};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fmt::{self, Debug};
 
 /// An error that arises when an expression cannot be evaluated.
