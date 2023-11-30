@@ -1,6 +1,7 @@
 use crate::asm::LabelDef;
 
 use super::macros::{ExpressionMacroInvocation, MacroDefinition};
+use indexmap::IndexMap;
 use num_bigint::BigInt;
 use snafu::OptionExt;
 use snafu::{Backtrace, Snafu};
@@ -24,7 +25,7 @@ pub enum Error {
     UndefinedVariable { name: String, backtrace: Backtrace },
 }
 
-type LabelsMap = BTreeMap<String, Option<LabelDef>>;
+type LabelsMap = IndexMap<String, Option<LabelDef>>;
 type VariablesMap = HashMap<String, Expression>;
 type MacrosMap = HashMap<String, MacroDefinition>;
 
@@ -393,7 +394,7 @@ mod tests {
     fn expr_with_label() {
         // foo + 1 = 42
         let expr = Expression::Plus(Terminal::Label(String::from("foo")).into(), 1.into());
-        let labels: BTreeMap<_, _> = vec![("foo".to_string(), Some(LabelDef::new(41)))]
+        let labels: IndexMap<_, _> = vec![("foo".to_string(), Some(LabelDef::new(41)))]
             .into_iter()
             .collect();
         let out = expr.eval_with_context(Context::from(&labels)).unwrap();
@@ -409,7 +410,7 @@ mod tests {
 
         // label w/o defined address
         let expr = Expression::Plus(Terminal::Label(String::from("foo")).into(), 1.into());
-        let labels: BTreeMap<_, _> = vec![("foo".to_string(), None)].into_iter().collect();
+        let labels: IndexMap<_, _> = vec![("foo".to_string(), None)].into_iter().collect();
         let err = expr.eval_with_context(Context::from(&labels)).unwrap_err();
         assert_matches!(err, Error::UnknownLabel { label, .. } if label == "foo");
     }

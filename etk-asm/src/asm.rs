@@ -143,9 +143,10 @@ mod error {
 pub use self::error::Error;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
 use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
+use indexmap::IndexMap;
 use num_traits::ToPrimitive;
 use rand::Rng;
-use std::collections::{hash_map, BTreeMap, HashMap, HashSet};
+use std::collections::{hash_map, HashMap, HashSet};
 
 /// An item to be assembled, which can be either an [`AbstractOp`],
 /// the inclusion of a new scope or a raw byte sequence.
@@ -207,7 +208,7 @@ pub struct Assembler {
     concrete_len: usize,
 
     /// Labels associated with an `AbstractOp::Label`.
-    declared_labels: BTreeMap<String, Option<LabelDef>>,
+    declared_labels: IndexMap<String, Option<LabelDef>>,
 
     /// Macros associated with an `AbstractOp::Macro`.
     declared_macros: HashMap<String, MacroDefinition>,
@@ -1245,6 +1246,23 @@ mod tests {
     }
 
     #[test]
+    fn assemble_variable_push_before_push2_inverted() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+        let ops = vec![
+            AbstractOp::Push(Imm::with_expression(Expression::Plus(
+                Terminal::Label("z".into()).into(),
+                BigInt::from(256).into(),
+            ))),
+            AbstractOp::new(Push2(Imm::with_label("a"))),
+            AbstractOp::Label("z".into()),
+            AbstractOp::Label("a".into()),
+        ];
+        let result = asm.assemble(&ops)?;
+        assert_eq!(result, hex!("610106610006"));
+        Ok(())
+    }
+
+    #[test]
     fn assemble_variable_push_mixed_labels() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let ops = vec![
@@ -1254,13 +1272,13 @@ mod tests {
             ))),
             AbstractOp::new(Push2(Imm::with_label("foo"))),
             AbstractOp::Push(Imm::with_expression(Expression::Plus(
-                Terminal::Label("foo1".into()).into(),
+                Terminal::Label("bar".into()).into(),
                 BigInt::from(256).into(),
             ))),
             AbstractOp::new(Gas),
             AbstractOp::Label("foo".into()),
             AbstractOp::new(Gas),
-            AbstractOp::Label("foo1".into()),
+            AbstractOp::Label("bar".into()),
         ];
         let result = asm.assemble(&ops)?;
         assert_eq!(result, hex!("61010961000961010a5a5a"));
