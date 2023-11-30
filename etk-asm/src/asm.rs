@@ -460,21 +460,21 @@ impl Assembler {
                                             continue;
                                         }
 
+                                        let pos = labeldef.position;
                                         // We check if the label is used in a dynamic push.
-                                        if let Some(value) =
+                                        if let Some(times) =
                                             self.labeled_dynamic_pushes.get_mut(label)
                                         {
                                             // If the label is used in a dynamic push, we need to
                                             // multiply the final resolved value of the label by
                                             // the number of times the label is used in dynamic
                                             // pushes (to update the size of the bytecode accordingly).
-                                            self.concrete_len += (push_size - 1) * *value;
+                                            self.concrete_len += (push_size - 1) * *times;
                                             *label_value = Some(LabelDef {
-                                                position: labeldef.position
-                                                    + *value * (push_size - 1),
+                                                position: pos + *times * (push_size - 1),
                                                 updated: true,
                                             });
-                                            acum += *value * (push_size - 1);
+                                            acum += *times * (push_size - 1);
                                         } else {
                                             // If the label is not used in a dynamic push, we
                                             // simply update the size of the push operation.
@@ -482,7 +482,7 @@ impl Assembler {
                                             // we can simply add the accumulated size to the
                                             // actual position of the label.
                                             *label_value = Some(LabelDef {
-                                                position: labeldef.position + acum,
+                                                position: pos + acum,
                                                 updated: true,
                                             });
                                         }
