@@ -1346,6 +1346,54 @@ mod tests {
     }
 
     #[test]
+    fn assemble_variable_push2_comparison_with_undeclared_labels() -> Result<(), Error> {
+        let mut asm = Assembler::new();
+
+        // %push(lbl1 - lbl2)
+        // push2 lbl1 + lbl2
+        // pc # repeat 126 times.
+        // lbl1:
+        // lbl2:
+        let mut ops = vec![AbstractOp::new(GetPc); 130];
+        ops[0] = AbstractOp::Push(Imm::with_expression(Expression::Minus(
+            Terminal::Label(String::from("lbl1")).into(),
+            Terminal::Label(String::from("lbl2")).into(),
+        )));
+        ops[1] = AbstractOp::new(Push2(
+            Expression::Plus(
+                Terminal::Label(String::from("lbl1")).into(),
+                Terminal::Label(String::from("lbl2")).into(),
+            )
+            .into(),
+        ));
+        ops[128] = AbstractOp::Label("lbl1".into());
+        ops[129] = AbstractOp::Label("lbl2".into());
+
+        let expected = asm.assemble(&ops)?;
+
+        let mut asm = Assembler::new();
+
+        // %push(lbl1 - lbl2)
+        // %push(lbl1 + lbl2)
+        // pc # repeat 126 times.
+        // lbl1:
+        // lbl2:
+        ops[1] = AbstractOp::Push(Imm::with_expression(Expression::Plus(
+            Terminal::Label(String::from("lbl1")).into(),
+            Terminal::Label(String::from("lbl2")).into(),
+        )));
+        let result = asm.assemble(&ops)?;
+
+        // Sanity check the expected result: should use push1 then push2.
+        assert_eq!(expected[0], 0x60);
+        assert_eq!(expected[2], 0x61);
+
+        // Assert that the two results are identical.
+        assert_eq!(expected, result);
+        Ok(())
+    }
+
+    #[test]
     fn assemble_variable_push1_expression() -> Result<(), Error> {
         let mut asm = Assembler::new();
         let ops = vec![
