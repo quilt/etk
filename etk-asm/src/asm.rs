@@ -215,7 +215,7 @@ pub struct Assembler {
 
     /// Labels that have been referred to (ex. with push) but
     /// have not been declared with an `AbstractOp::Label`.
-    undeclared_labels: Vec<String>,
+    undeclared_labels: HashSet<String>,
 
     /// Pushes that are dynamic and need to be backpatched.
     labeled_dynamic_pushes: HashMap<String, usize>,
@@ -359,7 +359,7 @@ impl Assembler {
                             self.concrete_len += op.size().unwrap();
                         }
 
-                        self.undeclared_labels.push(label);
+                        self.undeclared_labels.insert(label);
                         self.ready.push(rop.clone());
                     }
                     Err(ops::Error::ContextIncomplete {
@@ -503,7 +503,7 @@ impl Assembler {
                     source: UnknownLabel { .. },
                 }) => {
                     return error::UndeclaredLabels {
-                        labels: self.undeclared_labels.to_vec(),
+                        labels: self.undeclared_labels.iter().cloned().collect::<Vec<_>>(),
                     }
                     .fail();
                 }
