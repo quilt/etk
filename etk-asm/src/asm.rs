@@ -363,7 +363,7 @@ impl Assembler {
                             self.concrete_len += op.size().unwrap();
                         }
 
-                        self.undeclared_labels.extend(labels.into_iter());
+                        self.undeclared_labels.extend(labels);
                         self.ready.push(rop.clone());
                     }
                     Err(ops::Error::ContextIncomplete {
