@@ -182,7 +182,7 @@ impl From<&AbstractOp> for RawOp {
 }
 
 /// Assembles a series of [`RawOp`] into raw bytes, tracking and resolving macros and labels,
-/// and handling dynamic pushes.
+/// and handling variable-sized pushes.
 ///
 /// ## Example
 ///
@@ -217,8 +217,8 @@ pub struct Assembler {
     /// have not been declared with an `AbstractOp::Label`.
     undeclared_labels: HashSet<String>,
 
-    /// Pushes that are dynamic and need to be backpatched.
-    labeled_dynamic_pushes: HashMap<String, usize>,
+    /// Pushes that are variable-sized and need to be backpatched.
+    variable_sized_push: Vec<AbstractOp>,
 }
 
 /// A label definition.
@@ -344,22 +344,26 @@ impl Assembler {
                         .fail()
                     }
                     Err(ops::Error::ContextIncomplete {
-                        source: UnknownLabel { label, .. },
+                        source: UnknownLabel { .. },
                     }) => {
+                        let labels = op
+                            .expr()
+                            .unwrap()
+                            .labels(&self.declared_macros)
+                            .unwrap()
+                            .into_iter()
+                            .collect::<Vec<String>>();
+
                         if let AbstractOp::Push(_) = op {
                             // Here, we set the size of the push to 2 bytes (min possible value),
                             //  as we don't know the final value of the label yet.
                             self.concrete_len += 2;
-                            // We count the number of times this label appears in dynamic pushes.
-                            *self
-                                .labeled_dynamic_pushes
-                                .entry(label.to_owned())
-                                .or_insert(0) += 1;
+                            self.variable_sized_push.push(op.clone());
                         } else {
                             self.concrete_len += op.size().unwrap();
                         }
 
-                        self.undeclared_labels.insert(label);
+                        self.undeclared_labels.extend(labels.into_iter());
                         self.ready.push(rop.clone());
                     }
                     Err(ops::Error::ContextIncomplete {
@@ -385,10 +389,37 @@ impl Assembler {
         Ok(self.concrete_len)
     }
 
-    /// Backpatch dynamic operations and emit the assembled program.
+    fn backpatch_labels(&mut self) -> Result<(), Error> {
+        for op in self.variable_sized_push.iter() {
+            if let AbstractOp::Push(imm) = op {
+                let exp = imm
+                    .tree
+                    .eval_with_context((&self.declared_labels, &self.declared_macros).into());
+
+                if let Ok(val) = exp {
+                    let imm_size = (val.to_f64().unwrap().log2() / 8.0).ceil() as usize;
+
+                    if imm_size > 1 {
+                        for (_label, label_value) in self.declared_labels.iter_mut() {
+                            let labeldef = label_value.as_ref().unwrap();
+                            self.concrete_len += imm_size - 1;
+                            *label_value = Some(LabelDef {
+                                position: labeldef.position + imm_size - 1,
+                                updated: true,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Backpatch variable-sized operations and emit the assembled program.
     ///
     /// This function performs the final steps in the assembly process. It ensures that all labels
-    /// and dynamic elements in the code have been properly resolved and finalized. This includes
+    /// and variable-sized ops in the code have been properly resolved and finalized. This includes
     /// handling variable-sized push instructions, where the actual size of the push may not be known
     /// until all labels and expressions have been evaluated.
     ///
@@ -409,8 +440,17 @@ impl Assembler {
             }
             .fail();
         }
+        self.backpatch_labels()?;
+        let output = match self.emit_bytecode() {
+            Ok(value) => value,
+            Err(value) => return value,
+        };
+
+        Ok(output)
+    }
+
+    fn emit_bytecode(&mut self) -> Result<Vec<u8>, Result<Vec<u8>, Error>> {
         let mut output = Vec::new();
-        let mut acum = 0;
         for op in self.ready.iter() {
             let op = match op {
                 RawOp::Op(ref op) => op,
@@ -425,103 +465,28 @@ impl Assembler {
                 .clone()
                 .concretize((&self.declared_labels, &self.declared_macros).into())
             {
-                Ok(mut cop) => {
-                    // If the push is variable-sized, we need to recalculate (backpatch) the size of the
-                    // push based on the final resolved value of the label/expression.
-                    if let AbstractOp::Push(imm) = op {
-                        // Evaluate the expression with the current context.
-                        let exp = imm.tree.eval_with_context(
-                            (&self.declared_labels, &self.declared_macros).into(),
-                        );
-
-                        let labels: HashSet<String> = imm
-                            .tree
-                            .labels(&self.declared_macros)
-                            .unwrap()
-                            .into_iter()
-                            .collect();
-
-                        // If the expression contains any labels, we need to adjust the size of the
-                        // push operation to account for the final resolved value of the expression.
-                        if !labels.is_empty() {
-                            if let Ok(val) = exp {
-                                // We calculate the real size of the push operation based on the
-                                // final resolved value of the expression.
-                                let push_size =
-                                    (val.to_f64().unwrap().log2() / 8.0).ceil() as usize;
-
-                                if push_size > 1 {
-                                    // If the size of the push operation is greater than 1, we need
-                                    // to adjust the size to account for the final resolved value of the expression.
-                                    for (label, label_value) in self.declared_labels.iter_mut() {
-                                        let labeldef = label_value.as_ref().unwrap();
-                                        // If the label has already been updated, we skip it.
-                                        if labeldef.updated {
-                                            continue;
-                                        }
-
-                                        let pos = labeldef.position;
-                                        // We check if the label is used in a dynamic push.
-                                        if let Some(times) =
-                                            self.labeled_dynamic_pushes.get_mut(label)
-                                        {
-                                            // If the label is used in a dynamic push, we need to
-                                            // multiply the final resolved value of the label by
-                                            // the number of times the label is used in dynamic
-                                            // pushes (to update the size of the bytecode accordingly).
-                                            self.concrete_len += (push_size - 1) * *times;
-                                            *label_value = Some(LabelDef {
-                                                position: pos + *times * (push_size - 1),
-                                                updated: true,
-                                            });
-                                            acum += *times * (push_size - 1);
-                                        } else {
-                                            // If the label is not used in a dynamic push, we
-                                            // simply update the size of the push operation.
-                                            // Since ´declared_labels' is ordered by insertion
-                                            // we can simply add the accumulated size to the
-                                            // actual position of the label.
-                                            *label_value = Some(LabelDef {
-                                                position: pos + acum,
-                                                updated: true,
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Recreate the push operation with the new size.
-                        cop = op
-                            .clone()
-                            .concretize((&self.declared_labels, &self.declared_macros).into())
-                            .unwrap();
-                    }
-                    cop.assemble(&mut output)
-                }
+                Ok(cop) => cop.assemble(&mut output),
                 Err(ops::Error::ContextIncomplete {
                     source: UnknownLabel { .. },
                 }) => {
-                    return error::UndeclaredLabels {
+                    return Err(error::UndeclaredLabels {
                         labels: self.undeclared_labels.iter().cloned().collect::<Vec<_>>(),
                     }
-                    .fail();
+                    .fail());
                 }
                 Err(ops::Error::ContextIncomplete {
                     source: UnknownMacro { name, .. },
                 }) => {
-                    return error::UndeclaredInstructionMacro { name }.fail();
+                    return Err(error::UndeclaredInstructionMacro { name }.fail());
                 }
                 Err(ops::Error::ContextIncomplete {
                     source: UndefinedVariable { name, .. },
                 }) => {
-                    return error::UndeclaredVariableMacro { var: name }.fail();
+                    return Err(error::UndeclaredVariableMacro { var: name }.fail());
                 }
-
                 Err(_) => unreachable!("all ops should be concretizable"),
             }
         }
-
         Ok(output)
     }
 
@@ -1281,7 +1246,8 @@ mod tests {
             AbstractOp::Label("bar".into()),
         ];
         let result = asm.assemble(&ops)?;
-        assert_eq!(result, hex!("61010961000961010a5a5a"));
+
+        assert_eq!(result, hex!("61010a61000a61010b5a5a"));
         Ok(())
     }
 

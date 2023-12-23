@@ -294,7 +294,7 @@ fn every_op() -> Result<(), Error> {
 }
 
 #[test]
-fn test_dynamic_push_and_include() -> Result<(), Error> {
+fn test_variable_sized_push_and_include() -> Result<(), Error> {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);
     ingester.ingest_file(source(&["variable-push", "main.etk"]))?;
@@ -305,7 +305,7 @@ fn test_dynamic_push_and_include() -> Result<(), Error> {
 }
 
 #[test]
-fn test_dynamic_push2() -> Result<(), Error> {
+fn test_variable_sized_push2() -> Result<(), Error> {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);
     ingester.ingest_file(source(&["variable-push2", "main1.etk"]))?;
