@@ -144,7 +144,7 @@ pub use self::error::Error;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
 use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
 use indexmap::IndexMap;
-use num_traits::ToPrimitive;
+use num_bigint::BigInt;
 use rand::Rng;
 use std::collections::{hash_map, HashMap, HashSet};
 
@@ -397,14 +397,15 @@ impl Assembler {
                     .eval_with_context((&self.declared_labels, &self.declared_macros).into());
 
                 if let Ok(val) = exp {
-                    let imm_size = (val.to_f64().unwrap().log2() / 8.0).ceil() as usize;
+                    let val_bits = BigInt::bits(&val).max(1);
+                    let imm_size = 1 + ((val_bits - 1) / 8);
 
                     if imm_size > 1 {
-                        for (_label, label_value) in self.declared_labels.iter_mut() {
+                        for label_value in self.declared_labels.values_mut() {
                             let labeldef = label_value.as_ref().unwrap();
-                            self.concrete_len += imm_size - 1;
+                            self.concrete_len += imm_size as usize - 1;
                             *label_value = Some(LabelDef {
-                                position: labeldef.position + imm_size - 1,
+                                position: labeldef.position + imm_size as usize - 1,
                                 updated: true,
                             });
                         }

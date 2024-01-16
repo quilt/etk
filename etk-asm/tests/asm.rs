@@ -314,7 +314,7 @@ fn test_variable_sized_push2() -> Result<(), Error> {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);
     ingester.ingest_file(source(&["variable-push2", "main2.etk"]))?;
-    assert_eq!(output, hex!("61010058"));
+    assert_eq!(output, hex!("61010158"));
 
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);
