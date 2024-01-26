@@ -1,0 +1,6 @@
+%push(label)
+pc
+pc
+%include("included.etk")
+label:
+jumpdest

@@ -1,16 +1,15 @@
+use std::path::PathBuf;
+
 use crate::ops::{Abstract, AbstractOp, ExpressionMacroDefinition, InstructionMacroDefinition};
 use etk_ops::cancun::Op;
-use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Node {
     Op(AbstractOp),
-    Raw(Vec<u8>),
     Import(PathBuf),
     Include(PathBuf),
     IncludeHex(PathBuf),
 }
-
 impl From<Op<Abstract>> for Node {
     fn from(op: Op<Abstract>) -> Self {
         Node::Op(AbstractOp::Op(op))

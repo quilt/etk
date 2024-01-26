@@ -19,6 +19,7 @@ use self::{
     error::ParseError,
     parser::{AsmParser, Rule},
 };
+
 use crate::ast::Node;
 use crate::ops::AbstractOp;
 use etk_ops::cancun::Op;

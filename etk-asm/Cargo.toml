@@ -1,7 +1,10 @@
 [package]
 name = "etk-asm"
 version = "0.4.0-dev"
-authors = ["Sam Wilson <sam.wilson@mesh.xyz>", "lightclient <lightclient@protonmail.com>"]
+authors = [
+    "Sam Wilson <sam.wilson@mesh.xyz>",
+    "lightclient <lightclient@protonmail.com>",
+]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 description = "EVM Toolkit assembler"
@@ -9,23 +12,30 @@ homepage = "https://quilt.github.io/etk"
 repository = "https://github.com/quilt/etk"
 readme = "README.md"
 keywords = ["etk", "ethereum", "assembler"]
-categories = ["cryptography::cryptocurrencies", "command-line-utilities", "development-tools", "compilers"]
+categories = [
+    "cryptography::cryptocurrencies",
+    "command-line-utilities",
+    "development-tools",
+    "compilers",
+]
 
 [features]
 cli = ["clap", "etk-cli"]
-backtraces = [ "snafu/backtraces", "etk-ops/backtraces" ]
+backtraces = ["snafu/backtraces", "etk-ops/backtraces"]
 
 [dependencies]
 etk-ops = { path = "../etk-ops", version = "0.4.0-dev" }
 etk-cli = { optional = true, path = "../etk-cli", version = "0.4.0-dev" }
 hex = "0.4.3"
 num-bigint = "0.4"
+num-traits = "0.2.17"
 pest = "2.1.3"
 pest_derive = "2.1"
 rand = "0.8.5"
 sha3 = "0.10.1"
 clap = { optional = true, version = "3.1", features = ["derive"] }
-snafu = { version = "0.7.1", default-features = false, features = [ "std" ] }
+snafu = { version = "0.7.1", default-features = false, features = ["std"] }
+indexmap = "2.1.0"
 
 [dev-dependencies]
 assert_matches = "1.5.0"

@@ -109,6 +109,22 @@ fn instruction_macro_with_two_instructions_per_line() {
 }
 
 #[test]
+fn undefined_label_undefined_macro() {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    let err = ingester
+        .ingest_file(source(&[
+            "instruction-macro",
+            "undefined-label-undefined-macro.etk",
+        ]))
+        .unwrap_err();
+
+    assert_matches!(err, etk_asm::ingest::Error::Assemble { source:
+             etk_asm::asm::Error::UndeclaredInstructionMacro { name, .. }, .. 
+    } if name == "revert".to_string());
+}
+
+#[test]
 fn every_op() -> Result<(), Error> {
     let mut output = Vec::new();
     let mut ingester = Ingest::new(&mut output);
@@ -273,6 +289,37 @@ fn every_op() -> Result<(), Error> {
     "
         )
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_variable_sized_push_and_include() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["variable-push", "main.etk"]))?;
+
+    assert_eq!(output, hex!("61025758585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585801010101010158585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858015b"));
+
+    Ok(())
+}
+
+#[test]
+fn test_variable_sized_push2() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["variable-push2", "main1.etk"]))?;
+    assert_eq!(output, hex!("61010158"));
+
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["variable-push2", "main2.etk"]))?;
+    assert_eq!(output, hex!("61010158"));
+
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["variable-push2", "main3.etk"]))?;
+    assert_eq!(output, hex!("610107015801"));
 
     Ok(())
 }

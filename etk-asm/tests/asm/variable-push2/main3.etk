@@ -1,0 +1,6 @@
+%push(label1 + label2 + 254)  
+add
+label1:
+    pc
+label2:
+    add
