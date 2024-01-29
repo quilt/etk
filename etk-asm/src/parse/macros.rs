@@ -82,10 +82,7 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
                     }
                 };
 
-                directives.push(HardForkDirective {
-                    operator,
-                    hardfork: hardfork,
-                });
+                directives.push(HardForkDirective { operator, hardfork });
                 if directives.len() > 2 {
                     return ExceededRangeHardfork {
                         parsed: directives.len(),

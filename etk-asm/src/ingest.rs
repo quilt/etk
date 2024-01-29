@@ -366,17 +366,14 @@ where
                         }
                     );
 
-                    match ophfd2 {
-                        Some(hfd2) => {
-                            ensure!(
-                                self.hardfork.is_valid(&hfd2),
-                                error::OutOfRangeHardfork {
-                                    hardfork: self.hardfork.clone(),
-                                    directive: hfd2,
-                                }
-                            );
-                        }
-                        None => {}
+                    if let Some(hfd2) = ophfd2 {
+                        ensure!(
+                            self.hardfork.is_valid(&hfd2),
+                            error::OutOfRangeHardfork {
+                                hardfork: self.hardfork.clone(),
+                                directive: hfd2,
+                            }
+                        );
                     }
                 }
             }

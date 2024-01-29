@@ -309,6 +309,7 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         });
     }
 
+    let mut clone_bound = quote! {};
     let mut partial_eq_bound = quote! {};
     let mut eq_bound = quote! {};
     let mut ord_bound = quote! {};
@@ -318,6 +319,10 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
 
     for ii in 1..=32usize {
         let ident = format_ident!("P{}", ii);
+
+        clone_bound.extend(quote! {
+            T::#ident: Clone,
+        });
 
         partial_eq_bound.extend(quote! {
             T::#ident: std::cmp::PartialEq,
@@ -342,6 +347,7 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         bounds.push(quote! { #ident });
     }
 
+    let clone_bound = clone_bound.to_string();
     let partial_eq_bound = partial_eq_bound.to_string();
     let eq_bound = eq_bound.to_string();
     let ord_bound = ord_bound.to_string();
@@ -352,6 +358,7 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         #[doc = concat!("All instructions in the ", #fork_name, " fork.")]
         #[derive(educe::Educe)]
         #[educe(
+            Clone(bound = #clone_bound),
             PartialEq(bound = #partial_eq_bound),
             Eq(bound = #eq_bound),
             Ord(bound = #ord_bound),
@@ -376,22 +383,7 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
             T: super::Immediates + ?Sized,
         {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "Op<T> variant")
-            }
-        }
-
-        // TODO: For some reason deriving Clone with educe didn't work.
-        impl<T> Clone for Op<T>
-        where
-            T: super::Immediates + ?Sized,
-            #(T::#bounds: Clone,)*
-        {
-            fn clone(&self) -> Self {
-                match self {
-                    #(
-                    Self::#names(n) => Self::#names(n.clone()),
-                    )*
-                }
+                write!(f, "{}", self.mnemonic())
             }
         }
 
