@@ -116,7 +116,7 @@ fn hardfork_in_valid_range(directives: &[HardForkDirective]) -> Result<(), Parse
                 match decresing_bound {
                     Some(_) => {
                         return OverlappingRangeHardfork {
-                            directive0: directives.get(0),
+                            directive0: directives.first(),
                             directive1: directives.get(1),
                         }
                         .fail();
@@ -130,7 +130,7 @@ fn hardfork_in_valid_range(directives: &[HardForkDirective]) -> Result<(), Parse
                 match incresing_bound {
                     Some(_) => {
                         return OverlappingRangeHardfork {
-                            directive0: directives.get(0),
+                            directive0: directives.first(),
                             directive1: directives.get(1),
                         }
                         .fail();
@@ -142,7 +142,7 @@ fn hardfork_in_valid_range(directives: &[HardForkDirective]) -> Result<(), Parse
             }
             None => {
                 return InvalidRangeHardfork {
-                    directive0: directives.get(0),
+                    directive0: directives.first(),
                     directive1: directives.get(1),
                 }
                 .fail();
@@ -152,7 +152,7 @@ fn hardfork_in_valid_range(directives: &[HardForkDirective]) -> Result<(), Parse
 
     if incresing_bound.unwrap().hardfork > decresing_bound.unwrap().hardfork {
         return EmptyRangeHardfork {
-            directive0: directives.get(0),
+            directive0: directives.first(),
             directive1: directives.get(1),
         }
         .fail();
