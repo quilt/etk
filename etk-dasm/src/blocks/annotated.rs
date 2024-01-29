@@ -128,7 +128,7 @@ impl AnnotatedBlock {
     pub fn annotate(basic: &BasicBlock) -> Self {
         let jump_target = basic
             .ops
-            .get(0)
+            .first()
             .map(Operation::is_jump_target)
             .unwrap_or_default();
 

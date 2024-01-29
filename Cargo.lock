@@ -264,7 +264,7 @@ dependencies = [
  "bitflags",
  "clap_derive",
  "clap_lex",
- "indexmap",
+ "indexmap 1.8.1",
  "lazy_static",
  "strsim 0.10.0",
  "termcolor",
@@ -402,6 +402,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "equivalent"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
+
+[[package]]
 name = "etk-4byte"
 version = "0.4.0-dev"
 dependencies = [
@@ -439,6 +445,7 @@ dependencies = [
  "etk-ops",
  "hex",
  "hex-literal",
+ "indexmap 2.1.0",
  "num-bigint",
  "num-traits",
  "pest",
@@ -478,7 +485,7 @@ name = "etk-ops"
 version = "0.4.0-dev"
 dependencies = [
  "educe",
- "indexmap",
+ "indexmap 1.8.1",
  "quote",
  "serde",
  "snafu",
@@ -630,7 +637,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "http",
- "indexmap",
+ "indexmap 1.8.1",
  "slab",
  "tokio",
  "tokio-util",
@@ -642,6 +649,12 @@ name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
+
+[[package]]
+name = "hashbrown"
+version = "0.14.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 
 [[package]]
 name = "heck"
@@ -765,8 +778,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f647032dfaa1f8b6dc29bd3edb7bbef4861b8b8007ebb118d6db284fd59f6ee"
 dependencies = [
  "autocfg",
- "hashbrown",
+ "hashbrown 0.11.2",
  "serde",
+]
+
+[[package]]
+name = "indexmap"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
+dependencies = [
+ "equivalent",
+ "hashbrown 0.14.3",
 ]
 
 [[package]]
@@ -1079,7 +1102,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a13a2fa9d0b63e5f22328828741e523766fff0ee9e779316902290dff3f824f"
 dependencies = [
  "fixedbitset",
- "indexmap",
+ "indexmap 1.8.1",
 ]
 
 [[package]]
