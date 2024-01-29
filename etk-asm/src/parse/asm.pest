@@ -40,16 +40,27 @@ instruction_macro_variable = @{ "$" ~ function_parameter }
 instruction_macro = !{ "%" ~ function_invocation }
 
 local_macro = { !builtin ~ (instruction_macro_definition | instruction_macro  | expression_macro_definition) }
-builtin = ${ "%" ~ ( import | include | include_hex | push_macro ) }
+builtin = ${ "%" ~ (import | include | include_hex | push_macro | hardfork) }
 
 import = !{ "import" ~ arguments }
 include = !{ "include" ~ arguments }
 include_hex = !{ "include_hex" ~ arguments }
 push_macro = !{ "push" ~ arguments }
+hardfork = !{"hardfork" ~ hardfork_arguments }
 
 arguments = _{ "(" ~ arguments_list? ~ ")" }
 arguments_list = _{ ( argument ~ "," )* ~ argument? }
 argument = _{ string | expression }
+
+hardfork_arguments = _{ "(" ~  hardfork_arguments_list ~ ")" }
+hardfork_arguments_list = _{ "\"" ~ ( hardfork_argument ~ "," )* ~ hardfork_argument? ~ "\"" }
+hardfork_argument = { hardfork_operator? ~ hardfork_name }
+hardfork_operator = _{ lte | gte | gt | lt }
+gt = { ">" }
+lt = { "<" }
+gte = { ">=" }
+lte = { "<=" }
+hardfork_name = { ASCII_ALPHA* }
 
 string = @{ "\"" ~ string_char* ~ "\"" }
 string_char = _{ "\\\\" | "\\\"" | (!"\\" ~ !"\"" ~ ANY) }

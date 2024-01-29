@@ -1,5 +1,5 @@
 use super::args::Signature;
-use super::error::ParseError;
+use super::error::{EmptyRangeHardfork, OverlappingRangeHardfork, ParseError};
 use super::expression;
 use super::parser::Rule;
 use crate::ast::Node;
@@ -7,15 +7,17 @@ use crate::ops::{
     AbstractOp, Expression, ExpressionMacroDefinition, ExpressionMacroInvocation,
     InstructionMacroDefinition, InstructionMacroInvocation,
 };
+use crate::parse::error::{ExceededRangeHardfork, InvalidHardfork, InvalidRangeHardfork};
+use etk_ops::{HardFork, HardForkDirective, OperatorDirective};
 use pest::iterators::Pair;
 use std::path::PathBuf;
 
-pub(crate) fn parse(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+pub(crate) fn parse(pair: Pair<Rule>, hardfork: HardFork) -> Result<AbstractOp, ParseError> {
     let mut pairs = pair.into_inner();
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
-        Rule::instruction_macro_definition => parse_instruction_macro_defn(pair),
+        Rule::instruction_macro_definition => parse_instruction_macro_defn(pair, hardfork),
         Rule::instruction_macro => parse_instruction_macro(pair),
         Rule::expression_macro_definition => parse_expression_macro_defn(pair),
         _ => unreachable!(),
@@ -45,13 +47,124 @@ pub(crate) fn parse_builtin(pair: Pair<Rule>) -> Result<Node, ParseError> {
             let expr = expression::parse(pair.into_inner().next().unwrap())?;
             Node::Op(AbstractOp::Push(expr.into()))
         }
+        Rule::hardfork => {
+            let mut directives = Vec::new();
+            for inner in pair.into_inner() {
+                let mut directive = inner.into_inner();
+                let operator =
+                    match directive
+                        .peek()
+                        .and_then(|operator| match operator.as_rule() {
+                            Rule::lt => Some(OperatorDirective::LessThan),
+                            Rule::lte => Some(OperatorDirective::LessThanOrEqual),
+                            Rule::gt => Some(OperatorDirective::GreaterThan),
+                            Rule::gte => Some(OperatorDirective::GreaterThanOrEqual),
+                            _ => None,
+                        }) {
+                        Some(op) => {
+                            directive.next();
+                            Some(op)
+                        }
+                        None => None,
+                    };
+
+                // Tried moving this to into() but can't manage invalid hardforks.
+                let hardforkstr = directive.next().unwrap().as_str();
+                let hardfork = match hardforkstr {
+                    "london" => HardFork::London,
+                    "shanghai" => HardFork::Shanghai,
+                    "cancun" => HardFork::Cancun,
+                    _ => {
+                        return InvalidHardfork {
+                            hardfork: hardforkstr,
+                        }
+                        .fail()
+                    }
+                };
+
+                directives.push(HardForkDirective { operator, hardfork });
+                if directives.len() > 2 {
+                    return ExceededRangeHardfork {
+                        parsed: directives.len(),
+                    }
+                    .fail();
+                }
+            }
+
+            directives.reverse();
+            hardfork_in_valid_range(&directives)?;
+            let tuple = (directives.pop().unwrap(), directives.pop());
+            Node::HardforkMacro(tuple)
+        }
         _ => unreachable!(),
     };
 
     Ok(node)
 }
 
-fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+fn hardfork_in_valid_range(directives: &[HardForkDirective]) -> Result<(), ParseError> {
+    if directives.len() == 1 {
+        return Ok(());
+    }
+
+    let mut decresing_bound: Option<HardForkDirective> = None;
+    let mut incresing_bound: Option<HardForkDirective> = None;
+
+    for directive in directives {
+        match directive.operator {
+            Some(OperatorDirective::LessThan) | Some(OperatorDirective::LessThanOrEqual) => {
+                match decresing_bound {
+                    Some(_) => {
+                        return OverlappingRangeHardfork {
+                            directive0: directives.first(),
+                            directive1: directives.get(1),
+                        }
+                        .fail();
+                    }
+                    None => {
+                        decresing_bound = Some(directive.clone());
+                    }
+                }
+            }
+            Some(OperatorDirective::GreaterThan) | Some(OperatorDirective::GreaterThanOrEqual) => {
+                match incresing_bound {
+                    Some(_) => {
+                        return OverlappingRangeHardfork {
+                            directive0: directives.first(),
+                            directive1: directives.get(1),
+                        }
+                        .fail();
+                    }
+                    None => {
+                        incresing_bound = Some(directive.clone());
+                    }
+                }
+            }
+            None => {
+                return InvalidRangeHardfork {
+                    directive0: directives.first(),
+                    directive1: directives.get(1),
+                }
+                .fail();
+            }
+        }
+    }
+
+    if incresing_bound.unwrap().hardfork > decresing_bound.unwrap().hardfork {
+        return EmptyRangeHardfork {
+            directive0: directives.first(),
+            directive1: directives.get(1),
+        }
+        .fail();
+    }
+
+    Ok(())
+}
+
+fn parse_instruction_macro_defn(
+    pair: Pair<Rule>,
+    hardfork: HardFork,
+) -> Result<AbstractOp, ParseError> {
     let mut pairs = pair.into_inner();
 
     let mut macro_defn = pairs.next().unwrap().into_inner();
@@ -68,7 +181,7 @@ fn parse_instruction_macro_defn(pair: Pair<Rule>) -> Result<AbstractOp, ParseErr
             let expr = expression::parse(pair.into_inner().next().unwrap())?;
             contents.push(AbstractOp::Push(expr.into()));
         } else {
-            contents.push(super::parse_abstract_op(pair)?);
+            contents.push(super::parse_abstract_op(pair, hardfork.clone())?);
         }
     }
 

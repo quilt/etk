@@ -428,6 +428,7 @@ dependencies = [
  "etk-asm",
  "etk-cli",
  "etk-dasm",
+ "etk-ops",
  "hex-literal",
  "petgraph",
  "snafu",

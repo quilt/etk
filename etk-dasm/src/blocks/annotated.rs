@@ -3,6 +3,7 @@
 use crate::sym::{Expr, Var};
 
 use etk_ops::cancun::*;
+use etk_ops::Operation;
 
 use std::collections::VecDeque;
 

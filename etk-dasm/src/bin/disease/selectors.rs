@@ -1,6 +1,7 @@
 use etk_4byte::reverse_selector;
 
-use etk_ops::cancun::{Op, Operation};
+use etk_ops::cancun::Op;
+use etk_ops::Operation;
 
 use std::fmt;
 

@@ -1,7 +1,8 @@
 //! A list of EVM instructions with a single point of entry and a single exit.
 use etk_asm::disasm::Offset;
 
-use etk_ops::cancun::{Op, Operation};
+use etk_ops::cancun::Op;
+use etk_ops::Operation;
 
 /// A list of EVM instructions with a single point of entry and a single exit.
 #[derive(Debug, Eq, PartialEq)]

@@ -96,64 +96,7 @@ fn read_fork(name: &str) -> Result<[(String, Op); 256], Error> {
 fn generate_fork(fork_name: &str) -> Result<(), Error> {
     let ops = read_fork(fork_name)?;
 
-    let mut tokens = quote! {
-        /// Trait for types that represent an EVM instruction.
-        pub trait Operation {
-            /// The return type of [`Operation::code`].
-            type Code: Operation<Code = Self::Code> + Into<u8>;
-
-            /// The return root type of [`Operation::immediate_mut`] and
-            /// [`Operation::immediate`].
-            type ImmediateRef: ?Sized;
-
-            /// The type of the immediate argument for this operation.
-            type Immediate:
-                std::borrow::Borrow<Self::ImmediateRef> + std::borrow::BorrowMut<Self::ImmediateRef>;
-
-            /// Get a shared reference to the immediate argument of this operation,
-            /// if one exists.
-            fn immediate(&self) -> Option<&Self::ImmediateRef>;
-
-            /// Get a mutable reference to the immediate argument of this operation,
-            /// if one exists.
-            fn immediate_mut(&mut self) -> Option<&mut Self::ImmediateRef>;
-
-            /// Consume this operation and return its immediate argument, if one
-            /// exists.
-            fn into_immediate(self) -> Option<Self::Immediate>;
-
-            /// Length of immediate argument.
-            fn extra_len(&self) -> usize;
-
-            /// The action (opcode) of this operation, without any immediates.
-            fn code(&self) -> Self::Code;
-
-            /// The byte (opcode) that indicates this operation.
-            fn code_byte(&self) -> u8 {
-                self.code().into()
-            }
-
-            /// Human-readable name for this operation.
-            fn mnemonic(&self) -> &str;
-
-            /// Returns true if the current instruction changes the program counter (other
-            /// than incrementing it.)
-            fn is_jump(&self) -> bool;
-
-            /// Returns true if the current instruction is a valid destination for jumps.
-            fn is_jump_target(&self) -> bool;
-
-            /// Returns true if the current instruction causes the EVM to stop executing
-            /// the contract.
-            fn is_exit(&self) -> bool;
-
-            /// How many stack elements this instruction pops.
-            fn pops(&self) -> usize;
-
-            /// How many stack elements this instruction pushes.
-            fn pushes(&self) -> usize;
-        }
-    };
+    let mut tokens = quote! {use super::Operation;};
 
     let mut code_matches = quote! {};
     let mut size_matches = quote! {};
@@ -366,7 +309,6 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         });
     }
 
-    let mut debug_bound = quote! {};
     let mut clone_bound = quote! {};
     let mut partial_eq_bound = quote! {};
     let mut eq_bound = quote! {};
@@ -377,10 +319,6 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
 
     for ii in 1..=32usize {
         let ident = format_ident!("P{}", ii);
-
-        debug_bound.extend(quote! {
-            T::#ident: std::fmt::Debug,
-        });
 
         clone_bound.extend(quote! {
             T::#ident: Clone,
@@ -409,7 +347,6 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         bounds.push(quote! { #ident });
     }
 
-    let debug_bound = debug_bound.to_string();
     let clone_bound = clone_bound.to_string();
     let partial_eq_bound = partial_eq_bound.to_string();
     let eq_bound = eq_bound.to_string();
@@ -422,7 +359,6 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
         #[derive(educe::Educe)]
         #[educe(
             Clone(bound = #clone_bound),
-            Debug(bound = #debug_bound),
             PartialEq(bound = #partial_eq_bound),
             Eq(bound = #eq_bound),
             Ord(bound = #ord_bound),
@@ -439,6 +375,16 @@ fn generate_fork(fork_name: &str) -> Result<(), Error> {
             T: super::Immediates + ?Sized,
             #(T::#bounds: Copy,)*
         {
+        }
+
+        // TODO: For some reason deriving Debug with educe didn't work.
+        impl<T> std::fmt::Debug for Op<T>
+        where
+            T: super::Immediates + ?Sized,
+        {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "{}", self.mnemonic())
+            }
         }
 
         impl<T> Operation for Op<T> where T: super::Immediates + ?Sized {

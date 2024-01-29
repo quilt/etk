@@ -295,6 +295,7 @@ mod tests {
 
     use etk_asm::disasm::Disassembler;
     use etk_asm::ingest::Ingest;
+    use etk_ops::HardFork;
 
     use etk_dasm::blocks::basic::Separator;
 
@@ -328,7 +329,7 @@ mod tests {
     {
         fn compile(&self) -> Disassembler {
             let mut output = Disassembler::new();
-            Ingest::new(&mut output)
+            Ingest::new(&mut output, HardFork::Cancun)
                 .ingest("./test", self.source)
                 .unwrap();
             output

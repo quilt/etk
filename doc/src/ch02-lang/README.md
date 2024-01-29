@@ -12,6 +12,7 @@ This example should increment a value from 0 to 255 on the stack, then halt exec
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 push1 0x00
 
@@ -28,7 +29,7 @@ loop:
 pop
 stop                # This halts execution
 # "#;
-# let mut ingest = etk_asm::ingest::Ingest::new(Vec::new());
+# let mut ingest = etk_asm::ingest::Ingest::new(Vec::new(), etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 ```
 

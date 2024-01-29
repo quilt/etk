@@ -2,6 +2,7 @@ use assert_matches::assert_matches;
 
 use etk_asm::ingest::{Error, Ingest};
 
+use etk_ops::HardFork;
 use hex_literal::hex;
 
 use std::path::{Path, PathBuf};
@@ -20,7 +21,7 @@ where
 #[test]
 fn simple_constructor() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["simple-constructor", "ctor.etk"]))?;
 
     assert_eq!(
@@ -39,7 +40,7 @@ fn simple_constructor() -> Result<(), Error> {
 #[test]
 fn out_of_bounds() {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     let err = ingester
         .ingest_file(source(&["out-of-bounds", "main", "main.etk"]))
         .unwrap_err();
@@ -50,7 +51,7 @@ fn out_of_bounds() {
 #[test]
 fn subdirectory() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["subdirectory", "main.etk"]))?;
 
     assert_eq!(output, hex!("63c001c0de60ff"));
@@ -61,7 +62,7 @@ fn subdirectory() -> Result<(), Error> {
 #[test]
 fn variable_jump() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["variable-jump", "main.etk"]))?;
 
     assert_eq!(output, hex!("6003565b"));
@@ -72,7 +73,7 @@ fn variable_jump() -> Result<(), Error> {
 #[test]
 fn instruction_macro() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["instruction-macro", "main.etk"]))?;
 
     assert_eq!(
@@ -86,7 +87,7 @@ fn instruction_macro() -> Result<(), Error> {
 #[test]
 fn instruction_macro_with_empty_lines() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["instruction-macro", "empty_lines.etk"]))?;
 
     assert_eq!(output, hex!("6000600060006000600060006000"));
@@ -97,7 +98,7 @@ fn instruction_macro_with_empty_lines() -> Result<(), Error> {
 #[test]
 fn instruction_macro_with_two_instructions_per_line() {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     let err = ingester
         .ingest_file(source(&[
             "instruction-macro",
@@ -111,7 +112,7 @@ fn instruction_macro_with_two_instructions_per_line() {
 #[test]
 fn undefined_label_undefined_macro() {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     let err = ingester
         .ingest_file(source(&[
             "instruction-macro",
@@ -127,7 +128,7 @@ fn undefined_label_undefined_macro() {
 #[test]
 fn every_op() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["every-op", "main.etk"]))?;
 
     assert_eq!(
@@ -294,9 +295,9 @@ fn every_op() -> Result<(), Error> {
 }
 
 #[test]
-fn test_variable_sized_push_and_include() -> Result<(), Error> {
+fn test_dynamic_push_and_include() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["variable-push", "main.etk"]))?;
 
     assert_eq!(output, hex!("61025758585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585801010101010158585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858585858015b"));
@@ -305,19 +306,61 @@ fn test_variable_sized_push_and_include() -> Result<(), Error> {
 }
 
 #[test]
-fn test_variable_sized_push2() -> Result<(), Error> {
+fn test_valid_hardfork() -> Result<(), Error> {
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
+    ingester.ingest_file(source(&["hardfork", "valid-hardfork.etk"]))?;
+
+    assert_eq!(output, hex!(""));
+
+    Ok(())
+}
+
+#[test]
+fn test_invalid_hardfork() {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
+    let err = ingester
+        .ingest_file(source(&["hardfork", "invalid-hardfork.etk"]))
+        .unwrap_err();
+
+    println!("{:?}", err);
+
+    assert_matches!(err, etk_asm::ingest::Error::Parse { source:
+        etk_asm::ParseError::InvalidHardfork { hardfork, .. }, .. }
+    if hardfork == "buenosaires".to_string());
+}
+
+#[test]
+fn test_invalid_range_hardfork() {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
+    let err = ingester
+        .ingest_file(source(&["hardfork", "invalid-range.etk"]))
+        .unwrap_err();
+
+    assert_matches!(
+        err,
+        etk_asm::ingest::Error::Parse {
+            source: etk_asm::ParseError::EmptyRangeHardfork { .. },
+            ..
+        }
+    );
+}
+#[test]
+fn test_dynamic_push2() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["variable-push2", "main1.etk"]))?;
     assert_eq!(output, hex!("61010158"));
 
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["variable-push2", "main2.etk"]))?;
     assert_eq!(output, hex!("61010158"));
 
     let mut output = Vec::new();
-    let mut ingester = Ingest::new(&mut output);
+    let mut ingester = Ingest::new(&mut output, HardFork::Cancun);
     ingester.ingest_file(source(&["variable-push2", "main3.etk"]))?;
     assert_eq!(output, hex!("610107015801"));
 

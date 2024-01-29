@@ -20,13 +20,17 @@ use self::{
     parser::{AsmParser, Rule},
 };
 
+use etk_ops::cancun::Op as CancunOp;
+use etk_ops::london::Op as LondonOp;
+use etk_ops::shanghai::Op as ShanghaiOp;
+
 use crate::ast::Node;
 use crate::ops::AbstractOp;
-use etk_ops::cancun::Op;
+use etk_ops::{HardFork, HardForkOp};
 use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
 
-pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
+pub(crate) fn parse_asm(asm: &str, hardfork: HardFork) -> Result<Vec<Node>, ParseError> {
     let mut program: Vec<Node> = Vec::new();
 
     let pairs = AsmParser::parse(Rule::program, asm)?;
@@ -34,7 +38,7 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
         let node = match pair.as_rule() {
             Rule::builtin => macros::parse_builtin(pair)?,
             Rule::EOI => continue,
-            _ => parse_abstract_op(pair)?.into(),
+            _ => parse_abstract_op(pair, hardfork.clone())?.into(),
         };
         program.push(node);
     }
@@ -42,16 +46,26 @@ pub(crate) fn parse_asm(asm: &str) -> Result<Vec<Node>, ParseError> {
     Ok(program)
 }
 
-fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+fn parse_abstract_op(pair: Pair<Rule>, hardfork: HardFork) -> Result<AbstractOp, ParseError> {
     let ret = match pair.as_rule() {
-        Rule::local_macro => macros::parse(pair)?,
+        Rule::local_macro => macros::parse(pair, hardfork)?,
         Rule::label_definition => {
             AbstractOp::Label(pair.into_inner().next().unwrap().as_str().to_string())
         }
-        Rule::push => parse_push(pair)?,
+        Rule::push => parse_push(pair, hardfork)?,
         Rule::op => {
-            let spec: Op<()> = pair.as_str().parse().unwrap();
-            let op = Op::new(spec).unwrap();
+            let op: HardForkOp<_> = match hardfork {
+                HardFork::Cancun => {
+                    HardForkOp::Cancun(CancunOp::new(pair.as_str().parse().unwrap()).unwrap())
+                }
+                HardFork::Shanghai => {
+                    HardForkOp::Shanghai(ShanghaiOp::new(pair.as_str().parse().unwrap()).unwrap())
+                }
+                HardFork::London => {
+                    HardForkOp::London(LondonOp::new(pair.as_str().parse().unwrap()).unwrap())
+                }
+            };
+
             AbstractOp::Op(op)
         }
         _ => unreachable!(),
@@ -60,13 +74,18 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     Ok(ret)
 }
 
-fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+fn parse_push(pair: Pair<Rule>, hardfork: HardFork) -> Result<AbstractOp, ParseError> {
     let mut pair = pair.into_inner();
     let size = pair.next().unwrap();
     let size: usize = size.as_str().parse().unwrap();
     let operand = pair.next().unwrap();
 
-    let spec = Op::<()>::push(size).unwrap();
+    let spec = match hardfork {
+        HardFork::Cancun => HardForkOp::Cancun(CancunOp::<()>::push(size).unwrap()),
+        HardFork::Shanghai => HardForkOp::Shanghai(ShanghaiOp::<()>::push(size).unwrap()),
+        HardFork::London => HardForkOp::London(LondonOp::<()>::push(size).unwrap()),
+    };
+
     let expr = expression::parse(operand)?;
 
     if let Ok(val) = expr.eval() {
@@ -114,7 +133,7 @@ mod tests {
             Op::from(Xor),
             Op::from(Push0)
         ];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
@@ -126,7 +145,7 @@ mod tests {
             Op::from(Push1(Imm::from([0]))),
             Op::from(Push1(Imm::from([1])))
         ];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
@@ -140,7 +159,7 @@ mod tests {
             Op::from(Push1(Imm::from([1]))),
             Op::from(Push1(Imm::from([1])))
         ];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
@@ -154,7 +173,7 @@ mod tests {
             Op::from(Push1(Imm::from([0]))),
             Op::from(Push1(Imm::from([1])))
         ];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
@@ -170,8 +189,8 @@ mod tests {
             Op::from(Push1(Imm::from([7]))),
             Op::from(Push2(Imm::from([1, 0]))),
         ];
-        println!("{:?}\n\n{:?}", parse_asm(asm), expected);
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        println!("{:?}\n\n{:?}", parse_asm(asm, HardFork::Cancun), expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
@@ -197,10 +216,13 @@ mod tests {
             Op::from(Push2(Imm::from(hex!("0100")))),
             Op::from(Push4(Imm::from(hex!("ffffffff")))),
         ];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
 
         let asm = "push1 256";
-        assert_matches!(parse_asm(asm), Err(ParseError::ImmediateTooLarge { .. }));
+        assert_matches!(
+            parse_asm(asm, HardFork::Cancun),
+            Err(ParseError::ImmediateTooLarge { .. })
+        );
     }
 
     #[test]
@@ -229,10 +251,13 @@ mod tests {
                 "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
             )))),
         ];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
 
         let asm = "push2 0x010203";
-        assert_matches!(parse_asm(asm), Err(ParseError::ImmediateTooLarge { .. }));
+        assert_matches!(
+            parse_asm(asm, HardFork::Cancun),
+            Err(ParseError::ImmediateTooLarge { .. })
+        );
     }
 
     #[test]
@@ -257,21 +282,21 @@ mod tests {
             Op::from(Log0),
             Op::from(Log4),
         ];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
     fn parse_jumpdest_no_label() {
         let asm = "jumpdest";
         let expected = nodes![Op::from(JumpDest)];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
     fn parse_jumpdest_label() {
         let asm = "start:\njumpdest";
         let expected = nodes![AbstractOp::Label("start".into()), Op::from(JumpDest),];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
@@ -284,7 +309,7 @@ mod tests {
             Op::from(Push2(Imm::with_label("snake_case"))),
             Op::from(JumpI)
         ];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
@@ -299,7 +324,7 @@ mod tests {
             Op::from(Push1(Imm::with_label("push1"))),
             Op::from(JumpI),
         ];
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
@@ -320,8 +345,8 @@ mod tests {
                 "a9059cbb2ab09eb219583f4a59a5d0623ade346d962bcd4e46b11da047c9049b"
             )))),
         ];
-        println!("{:?}\n\n{:?}", parse_asm(asm), expected);
-        assert_matches!(parse_asm(asm), Ok(e) if e == expected);
+        println!("{:?}\n\n{:?}", parse_asm(asm, HardFork::Cancun), expected);
+        assert_matches!(parse_asm(asm, HardFork::Cancun), Ok(e) if e == expected);
     }
 
     #[test]
@@ -329,7 +354,10 @@ mod tests {
         let asm = r#"
             push4 selector("name( )")
         "#;
-        assert_matches!(parse_asm(asm), Err(ParseError::Lexer { .. }));
+        assert_matches!(
+            parse_asm(asm, HardFork::Cancun),
+            Err(ParseError::Lexer { .. })
+        );
     }
 
     #[test]
@@ -346,7 +374,7 @@ mod tests {
             Node::Include(PathBuf::from("foo.asm")),
             Op::from(Push1(Imm::from(2u8))),
         ];
-        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+        assert_matches!(parse_asm(&asm, HardFork::Cancun), Ok(e) if e == expected)
     }
 
     #[test]
@@ -363,7 +391,7 @@ mod tests {
             Node::IncludeHex(PathBuf::from("foo.hex")),
             Op::from(Push1(Imm::from(2u8))),
         ];
-        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+        assert_matches!(parse_asm(&asm, HardFork::Cancun), Ok(e) if e == expected)
     }
 
     #[test]
@@ -380,7 +408,7 @@ mod tests {
             Node::Import(PathBuf::from("foo.asm")),
             Op::from(Push1(Imm::from(2u8))),
         ];
-        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+        assert_matches!(parse_asm(&asm, HardFork::Cancun), Ok(e) if e == expected)
     }
 
     #[test]
@@ -391,7 +419,7 @@ mod tests {
             "#,
         );
         assert!(matches!(
-            parse_asm(&asm),
+            parse_asm(&asm, HardFork::Cancun),
             Err(ParseError::ExtraArgument {
                 expected: 1,
                 backtrace: _
@@ -407,7 +435,7 @@ mod tests {
             "#,
         );
         assert!(matches!(
-            parse_asm(&asm),
+            parse_asm(&asm, HardFork::Cancun),
             Err(ParseError::MissingArgument {
                 got: 0,
                 expected: 1,
@@ -423,7 +451,10 @@ mod tests {
             %import(0x44)
             "#,
         );
-        assert_matches!(parse_asm(&asm), Err(ParseError::ArgumentType { .. }))
+        assert_matches!(
+            parse_asm(&asm, HardFork::Cancun),
+            Err(ParseError::ArgumentType { .. })
+        )
     }
 
     #[test]
@@ -440,7 +471,7 @@ mod tests {
             Node::Import(PathBuf::from("hello.asm")),
             Op::from(Push1(Imm::from(2u8))),
         ];
-        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+        assert_matches!(parse_asm(&asm, HardFork::Cancun), Ok(e) if e == expected)
     }
 
     #[test]
@@ -457,7 +488,7 @@ mod tests {
             AbstractOp::Push(Imm::with_label("hello")),
             Op::from(Push1(Imm::from(2u8))),
         ];
-        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+        assert_matches!(parse_asm(&asm, HardFork::Cancun), Ok(e) if e == expected)
     }
 
     #[test]
@@ -480,12 +511,15 @@ mod tests {
                     name: "my_macro".into(),
                     parameters: vec!["foo".into(), "bar".into()],
                     contents: vec![
-                        AbstractOp::new(GasPrice),
-                        AbstractOp::new(Pop),
-                        AbstractOp::new(Push1(
-                            Expression::Plus(
-                                Terminal::Variable("foo".to_string()).into(),
-                                Terminal::Variable("bar".to_string()).into()
+                        AbstractOp::new(HardForkOp::Cancun(GasPrice.into())),
+                        AbstractOp::new(HardForkOp::Cancun(Pop.into())),
+                        AbstractOp::new(HardForkOp::Cancun(
+                            Push1(
+                                Expression::Plus(
+                                    Terminal::Variable("foo".to_string()).into(),
+                                    Terminal::Variable("bar".to_string()).into()
+                                )
+                                .into()
                             )
                             .into()
                         )),
@@ -511,7 +545,7 @@ mod tests {
             })
         ];
 
-        assert_eq!(parse_asm(&asm).unwrap(), expected)
+        assert_eq!(parse_asm(&asm, HardFork::Cancun).unwrap(), expected)
     }
 
     #[test]
@@ -554,7 +588,7 @@ mod tests {
                 2.into()
             ))))
         ];
-        assert_eq!(parse_asm(&asm).unwrap(), expected)
+        assert_eq!(parse_asm(&asm, HardFork::Cancun).unwrap(), expected)
     }
 
     #[test]
@@ -571,7 +605,7 @@ mod tests {
             AbstractOp::Push(Imm::with_expression(Expression::Plus(1.into(), 1.into()))),
             Op::from(Push1(Imm::from(2u8))),
         ];
-        assert_matches!(parse_asm(&asm), Ok(e) if e == expected)
+        assert_matches!(parse_asm(&asm, HardFork::Cancun), Ok(e) if e == expected)
     }
 
     #[test]
@@ -595,6 +629,6 @@ mod tests {
                 parameters: vec![]
             }))),
         ];
-        assert_eq!(parse_asm(&asm).unwrap(), expected);
+        assert_eq!(parse_asm(&asm, HardFork::Cancun).unwrap(), expected);
     }
 }

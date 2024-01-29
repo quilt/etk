@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+
+use etk_ops::HardForkDirective;
 use pest::error::Error;
 
 use snafu::{Backtrace, IntoError, Snafu};
@@ -57,6 +60,96 @@ pub enum ParseError {
     #[snafu(display("incorrect argument type"))]
     #[non_exhaustive]
     ArgumentType {
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// An argument provided to a macro was of the wrong type.
+    #[snafu(display("File {} does not exist", path.to_string_lossy()))]
+    #[non_exhaustive]
+    FileNotFound {
+        /// Path to the offending file.
+        path: PathBuf,
+
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// An included fail failed to parse as hexadecimal.
+    #[snafu(display("included file `{}` is invalid hex: {}", path.to_string_lossy(), source))]
+    #[non_exhaustive]
+    InvalidHex {
+        /// Path to the offending file.
+        path: PathBuf,
+
+        /// The underlying source of this error.
+        source: Box<dyn std::error::Error>,
+
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Hardfork defined inside macro is invalid.
+    #[snafu(display("hardfork `{}` is invalid", hardfork))]
+    #[non_exhaustive]
+    InvalidHardfork {
+        /// Name of the invalid hardfork.
+        hardfork: String,
+
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Range of Hardforks exceeded max amout.
+    #[snafu(display("Expected range of two hardfork max, but got {}.", parsed))]
+    #[non_exhaustive]
+    ExceededRangeHardfork {
+        /// Number of hardforks parsed.
+        parsed: usize,
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Range of hardforks is invalid
+    #[snafu(display(
+        "For a range, both hardforks needs to have operators: {},{}.",
+        directive0,
+        directive1
+    ))]
+    #[non_exhaustive]
+    InvalidRangeHardfork {
+        /// Directive with invalid range.
+        directive0: HardForkDirective,
+        /// Directive with invalid range.
+        directive1: HardForkDirective,
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Range of hardforks overlap and should be simplified.
+    #[snafu(display(
+        "Range of hardforks overlap and should be simplified: {},{}.",
+        directive0,
+        directive1
+    ))]
+    #[non_exhaustive]
+    OverlappingRangeHardfork {
+        /// Directive with invalid range.
+        directive0: HardForkDirective,
+        /// Directive with invalid range.
+        directive1: HardForkDirective,
+        /// The location of the error.
+        backtrace: Backtrace,
+    },
+
+    /// Range of hardforks is empty.
+    #[snafu(display("Range of hardforks is empty: {},{}.", directive0, directive1))]
+    #[non_exhaustive]
+    EmptyRangeHardfork {
+        /// Directive with invalid range.
+        directive0: HardForkDirective,
+        /// Directive with invalid range.
+        directive1: HardForkDirective,
         /// The location of the error.
         backtrace: Backtrace,
     },

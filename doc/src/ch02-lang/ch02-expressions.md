@@ -10,11 +10,12 @@ While an assembled `push` must have a concrete value, it is often useful when de
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 push1 1+(2*3)/4
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x60, 0x02]);
 ```
@@ -50,12 +51,13 @@ A [label](ch03-labels.md) may be used as a term in an expression.
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 start:
     push1 start + 1
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x60, 0x01]);
 ```
@@ -66,11 +68,12 @@ start:
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 push4 selector("transfer(uint256,uint256)")
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x63, 12, 247, 158, 10]);
 ```
@@ -83,6 +86,7 @@ Expressions support the following binary operators:
 
 ```rust
 # extern crate etk_asm;
+# extern crate etk_ops;
 # let src = r#"
 push1 1+2       # addition
 push1 1*2       # multiplication
@@ -91,7 +95,7 @@ push1 2/2       # division
 
 # "#;
 # let mut output = Vec::new();
-# let mut ingest = etk_asm::ingest::Ingest::new(&mut output);
+# let mut ingest = etk_asm::ingest::Ingest::new(&mut output, etk_ops::HardFork::Cancun);
 # ingest.ingest(file!(), src).unwrap();
 # assert_eq!(output, &[0x60, 0x03, 0x60, 0x02, 0x60, 0x01, 0x60, 0x01]);
 ```

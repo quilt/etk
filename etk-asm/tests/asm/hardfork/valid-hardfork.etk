@@ -1,0 +1,5 @@
+%hardfork(">london,<=cancun")
+%hardfork(">=cancun,<=cancun")
+%hardfork("cancun")
+%hardfork(">london")
+%hardfork("<=cancun")

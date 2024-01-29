@@ -2,7 +2,7 @@
 
 mod error {
     use super::expression;
-    use etk_ops::cancun::Op;
+    use etk_ops::HardForkOp;
     use num_bigint::BigInt;
     use snafu::{Backtrace, Snafu};
 
@@ -16,7 +16,7 @@ mod error {
         ExpressionTooLarge {
             source: std::array::TryFromSliceError,
             value: BigInt,
-            spec: Op<()>,
+            spec: HardForkOp<()>,
             backtrace: Backtrace,
         },
         ExpressionNegative {
@@ -43,7 +43,12 @@ mod types;
 
 pub(crate) use self::error::Error;
 
-use etk_ops::cancun::{Op, Operation, Push32};
+use etk_ops::cancun::Push32 as CancunPush32;
+use etk_ops::london::Push32 as LondonPush32;
+use etk_ops::shanghai::Push32 as ShanghaiPush32;
+use etk_ops::HardFork;
+use etk_ops::HardForkOp;
+use etk_ops::Operation;
 
 pub use self::error::UnknownSpecifierError;
 pub use self::expression::{Context, Expression, Terminal};
@@ -84,13 +89,13 @@ pub(crate) trait Concretize {
     fn concretize(&self, ctx: Context) -> Result<Self::Concrete, error::Error>;
 }
 
-impl Concretize for Op<Abstract> {
-    type Concrete = Op<[u8]>;
+impl Concretize for HardForkOp<Abstract> {
+    type Concrete = HardForkOp<[u8]>;
 
     fn concretize(&self, ctx: Context) -> Result<Self::Concrete, error::Error> {
         let expr = match self.immediate() {
             Some(i) => &i.tree,
-            None => return Ok(Op::new(self.code()).unwrap()),
+            None => return Ok(HardForkOp::new_op(self.code()).unwrap()),
         };
 
         let value = expr
@@ -110,13 +115,38 @@ impl Concretize for Op<Abstract> {
             bytes = new;
         }
 
-        let result = self
-            .code()
-            .with(bytes.as_slice())
-            .context(error::ExpressionTooLarge {
-                value,
-                spec: self.code(),
-            })?;
+        let result = match &self {
+            HardForkOp::Cancun(op) => {
+                let op_context =
+                    op.code()
+                        .with(bytes.as_slice())
+                        .context(error::ExpressionTooLarge {
+                            value,
+                            spec: self.code(),
+                        })?;
+                HardForkOp::Cancun(op_context)
+            }
+            HardForkOp::Shanghai(op) => {
+                let op_context =
+                    op.code()
+                        .with(bytes.as_slice())
+                        .context(error::ExpressionTooLarge {
+                            value,
+                            spec: self.code(),
+                        })?;
+                HardForkOp::Shanghai(op_context)
+            }
+            HardForkOp::London(op) => {
+                let op_context =
+                    op.code()
+                        .with(bytes.as_slice())
+                        .context(error::ExpressionTooLarge {
+                            value,
+                            spec: self.code(),
+                        })?;
+                HardForkOp::London(op_context)
+            }
+        };
 
         Ok(result)
     }
@@ -172,7 +202,7 @@ impl Access {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum AbstractOp {
     /// A real `Op`, as opposed to a label or variable sized push.
-    Op(Op<Abstract>),
+    Op(HardForkOp<Abstract>),
 
     /// A label, which is a virtual instruction.
     Label(String),
@@ -191,12 +221,16 @@ impl AbstractOp {
     /// Construct a new `AbstractOp` from an `Operation`.
     pub fn new<O>(op: O) -> Self
     where
-        O: Into<Op<Abstract>>,
+        O: Into<HardForkOp<Abstract>>,
     {
         Self::Op(op.into())
     }
 
-    pub(crate) fn concretize(self, ctx: Context) -> Result<Op<[u8]>, error::Error> {
+    pub(crate) fn concretize(
+        self,
+        ctx: Context,
+        hardfork: HardFork,
+    ) -> Result<HardForkOp<[u8]>, error::Error> {
         match self {
             Self::Op(op) => op.concretize(ctx),
             Self::Push(imm) => {
@@ -213,21 +247,44 @@ impl AbstractOp {
                 );
 
                 if bytes.len() > 32 {
+                    let push32 = match hardfork {
+                        HardFork::Cancun => {
+                            HardForkOp::Cancun(etk_ops::cancun::Op::Push32(CancunPush32(())))
+                        }
+                        HardFork::Shanghai => {
+                            HardForkOp::Shanghai(etk_ops::shanghai::Op::Push32(ShanghaiPush32(())))
+                        }
+                        HardFork::London => {
+                            HardForkOp::London(etk_ops::london::Op::Push32(LondonPush32(())))
+                        }
+                    };
                     // TODO: Fix hack to get a TryFromSliceError.
                     let err = <[u8; 32]>::try_from(bytes.as_slice())
                         .context(error::ExpressionTooLarge {
                             value,
-                            spec: Push32(()),
+                            spec: push32,
                         })
                         .unwrap_err();
                     return Err(err);
                 }
 
                 let size = std::cmp::max(1, (value.bits() + 8 - 1) / 8);
-                let spec = Op::<()>::push(size.try_into().unwrap()).unwrap();
+                //let spec = Op::<()>::push(size.try_into().unwrap()).unwrap();
+
+                let spec = match hardfork {
+                    HardFork::Cancun => HardForkOp::Cancun(
+                        etk_ops::cancun::Op::<()>::push(size.try_into().unwrap()).unwrap(),
+                    ),
+                    HardFork::Shanghai => HardForkOp::Shanghai(
+                        etk_ops::shanghai::Op::<()>::push(size.try_into().unwrap()).unwrap(),
+                    ),
+                    HardFork::London => HardForkOp::London(
+                        etk_ops::london::Op::<()>::push(size.try_into().unwrap()).unwrap(),
+                    ),
+                };
 
                 let start = bytes.len() + 1 - spec.size();
-                AbstractOp::new(spec.with(&bytes[start..]).unwrap()).concretize(ctx)
+                AbstractOp::new(spec.with(&bytes[start..]).unwrap()).concretize(ctx, hardfork)
             }
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),
@@ -269,7 +326,7 @@ impl AbstractOp {
     }
 
     /// Return the specifier that corresponds to this `AbstractOp`.
-    pub fn specifier(&self) -> Option<Op<()>> {
+    pub fn specifier(&self) -> Option<HardForkOp<()>> {
         match self {
             Self::Op(op) => Some(op.code()),
             _ => None,
@@ -277,12 +334,12 @@ impl AbstractOp {
     }
 }
 
-impl From<Op<[u8]>> for AbstractOp {
-    fn from(cop: Op<[u8]>) -> Self {
+impl From<HardForkOp<[u8]>> for AbstractOp {
+    fn from(cop: HardForkOp<[u8]>) -> Self {
         let code = cop.code();
         let cop = match cop.into_immediate() {
             Some(i) => code.with(i).unwrap(),
-            None => Op::new(code).unwrap(),
+            None => HardForkOp::new_op(code).unwrap(),
         };
         Self::Op(cop)
     }

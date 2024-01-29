@@ -5,6 +5,8 @@ mod error {
     use crate::asm::Error as AssembleError;
     use crate::ParseError;
 
+    use etk_ops::HardFork;
+    use etk_ops::HardForkDirective;
     use snafu::{Backtrace, Snafu};
 
     use std::path::PathBuf;
@@ -93,6 +95,22 @@ mod error {
             /// The location of the error.
             backtrace: Backtrace,
         },
+
+        /// Hardfork set for compilation is out of range.
+        #[snafu(display(
+            "Hardfork set for compilation was `{}` but `{}` is required.",
+            hardfork,
+            directive
+        ))]
+        #[non_exhaustive]
+        OutOfRangeHardfork {
+            /// Hardfork set for compilation.
+            hardfork: HardFork,
+            /// Directive that breaks the compilation.
+            directive: HardForkDirective,
+            /// The location of the error.
+            backtrace: Backtrace,
+        },
     }
 }
 
@@ -102,6 +120,7 @@ use crate::parse::parse_asm;
 
 pub use self::error::Error;
 
+use etk_ops::HardFork;
 use snafu::{ensure, ResultExt};
 
 use std::fs::{read_to_string, File};
@@ -227,6 +246,7 @@ impl Program {
 ///
 /// ```rust
 /// use etk_asm::ingest::Ingest;
+/// use etk_ops::HardFork;
 /// #
 /// # use etk_asm::ingest::Error;
 /// #
@@ -239,7 +259,7 @@ impl Program {
 /// "#;
 ///
 /// let mut output = Vec::new();
-/// let mut ingest = Ingest::new(&mut output);
+/// let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
 /// ingest.ingest("./example.etk", &text)?;
 ///
 /// # let expected = hex!("6100035b");
@@ -249,12 +269,13 @@ impl Program {
 #[derive(Debug)]
 pub struct Ingest<W> {
     output: W,
+    hardfork: HardFork,
 }
 
 impl<W> Ingest<W> {
     /// Make a new `Ingest` that writes assembled bytes to `output`.
-    pub fn new(output: W) -> Self {
-        Self { output }
+    pub fn new(output: W, hardfork: HardFork) -> Self {
+        Self { output, hardfork }
     }
 }
 
@@ -285,12 +306,12 @@ where
 
     /// Assemble instructions from `src` as if they were read from a file located
     /// at `path`.
-    pub fn ingest<P>(&mut self, path: P, src: &str) -> Result<(), Error>
+    pub fn ingest<P>(&mut self, path: P, text: &str) -> Result<(), Error>
     where
         P: Into<PathBuf>,
     {
         let mut program = Program::new(path.into());
-        let nodes = self.preprocess(&mut program, src)?;
+        let nodes = self.preprocess(&mut program, text)?;
         let mut asm = Assembler::new();
         let raw = asm.assemble(&nodes)?;
 
@@ -303,7 +324,7 @@ where
     }
 
     fn preprocess(&mut self, program: &mut Program, src: &str) -> Result<Vec<RawOp>, Error> {
-        let nodes = parse_asm(src).with_context(|_| error::Parse {
+        let nodes = parse_asm(src, self.hardfork.clone()).context(error::Parse {
             path: program.sources.last().unwrap().clone(),
         })?;
         let mut raws = Vec::new();
@@ -333,6 +354,27 @@ where
                         })?;
 
                     raws.push(RawOp::Raw(raw))
+                }
+                Node::HardforkMacro(directive) => {
+                    // Here, `directive`` is always a valid range.
+                    let (hfd1, ophfd2) = directive;
+                    ensure!(
+                        self.hardfork.is_valid(&hfd1),
+                        error::OutOfRangeHardfork {
+                            hardfork: self.hardfork.clone(),
+                            directive: hfd1,
+                        }
+                    );
+
+                    if let Some(hfd2) = ophfd2 {
+                        ensure!(
+                            self.hardfork.is_valid(&hfd2),
+                            error::OutOfRangeHardfork {
+                                hardfork: self.hardfork.clone(),
+                                directive: hfd2,
+                            }
+                        );
+                    }
                 }
             }
         }
@@ -393,7 +435,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         ingest.ingest(root, &text)?;
         assert_eq!(output, hex!("6001602a6002"));
 
@@ -422,7 +464,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         ingest.ingest(root, &text)?;
 
         assert_eq!(output, hex!("60015b586000566002"));
@@ -451,7 +493,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         let err = ingest.ingest(root, &text).unwrap_err();
 
         assert_matches!(
@@ -476,7 +518,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         ingest.ingest(root, &text)?;
         assert_eq!(output, hex!("6001deadbeef0102f66002"));
 
@@ -500,7 +542,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         ingest.ingest(root, &text)?;
         assert_eq!(output, hex!("6001deadbeef0102f65b600960ff"));
 
@@ -522,7 +564,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         ingest.ingest(root, &text)?;
 
         let expected = hex!("61001caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5b");
@@ -565,7 +607,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         ingest.ingest(root, &text)?;
 
         let expected = hex!("620000096200000e5b5b6008600e5b610008610009");
@@ -614,7 +656,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         ingest.ingest(root, &text)?;
 
         let expected = hex!("620000155b58600b5b5b61000b6100035b600360045b62000004");
@@ -635,7 +677,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         let root = std::env::current_exe().unwrap();
         let err = ingest.ingest(root, &text).unwrap_err();
 
@@ -656,7 +698,7 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        let mut ingest = Ingest::new(&mut output);
+        let mut ingest = Ingest::new(&mut output, HardFork::Cancun);
         let err = ingest.ingest(root, &text).unwrap_err();
 
         assert_matches!(err, Error::RecursionLimit { .. });
