@@ -453,6 +453,7 @@ impl<'a> Annotator<'a> {
             Op::ChainId(_) => stack.push(Expr::chain_id()),
             Op::SelfBalance(_) => stack.push(Expr::self_balance()),
             Op::BaseFee(_) => stack.push(Expr::base_fee()),
+            Op::BlobBaseFee(_) => stack.push(Expr::blob_base_fee()),
 
             Op::MSize(_) => stack.push(Expr::m_size()),
             Op::Gas(_) => stack.push(Expr::gas()),
@@ -817,7 +818,6 @@ impl<'a> Annotator<'a> {
             | Op::Invalid4b(_)
             | Op::Invalid4c(_)
             | Op::Invalid4d(_)
-            | Op::Invalid4e(_)
             | Op::Invalid4f(_)
             | Op::Invalid5c(_)
             | Op::Invalid5d(_)

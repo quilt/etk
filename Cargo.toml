@@ -1,2 +1,3 @@
 [workspace]
 members = ["etk-ops", "etk-asm", "etk-dasm", "etk-analyze", "etk-cli", "etk-4byte"]
+resolver = "2"

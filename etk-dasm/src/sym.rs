@@ -169,6 +169,13 @@ impl Expr {
         }
     }
 
+    /// Create an [`Expr`] representing `blobbasefee` (`0x4e`).
+    pub fn blob_base_fee() -> Self {
+        Self {
+            ops: vec![Sym::BlobBaseFee],
+        }
+    }
+
     /// Create an [`Expr`] representing `pc` (`0x58`).
     pub fn pc(offset: u16) -> Self {
         Self {
@@ -798,6 +805,9 @@ pub enum Sym {
     /// A `basefee` (`0x48`) operation.
     BaseFee,
 
+    /// A `blobbasefee` (`0x4e`) operation.
+    BlobBaseFee,
+
     /// A `pc` (`0x58`) operation.
     GetPc(u16),
 
@@ -878,6 +888,7 @@ impl Sym {
             | Sym::ChainId
             | Sym::SelfBalance
             | Sym::BaseFee
+            | Sym::BlobBaseFee
             | Sym::GetPc(_)
             | Sym::MSize
             | Sym::Gas
