@@ -522,6 +522,15 @@ impl<'a> Annotator<'a> {
             Op::JumpDest(_) => {
                 // No-op
             }
+            Op::TLoad(_) => {
+                let addr = stack.pop();
+                stack.push(addr.s_load());
+            }
+            Op::TStore(_) => {
+                let _key = stack.pop();
+                let _value = stack.pop();
+                // TODO: set storage
+            }
             Op::MCopy(_) => {
                 let _dest_offset = stack.pop();
                 let _offset = stack.pop();
@@ -819,8 +828,6 @@ impl<'a> Annotator<'a> {
             | Op::Invalid4d(_)
             | Op::Invalid4e(_)
             | Op::Invalid4f(_)
-            | Op::Invalid5c(_)
-            | Op::Invalid5d(_)
             | Op::InvalidA5(_)
             | Op::InvalidA6(_)
             | Op::InvalidA7(_)

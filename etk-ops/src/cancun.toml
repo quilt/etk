@@ -386,6 +386,18 @@ pushes = 0
 pops = 0
 jump_target = true
 
+[TLoad]
+code = 0x5c
+mnemonic = "tload"
+pushes = 1
+pops = 1
+
+[TStore]
+code = 0x5d
+mnemonic = "tstore"
+pushes = 0
+pops = 2
+
 [MCopy]
 code = 0x5e
 mnemonic = "mcopy"

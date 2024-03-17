@@ -66,6 +66,8 @@ pc
 msize
 gas
 jumpdest
+tload
+tstore
 mcopy
 
 push1 0xAA
