@@ -202,6 +202,8 @@ fn every_op() -> Result<(), Error> {
         59
         5a
         5b
+        5c
+        5d
         5e
 
         60 aa
