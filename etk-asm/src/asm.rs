@@ -218,7 +218,7 @@ pub struct Assembler {
     undeclared_labels: HashSet<String>,
 
     /// Pushes that are variable-sized and need to be backpatched.
-    variable_sized_push: Vec<AbstractOp>,
+    variable_sized_push: Vec<PushDef>,
 }
 
 /// A label definition.
@@ -240,6 +240,30 @@ impl LabelDef {
     /// Get the position of the label.
     pub fn position(&self) -> usize {
         self.position
+    }
+}
+
+/// A push definition.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PushDef {
+    position: usize,
+    op: AbstractOp,
+}
+
+impl PushDef {
+    /// Create a new `PushDef`.
+    pub fn new(op: AbstractOp, position: usize) -> Self {
+        Self { op, position }
+    }
+
+    /// Get the position of the push.
+    pub fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Get the op from the push.
+    pub fn op(&self) -> &AbstractOp {
+        &self.op
     }
 }
 
@@ -358,7 +382,10 @@ impl Assembler {
                             // Here, we set the size of the push to 2 bytes (min possible value),
                             //  as we don't know the final value of the label yet.
                             self.concrete_len += 2;
-                            self.variable_sized_push.push(op.clone());
+                            self.variable_sized_push.push(PushDef {
+                                position: self.concrete_len,
+                                op: op.clone(),
+                            });
                         } else {
                             self.concrete_len += op.size().unwrap();
                         }
@@ -390,8 +417,8 @@ impl Assembler {
     }
 
     fn backpatch_labels(&mut self) -> Result<(), Error> {
-        for op in self.variable_sized_push.iter() {
-            if let AbstractOp::Push(imm) = op {
+        for pushdef in self.variable_sized_push.iter() {
+            if let AbstractOp::Push(imm) = &pushdef.op {
                 let exp = imm
                     .tree
                     .eval_with_context((&self.declared_labels, &self.declared_macros).into());
@@ -403,7 +430,12 @@ impl Assembler {
                     if imm_size > 1 {
                         for label_value in self.declared_labels.values_mut() {
                             let labeldef = label_value.as_ref().unwrap();
+                            if labeldef.position < pushdef.position {
+                                // don't move labels that are declared earlier than this push
+                                continue;
+                            };
                             self.concrete_len += imm_size as usize - 1;
+
                             *label_value = Some(LabelDef {
                                 position: labeldef.position + imm_size as usize - 1,
                                 updated: true,

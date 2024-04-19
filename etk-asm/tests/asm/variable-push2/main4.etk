@@ -1,0 +1,32 @@
+    %macro insert_instructions()
+        push32 0x01
+        pop
+        push32 0x02
+        pop
+        push32 0x03
+        pop
+        push32 0x04
+        pop
+        push32 0x05
+        pop
+        push32 0x06
+        pop
+        push32 0x07
+        pop
+        push32 0x08
+        pop
+    %end
+
+    %push(first)
+    jump
+    stop
+first:
+    jumpdest
+    pc
+    pc
+    push1 0x01
+    %push(second)
+    jumpi
+    %insert_instructions()
+second:
+    jumpdest
