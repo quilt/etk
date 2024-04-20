@@ -321,5 +321,11 @@ fn test_variable_sized_push2() -> Result<(), Error> {
     ingester.ingest_file(source(&["variable-push2", "main3.etk"]))?;
     assert_eq!(output, hex!("610107015801"));
 
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["variable-push2", "main4.etk"]))?;
+    let first_push = output.get(0..2).unwrap();
+    assert_eq!(first_push, hex!("6004"));
+
     Ok(())
 }
