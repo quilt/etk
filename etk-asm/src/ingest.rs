@@ -227,7 +227,7 @@ impl Program {
             Some(s) => s,
             None => Path::new("./"),
         };
-        let resolved = dir.join(path.to_owned());
+        let resolved = dir.join(path);
         self.root.as_ref().unwrap().check(&resolved)?;
 
         Ok(resolved)
