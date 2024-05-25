@@ -329,3 +329,22 @@ fn test_variable_sized_push2() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_include_hex() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["include-hex", "main1.etk"]))?;
+
+    assert_eq!(output, hex!("6002600c5f3960025ff300 cafeb0ba cafebabe"));
+
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    let err = ingester
+        .ingest_file(source(&["include-hex", "subdirectory", "main2.etk"]))
+        .unwrap_err();
+
+    assert_matches!(err, Error::DirectoryTraversal { .. });
+
+    Ok(())
+}

@@ -219,6 +219,19 @@ impl Program {
     fn pop_path(&mut self) {
         self.sources.pop();
     }
+
+    /// Expands the path relative to last pushed path without pushing new path
+    fn resolve_path(&self, path: &PathBuf) -> Result<PathBuf, Error> {
+        let last = self.sources.last().unwrap();
+        let dir = match last.parent() {
+            Some(s) => s,
+            None => Path::new("./"),
+        };
+        let resolved = dir.join(path);
+        self.root.as_ref().unwrap().check(&resolved)?;
+
+        Ok(resolved)
+    }
 }
 
 /// A high-level interface for assembling files into EVM bytecode.
@@ -321,7 +334,8 @@ where
                     raws.push(RawOp::Scope(inc_raws));
                 }
                 Node::IncludeHex(hex_path) => {
-                    let file = std::fs::read_to_string(&hex_path).with_context(|_| error::Io {
+                    let source = program.resolve_path(&hex_path)?;
+                    let file = std::fs::read_to_string(&source).with_context(|_| error::Io {
                         message: "reading hex include",
                         path: hex_path.to_owned(),
                     })?;
