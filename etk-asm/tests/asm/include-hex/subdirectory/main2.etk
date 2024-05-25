@@ -1,0 +1,11 @@
+push1 2
+push1 12
+push0
+codecopy
+push1 2
+push0
+return
+stop
+
+%include_hex("hex2.etk")
+%include_hex("../hex1.etk")
