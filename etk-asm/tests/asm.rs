@@ -369,10 +369,7 @@ fn test_eof_multiple_code_sections() -> Result<(), Error> {
     let mut ingester = Ingest::new(&mut output);
     ingester.ingest_file(source(&["eof", "main2.etk"]))?;
 
-    assert_eq!(
-        output,
-        hex!("ef0001 01000c 020003000100010003 040000 00 00800000 00800000 00800002 00 fe 5f5ff3")
-    );
+    assert_eq!(output, hex!("ef0001 010010 0200040001000100030004 040000 00 00800000 00800000 00800002 01000002 00 fe 5f5ff3 505f5f00"));
 
     Ok(())
 }

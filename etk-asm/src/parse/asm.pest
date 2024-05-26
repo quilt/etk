@@ -73,8 +73,12 @@ function_parameter = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 //////////////
 section = ${ "section" ~ WHITESPACE ~ section_kind ~ (WHITESPACE ~ section_attributes)? }
 section_kind = { ".code" | ".data" }
-section_attributes = { max_stack_height_attribute? }
+section_attributes = { (section_attribute ~WHITESPACE?)* }
+section_attribute = { inputs_attribute | outputs_attribute | max_stack_height_attribute }
 max_stack_height_attribute = { "max_stack_height" ~ "=" ~ number }
+inputs_attribute = { "inputs" ~ "=" ~ number }
+outputs_attribute = { "outputs" ~ "=" ~ (number | nonreturning) }
+nonreturning = { "nonret" }
 
 //////////////
 // operands //

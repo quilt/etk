@@ -3,6 +3,7 @@ mod expression;
 mod macros;
 
 pub(crate) mod error;
+
 mod parser {
     #![allow(clippy::upper_case_acronyms)]
 
@@ -54,34 +55,7 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
             let op = Op::new(spec).unwrap();
             AbstractOp::Op(op)
         }
-        Rule::section => {
-            let mut pairs = pair.into_inner();
-            let section_kind = pairs.next().unwrap().as_str();
-
-            if section_kind == ".code" {
-                let max_stack_height = {
-                    if let Some(section_attributes) = pairs.next() {
-                        if let Some(msh_pair) = section_attributes.into_inner().next() {
-                            msh_pair
-                                .into_inner()
-                                .next()
-                                .unwrap()
-                                .as_str()
-                                .parse::<u16>()
-                                .unwrap()
-                        } else {
-                            0
-                        }
-                    } else {
-                        0
-                    }
-                };
-                AbstractOp::EOFSection(EOFSectionKind::Code { max_stack_height })
-            } else {
-                // attributes are ignored
-                AbstractOp::EOFSection(EOFSectionKind::Data)
-            }
-        }
+        Rule::section => parse_section(pair)?,
         _ => unreachable!(),
     };
 
@@ -105,6 +79,48 @@ fn parse_push(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
     }
 
     Ok(AbstractOp::Op(spec.with(expr).unwrap()))
+}
+
+fn parse_section(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
+    let mut pairs = pair.into_inner();
+    let section_kind = pairs.next().unwrap().as_str();
+
+    if section_kind == ".code" {
+        let mut inputs: u8 = 0;
+        let mut outputs: u8 = 0x80; // non-returning by default
+        let mut max_stack_height: u16 = 0;
+        if let Some(section_attributes) = pairs.next() {
+            for attribute in section_attributes.into_inner() {
+                let attr_inner = attribute.into_inner().next().unwrap();
+
+                match attr_inner.as_rule() {
+                    Rule::max_stack_height_attribute => {
+                        let max_stack_height_str = attr_inner.into_inner().next().unwrap().as_str();
+                        max_stack_height = max_stack_height_str.parse::<u16>().unwrap();
+                    }
+                    Rule::inputs_attribute => {
+                        let inputs_str = attr_inner.into_inner().next().unwrap().as_str();
+                        inputs = inputs_str.parse::<u8>().unwrap();
+                    }
+                    Rule::outputs_attribute => {
+                        let outputs_str = attr_inner.into_inner().next().unwrap().as_str();
+                        if outputs_str != "nonret" {
+                            outputs = outputs_str.parse::<u8>().unwrap();
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+        Ok(AbstractOp::EOFSection(EOFSectionKind::Code {
+            inputs,
+            outputs,
+            max_stack_height,
+        }))
+    } else {
+        // attributes are ignored
+        Ok(AbstractOp::EOFSection(EOFSectionKind::Data))
+    }
 }
 
 #[cfg(test)]

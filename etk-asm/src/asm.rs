@@ -582,6 +582,8 @@ impl Assembler {
         #[derive(Clone, Copy, Debug, PartialEq)]
         struct EOFCodeSection {
             size: u16,
+            inputs: u8,
+            outputs: u8,
             max_stack_height: u16,
         }
 
@@ -591,9 +593,16 @@ impl Assembler {
         for section_bounds in self.sections.windows(2) {
             if let [start, end] = section_bounds {
                 let size = (end.position - start.position) as u16;
-                if let EOFSectionKind::Code { max_stack_height } = start.kind {
+                if let EOFSectionKind::Code {
+                    inputs,
+                    outputs,
+                    max_stack_height,
+                } = start.kind
+                {
                     code_sections.push(EOFCodeSection {
                         size,
+                        inputs,
+                        outputs,
                         max_stack_height,
                     });
                 } else {
@@ -605,9 +614,16 @@ impl Assembler {
         // add last section
         if let Some(&last_section) = self.sections.last() {
             let size = (self.concrete_len - last_section.position) as u16;
-            if let EOFSectionKind::Code { max_stack_height } = last_section.kind {
+            if let EOFSectionKind::Code {
+                inputs,
+                outputs,
+                max_stack_height,
+            } = last_section.kind
+            {
                 code_sections.push(EOFCodeSection {
                     size,
+                    inputs,
+                    outputs,
                     max_stack_height,
                 });
             } else {
@@ -636,8 +652,8 @@ impl Assembler {
         output.push(0x00);
         // types section
         for code_section in code_sections {
-            // TODO all functions are 0 inputs, non-returning for now
-            output.extend_from_slice(&[0x00, 0x80]);
+            output.push(code_section.inputs);
+            output.push(code_section.outputs);
             output.extend_from_slice(&code_section.max_stack_height.to_be_bytes());
         }
         Ok(())
@@ -1666,6 +1682,8 @@ mod tests {
             AbstractOp::new(Push0),
             AbstractOp::new(Stop),
             AbstractOp::EOFSection(EOFSectionKind::Code {
+                inputs: 0,
+                outputs: 0,
                 max_stack_height: 0,
             }),
             AbstractOp::new(Stop),
@@ -1682,6 +1700,8 @@ mod tests {
 
         let code = vec![
             AbstractOp::EOFSection(EOFSectionKind::Code {
+                inputs: 0,
+                outputs: 0x80,
                 max_stack_height: 1,
             }),
             AbstractOp::new(Push0),
@@ -1689,6 +1709,8 @@ mod tests {
             AbstractOp::EOFSection(EOFSectionKind::Data),
             AbstractOp::new(JumpDest),
             AbstractOp::EOFSection(EOFSectionKind::Code {
+                inputs: 0,
+                outputs: 0,
                 max_stack_height: 0,
             }),
             AbstractOp::new(Stop),

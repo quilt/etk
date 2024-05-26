@@ -170,6 +170,10 @@ impl Access {
 pub enum EOFSectionKind {
     /// Code section
     Code {
+        /// Code section's inputs
+        inputs: u8,
+        /// Code section's outputs or 0x80 if secton is non-returning
+        outputs: u8,
         /// Code section's max stack height
         max_stack_height: u16,
     },
