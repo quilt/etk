@@ -137,6 +137,11 @@ mod error {
             /// The location of the error.
             backtrace: Backtrace,
         },
+
+        /// Code containing secions does not start with section declaration.
+        #[snafu(display("EOF code does not start with section declaration"))]
+        #[non_exhaustive]
+        EOFCodeDoesNotStartWithSection,
     }
 }
 
@@ -508,7 +513,9 @@ impl Assembler {
     fn emit_bytecode(&mut self) -> Result<Vec<u8>, Result<Vec<u8>, Error>> {
         let mut output = Vec::new();
         if !self.sections.is_empty() {
-            self.emit_eof_header(&mut output);
+            if let Err(err) = self.emit_eof_header(&mut output) {
+                return Err(Err(err)); // Convert the error to the nested `Result` type
+            }
         }
 
         for op in self.ready.iter() {
@@ -550,8 +557,11 @@ impl Assembler {
         Ok(output)
     }
 
-    fn emit_eof_header(&self, output: &mut Vec<u8>) {
-        // TODO issue an error if first section doesn't start at 0
+    fn emit_eof_header(&self, output: &mut Vec<u8>) -> Result<(), Error> {
+        // Error if some code preceeds 0th section declaration
+        if self.sections.first().unwrap().position != 0 {
+            return error::EOFCodeDoesNotStartWithSection.fail();
+        }
 
         // TODO error if data section is not last
 
@@ -599,6 +609,7 @@ impl Assembler {
             // TODO all functions are 0 inputs, non-returning, 0 max stack for now
             output.extend_from_slice(&[0x00, 0x80, 0x00, 0x00]);
         }
+        Ok(())
     }
 
     fn declare_label(&mut self, rop: &RawOp) -> Result<(), Error> {
@@ -1614,5 +1625,21 @@ mod tests {
         assert_eq!(result, hex!("585b33"));
 
         Ok(())
+    }
+
+    #[test]
+    fn assemble_eof_not_starting_with_section() {
+        let mut asm = Assembler::new();
+
+        let code = vec![
+            AbstractOp::new(Push0),
+            AbstractOp::new(Stop),
+            AbstractOp::EOFSection(EOFSectionKind::Code),
+            AbstractOp::new(Stop),
+        ];
+
+        let err = asm.assemble(&code).unwrap_err();
+
+        assert_matches!(err, Error::EOFCodeDoesNotStartWithSection {});
     }
 }
