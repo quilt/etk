@@ -54,6 +54,10 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
             let op = Op::new(spec).unwrap();
             AbstractOp::Op(op)
         }
+        Rule::section => {
+            // TODO get section kind
+            AbstractOp::EOFSection
+        }
         _ => unreachable!(),
     };
 

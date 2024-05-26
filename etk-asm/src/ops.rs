@@ -185,6 +185,9 @@ pub enum AbstractOp {
 
     /// A user-defined macro, which is a virtual instruction.
     Macro(InstructionMacroInvocation),
+
+    /// EOF Section
+    EOFSection,
 }
 
 impl AbstractOp {
@@ -232,6 +235,7 @@ impl AbstractOp {
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),
             Self::MacroDefinition(_) => panic!("macro definitions cannot be concretized"),
+            Self::EOFSection => panic!("EOF sections cannot be concretized"),
         }
     }
 
@@ -265,6 +269,7 @@ impl AbstractOp {
             Self::Push(_) => None,
             Self::Macro(_) => None,
             Self::MacroDefinition(_) => None,
+            Self::EOFSection => None,
         }
     }
 
@@ -314,6 +319,7 @@ impl fmt::Display for AbstractOp {
             Self::Label(lbl) => write!(f, r#"{}:"#, lbl),
             Self::Macro(m) => write!(f, "{}", m),
             Self::MacroDefinition(defn) => write!(f, "{}", defn),
+            Self::EOFSection => write!(f, "EOF section"),
         }
     }
 }

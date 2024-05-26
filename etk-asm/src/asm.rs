@@ -219,6 +219,9 @@ pub struct Assembler {
 
     /// Pushes that are variable-sized and need to be backpatched.
     variable_sized_push: Vec<PushDef>,
+
+    /// Positions of sections, if assembling EOF
+    sections: Vec<usize>,
 }
 
 /// A label definition.
@@ -343,6 +346,7 @@ impl Assembler {
             RawOp::Op(AbstractOp::Macro(ref m)) => {
                 self.expand_macro(&m.name, &m.parameters)?;
             }
+            RawOp::Op(AbstractOp::EOFSection) => self.sections.push(self.concrete_len),
             RawOp::Op(ref op) => {
                 match op
                     .clone()
@@ -416,7 +420,7 @@ impl Assembler {
         Ok(self.concrete_len)
     }
 
-    fn backpatch_labels(&mut self) -> Result<(), Error> {
+    fn backpatch_labels_and_sections(&mut self) -> Result<(), Error> {
         for pushdef in self.variable_sized_push.iter() {
             if let AbstractOp::Push(imm) = &pushdef.op {
                 let exp = imm
@@ -440,6 +444,15 @@ impl Assembler {
                                 position: labeldef.position + imm_size as usize - 1,
                                 updated: true,
                             });
+                        }
+                        for section in self.sections.iter_mut() {
+                            if *section < pushdef.position {
+                                // don't move sections that are declared earlier than this push
+                                continue;
+                            };
+
+                            *section += imm_size as usize - 1;
+                            // TODO check whether `updated` flag is needed
                         }
                     }
                 }
@@ -473,7 +486,7 @@ impl Assembler {
             }
             .fail();
         }
-        self.backpatch_labels()?;
+        self.backpatch_labels_and_sections()?;
         let output = match self.emit_bytecode() {
             Ok(value) => value,
             Err(value) => return value,
@@ -484,6 +497,10 @@ impl Assembler {
 
     fn emit_bytecode(&mut self) -> Result<Vec<u8>, Result<Vec<u8>, Error>> {
         let mut output = Vec::new();
+        if !self.sections.is_empty() {
+            self.emit_eof_header(&mut output);
+        }
+
         for op in self.ready.iter() {
             let op = match op {
                 RawOp::Op(ref op) => op,
@@ -521,6 +538,44 @@ impl Assembler {
             }
         }
         Ok(output)
+    }
+
+    fn emit_eof_header(&self, output: &mut Vec<u8>) {
+        // TODO issue an error if first section doesn't start at 0
+
+        output.extend_from_slice(&[0xef, 0x00, 0x01]);
+        // Type section header
+        output.push(0x01);
+        let type_section_size = (self.sections.len() * 4) as u16;
+        output.extend_from_slice(&type_section_size.to_be_bytes());
+        // Code section headers
+        output.push(0x02);
+        let code_section_num = self.sections.len() as u16;
+        output.extend_from_slice(&code_section_num.to_be_bytes());
+
+        // Calculate section sizes
+        let mut section_sizes = Vec::with_capacity(self.sections.len());
+        for section_bounds in self.sections.windows(2) {
+            if let [start, end] = section_bounds {
+                section_sizes.push(end - start);
+            }
+        }
+        // add last section
+        if let Some(&last_section_offset) = self.sections.last() {
+            section_sizes.push(self.concrete_len - last_section_offset);
+        }
+
+        for section_size in section_sizes {
+            let size = section_size as u16;
+            output.extend_from_slice(&size.to_be_bytes());
+        }
+        // data section header + terminator
+        output.extend_from_slice(&[0x04, 0x00, 0x00, 0x00]);
+        // types section
+        for _ in &self.sections {
+            // TODO all functions are 0 inputs, non-returning, 0 max stack for now
+            output.extend_from_slice(&[0x00, 0x80, 0x00, 0x00]);
+        }
     }
 
     fn declare_label(&mut self, rop: &RawOp) -> Result<(), Error> {

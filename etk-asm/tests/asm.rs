@@ -348,3 +348,14 @@ fn test_include_hex() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_eof_minimal() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["eof", "main1.etk"]))?;
+
+    assert_eq!(output, hex!("ef00010100040200010001040000000080000000"));
+
+    Ok(())
+}

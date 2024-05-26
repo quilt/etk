@@ -3,7 +3,7 @@
 ///////////////////////
 program = _{ SOI ~ inner ~ EOI }
 inner = _{ NEWLINE* ~ (stmt ~ (NEWLINE+|";"))* ~ stmt? }
-stmt = _{ label_definition | builtin | local_macro | push | op }
+stmt = _{ label_definition | builtin | local_macro | push | op  | section }
 
 //////////////////////
 // opcode mnemonics //
@@ -67,6 +67,12 @@ function_declaration = { function_name ~ "(" ~ function_parameter* ~ ("," ~ func
 function_invocation = _{ function_name ~ "(" ~ expression* ~ ("," ~ expression)* ~ ")" }
 function_name = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
 function_parameter = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
+
+//////////////
+// sections //
+//////////////
+section = @{ "section" ~ WHITESPACE ~ section_kind }
+section_kind = { (".code" | ".data") }
 
 //////////////
 // operands //
