@@ -579,39 +579,55 @@ impl Assembler {
             }
         }
 
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        struct EOFCodeSection {
+            size: u16,
+            max_stack_height: u16,
+        }
+
         // Calculate section sizes
-        let mut code_section_sizes = Vec::with_capacity(self.sections.len());
+        let mut code_sections = Vec::with_capacity(self.sections.len());
         let mut data_section_size = 0;
         for section_bounds in self.sections.windows(2) {
             if let [start, end] = section_bounds {
-                code_section_sizes.push(end.position - start.position);
+                let size = (end.position - start.position) as u16;
+                if let EOFSectionKind::Code { max_stack_height } = start.kind {
+                    code_sections.push(EOFCodeSection {
+                        size,
+                        max_stack_height,
+                    });
+                } else {
+                    unreachable!("data section was checked to be the last one")
+                }
             }
         }
 
         // add last section
         if let Some(&last_section) = self.sections.last() {
-            let last_section_size = self.concrete_len - last_section.position;
-            if last_section.kind == EOFSectionKind::Code {
-                code_section_sizes.push(last_section_size);
+            let size = (self.concrete_len - last_section.position) as u16;
+            if let EOFSectionKind::Code { max_stack_height } = last_section.kind {
+                code_sections.push(EOFCodeSection {
+                    size,
+                    max_stack_height,
+                });
             } else {
-                data_section_size = last_section_size
+                data_section_size = size
             }
         }
 
         output.extend_from_slice(&[0xef, 0x00, 0x01]);
         // Type section header
         output.push(0x01);
-        let type_section_size = (code_section_sizes.len() * 4) as u16;
+        let type_section_size = (code_sections.len() * 4) as u16;
         output.extend_from_slice(&type_section_size.to_be_bytes());
         // Code section headers
         output.push(0x02);
 
-        let code_section_num = code_section_sizes.len() as u16;
+        let code_section_num = code_sections.len() as u16;
         output.extend_from_slice(&code_section_num.to_be_bytes());
 
-        for code_section_size in &code_section_sizes {
-            let size = *code_section_size as u16;
-            output.extend_from_slice(&size.to_be_bytes());
+        for code_section_size in &code_sections {
+            output.extend_from_slice(&code_section_size.size.to_be_bytes());
         }
         // data section header + terminator
         output.push(0x04);
@@ -619,9 +635,10 @@ impl Assembler {
         // terminator
         output.push(0x00);
         // types section
-        for _ in code_section_sizes {
-            // TODO all functions are 0 inputs, non-returning, 0 max stack for now
-            output.extend_from_slice(&[0x00, 0x80, 0x00, 0x00]);
+        for code_section in code_sections {
+            // TODO all functions are 0 inputs, non-returning for now
+            output.extend_from_slice(&[0x00, 0x80]);
+            output.extend_from_slice(&code_section.max_stack_height.to_be_bytes());
         }
         Ok(())
     }
@@ -1648,7 +1665,9 @@ mod tests {
         let code = vec![
             AbstractOp::new(Push0),
             AbstractOp::new(Stop),
-            AbstractOp::EOFSection(EOFSectionKind::Code),
+            AbstractOp::EOFSection(EOFSectionKind::Code {
+                max_stack_height: 0,
+            }),
             AbstractOp::new(Stop),
         ];
 
@@ -1662,12 +1681,16 @@ mod tests {
         let mut asm = Assembler::new();
 
         let code = vec![
-            AbstractOp::EOFSection(EOFSectionKind::Code),
+            AbstractOp::EOFSection(EOFSectionKind::Code {
+                max_stack_height: 1,
+            }),
             AbstractOp::new(Push0),
             AbstractOp::new(Stop),
             AbstractOp::EOFSection(EOFSectionKind::Data),
             AbstractOp::new(JumpDest),
-            AbstractOp::EOFSection(EOFSectionKind::Code),
+            AbstractOp::EOFSection(EOFSectionKind::Code {
+                max_stack_height: 0,
+            }),
             AbstractOp::new(Stop),
         ];
 

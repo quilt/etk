@@ -55,12 +55,30 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
             AbstractOp::Op(op)
         }
         Rule::section => {
-            let mut pair = pair.into_inner();
-            let section_kind = pair.next().unwrap().as_str();
+            let mut pairs = pair.into_inner();
+            let section_kind = pairs.next().unwrap().as_str();
 
             if section_kind == ".code" {
-                AbstractOp::EOFSection(EOFSectionKind::Code)
+                let max_stack_height = {
+                    if let Some(section_attributes) = pairs.next() {
+                        if let Some(msh_pair) = section_attributes.into_inner().next() {
+                            msh_pair
+                                .into_inner()
+                                .next()
+                                .unwrap()
+                                .as_str()
+                                .parse::<u16>()
+                                .unwrap()
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                };
+                AbstractOp::EOFSection(EOFSectionKind::Code { max_stack_height })
             } else {
+                // attributes are ignored
                 AbstractOp::EOFSection(EOFSectionKind::Data)
             }
         }

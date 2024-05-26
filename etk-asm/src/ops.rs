@@ -169,7 +169,10 @@ impl Access {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum EOFSectionKind {
     /// Code section
-    Code,
+    Code {
+        /// Code section's max stack height
+        max_stack_height: u16,
+    },
     /// Data section
     Data,
 }
@@ -317,7 +320,7 @@ impl From<ExpressionMacroDefinition> for AbstractOp {
 impl fmt::Display for EOFSectionKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Code => {
+            Self::Code { .. } => {
                 write!(f, "code")?;
             }
             Self::Data => {
