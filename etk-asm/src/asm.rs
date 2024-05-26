@@ -142,6 +142,11 @@ mod error {
         #[snafu(display("EOF code does not start with section declaration"))]
         #[non_exhaustive]
         EOFCodeDoesNotStartWithSection,
+
+        /// Code containing secions does not start with section declaration.
+        #[snafu(display("EOF data section is not the last section"))]
+        #[non_exhaustive]
+        EOFDataSectionIsNotTheLast,
     }
 }
 
@@ -563,7 +568,16 @@ impl Assembler {
             return error::EOFCodeDoesNotStartWithSection.fail();
         }
 
-        // TODO error if data section is not last
+        // Error if data section is not the last
+        if let Some(index) = self
+            .sections
+            .iter()
+            .position(|&section| section.kind == EOFSectionKind::Data)
+        {
+            if index != self.sections.len() - 1 {
+                return error::EOFDataSectionIsNotTheLast.fail();
+            }
+        }
 
         // Calculate section sizes
         let mut code_section_sizes = Vec::with_capacity(self.sections.len());
@@ -1641,5 +1655,24 @@ mod tests {
         let err = asm.assemble(&code).unwrap_err();
 
         assert_matches!(err, Error::EOFCodeDoesNotStartWithSection {});
+    }
+
+    #[test]
+    fn assemble_eof_data_section_not_the_last() {
+        let mut asm = Assembler::new();
+
+        let code = vec![
+            AbstractOp::EOFSection(EOFSectionKind::Code),
+            AbstractOp::new(Push0),
+            AbstractOp::new(Stop),
+            AbstractOp::EOFSection(EOFSectionKind::Data),
+            AbstractOp::new(JumpDest),
+            AbstractOp::EOFSection(EOFSectionKind::Code),
+            AbstractOp::new(Stop),
+        ];
+
+        let err = asm.assemble(&code).unwrap_err();
+
+        assert_matches!(err, Error::EOFDataSectionIsNotTheLast {});
     }
 }
