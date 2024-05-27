@@ -311,6 +311,12 @@ mnemonic = "basefee"
 pushes = 1
 pops = 0
 
+[BlobBaseFee]
+code = 0x4e
+mnemonic = "blobbasefee"
+pushes = 1
+pops = 0
+
 [Pop]
 code = 0x50
 mnemonic = "pop"

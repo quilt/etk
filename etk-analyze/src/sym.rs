@@ -79,6 +79,7 @@ impl<'z> Visit for Z3Visit<'z> {
             Sym::ChainId => BV::new_const(self.context, "chainid", 256),
             Sym::SelfBalance => BV::fresh_const(self.context, "selfbalance", 256),
             Sym::BaseFee => BV::new_const(self.context, "basefee", 256),
+            Sym::BlobBaseFee => BV::new_const(self.context, "blobbasefee", 256),
             Sym::GetPc(pc) => BV::from_u64(self.context, *pc as u64, 256),
             Sym::MSize => BV::fresh_const(self.context, "msize", 256),
             Sym::Gas => BV::fresh_const(self.context, "gas", 256),
@@ -142,7 +143,10 @@ impl<'z> Visit for Z3Visit<'z> {
 
                 // TODO: Probably incorrect, certainly inefficient.
                 //       Something something discrete log problem?
-                lhs.to_int(false).power(&rhs.to_int(false)).to_ast(256)
+                lhs.to_int(false)
+                    .power(&rhs.to_int(false))
+                    .to_int()
+                    .to_ast(256)
             }
 
             Sym::Lt => {
