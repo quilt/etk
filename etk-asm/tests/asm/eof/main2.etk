@@ -1,0 +1,16 @@
+section .code
+stop
+
+section .code outputs=nonret
+invalid
+
+section .code outputs=nonret max_stack_height=2
+push0
+push0
+return
+
+section .code inputs=1 outputs=0 max_stack_height=2
+pop
+push0
+push0
+stop

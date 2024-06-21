@@ -137,12 +137,22 @@ mod error {
             /// The location of the error.
             backtrace: Backtrace,
         },
+
+        /// Code containing secions does not start with section declaration.
+        #[snafu(display("EOF code does not start with section declaration"))]
+        #[non_exhaustive]
+        EOFCodeDoesNotStartWithSection,
+
+        /// Code containing secions does not start with section declaration.
+        #[snafu(display("EOF data section is not the last section"))]
+        #[non_exhaustive]
+        EOFDataSectionIsNotTheLast,
     }
 }
 
 pub use self::error::Error;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
-use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
+use crate::ops::{self, AbstractOp, Assemble, EOFSectionKind, Expression, MacroDefinition};
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use rand::Rng;
@@ -219,6 +229,9 @@ pub struct Assembler {
 
     /// Pushes that are variable-sized and need to be backpatched.
     variable_sized_push: Vec<PushDef>,
+
+    /// Positions of sections, if assembling EOF
+    sections: Vec<SectionDef>,
 }
 
 /// A label definition.
@@ -265,6 +278,13 @@ impl PushDef {
     pub fn op(&self) -> &AbstractOp {
         &self.op
     }
+}
+
+/// An EOF section definition.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SectionDef {
+    position: usize,
+    kind: EOFSectionKind,
 }
 
 impl Assembler {
@@ -343,6 +363,10 @@ impl Assembler {
             RawOp::Op(AbstractOp::Macro(ref m)) => {
                 self.expand_macro(&m.name, &m.parameters)?;
             }
+            RawOp::Op(AbstractOp::EOFSection(kind)) => self.sections.push(SectionDef {
+                position: self.concrete_len,
+                kind,
+            }),
             RawOp::Op(ref op) => {
                 match op
                     .clone()
@@ -416,7 +440,7 @@ impl Assembler {
         Ok(self.concrete_len)
     }
 
-    fn backpatch_labels(&mut self) -> Result<(), Error> {
+    fn backpatch_labels_and_sections(&mut self) -> Result<(), Error> {
         for pushdef in self.variable_sized_push.iter() {
             if let AbstractOp::Push(imm) = &pushdef.op {
                 let exp = imm
@@ -440,6 +464,15 @@ impl Assembler {
                                 position: labeldef.position + imm_size as usize - 1,
                                 updated: true,
                             });
+                        }
+                        for section in self.sections.iter_mut() {
+                            if section.position < pushdef.position {
+                                // don't move sections that are declared earlier than this push
+                                continue;
+                            };
+
+                            section.position += imm_size as usize - 1;
+                            // TODO check whether `updated` flag is needed
                         }
                     }
                 }
@@ -473,7 +506,7 @@ impl Assembler {
             }
             .fail();
         }
-        self.backpatch_labels()?;
+        self.backpatch_labels_and_sections()?;
         let output = match self.emit_bytecode() {
             Ok(value) => value,
             Err(value) => return value,
@@ -484,6 +517,12 @@ impl Assembler {
 
     fn emit_bytecode(&mut self) -> Result<Vec<u8>, Result<Vec<u8>, Error>> {
         let mut output = Vec::new();
+        if !self.sections.is_empty() {
+            if let Err(err) = self.emit_eof_header(&mut output) {
+                return Err(Err(err)); // Convert the error to the nested `Result` type
+            }
+        }
+
         for op in self.ready.iter() {
             let op = match op {
                 RawOp::Op(ref op) => op,
@@ -521,6 +560,103 @@ impl Assembler {
             }
         }
         Ok(output)
+    }
+
+    fn emit_eof_header(&self, output: &mut Vec<u8>) -> Result<(), Error> {
+        // Error if some code preceeds 0th section declaration
+        if self.sections.first().unwrap().position != 0 {
+            return error::EOFCodeDoesNotStartWithSection.fail();
+        }
+
+        // Error if data section is not the last
+        if let Some(index) = self
+            .sections
+            .iter()
+            .position(|&section| section.kind == EOFSectionKind::Data)
+        {
+            if index != self.sections.len() - 1 {
+                return error::EOFDataSectionIsNotTheLast.fail();
+            }
+        }
+
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        struct EOFCodeSection {
+            size: u16,
+            inputs: u8,
+            outputs: u8,
+            max_stack_height: u16,
+        }
+
+        // Calculate section sizes
+        let mut code_sections = Vec::with_capacity(self.sections.len());
+        let mut data_section_size = 0;
+        for section_bounds in self.sections.windows(2) {
+            if let [start, end] = section_bounds {
+                let size = (end.position - start.position) as u16;
+                if let EOFSectionKind::Code {
+                    inputs,
+                    outputs,
+                    max_stack_height,
+                } = start.kind
+                {
+                    code_sections.push(EOFCodeSection {
+                        size,
+                        inputs,
+                        outputs,
+                        max_stack_height,
+                    });
+                } else {
+                    unreachable!("data section was checked to be the last one")
+                }
+            }
+        }
+
+        // add last section
+        if let Some(&last_section) = self.sections.last() {
+            let size = (self.concrete_len - last_section.position) as u16;
+            if let EOFSectionKind::Code {
+                inputs,
+                outputs,
+                max_stack_height,
+            } = last_section.kind
+            {
+                code_sections.push(EOFCodeSection {
+                    size,
+                    inputs,
+                    outputs,
+                    max_stack_height,
+                });
+            } else {
+                data_section_size = size
+            }
+        }
+
+        output.extend_from_slice(&[0xef, 0x00, 0x01]);
+        // Type section header
+        output.push(0x01);
+        let type_section_size = (code_sections.len() * 4) as u16;
+        output.extend_from_slice(&type_section_size.to_be_bytes());
+        // Code section headers
+        output.push(0x02);
+
+        let code_section_num = code_sections.len() as u16;
+        output.extend_from_slice(&code_section_num.to_be_bytes());
+
+        for code_section_size in &code_sections {
+            output.extend_from_slice(&code_section_size.size.to_be_bytes());
+        }
+        // data section header + terminator
+        output.push(0x04);
+        output.extend_from_slice(&data_section_size.to_be_bytes());
+        // terminator
+        output.push(0x00);
+        // types section
+        for code_section in code_sections {
+            output.push(code_section.inputs);
+            output.push(code_section.outputs);
+            output.extend_from_slice(&code_section.max_stack_height.to_be_bytes());
+        }
+        Ok(())
     }
 
     fn declare_label(&mut self, rop: &RawOp) -> Result<(), Error> {
@@ -1536,5 +1672,52 @@ mod tests {
         assert_eq!(result, hex!("585b33"));
 
         Ok(())
+    }
+
+    #[test]
+    fn assemble_eof_not_starting_with_section() {
+        let mut asm = Assembler::new();
+
+        let code = vec![
+            AbstractOp::new(Push0),
+            AbstractOp::new(Stop),
+            AbstractOp::EOFSection(EOFSectionKind::Code {
+                inputs: 0,
+                outputs: 0,
+                max_stack_height: 0,
+            }),
+            AbstractOp::new(Stop),
+        ];
+
+        let err = asm.assemble(&code).unwrap_err();
+
+        assert_matches!(err, Error::EOFCodeDoesNotStartWithSection {});
+    }
+
+    #[test]
+    fn assemble_eof_data_section_not_the_last() {
+        let mut asm = Assembler::new();
+
+        let code = vec![
+            AbstractOp::EOFSection(EOFSectionKind::Code {
+                inputs: 0,
+                outputs: 0x80,
+                max_stack_height: 1,
+            }),
+            AbstractOp::new(Push0),
+            AbstractOp::new(Stop),
+            AbstractOp::EOFSection(EOFSectionKind::Data),
+            AbstractOp::new(JumpDest),
+            AbstractOp::EOFSection(EOFSectionKind::Code {
+                inputs: 0,
+                outputs: 0,
+                max_stack_height: 0,
+            }),
+            AbstractOp::new(Stop),
+        ];
+
+        let err = asm.assemble(&code).unwrap_err();
+
+        assert_matches!(err, Error::EOFDataSectionIsNotTheLast {});
     }
 }

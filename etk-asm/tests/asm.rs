@@ -348,3 +348,39 @@ fn test_include_hex() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_eof_minimal() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["eof", "main1.etk"]))?;
+
+    assert_eq!(
+        output,
+        hex!("ef0001 010004 0200010001 040000 00 00800000 00")
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_eof_multiple_code_sections() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["eof", "main2.etk"]))?;
+
+    assert_eq!(output, hex!("ef0001 010010 0200040001000100030004 040000 00 00800000 00800000 00800002 01000002 00 fe 5f5ff3 505f5f00"));
+
+    Ok(())
+}
+
+#[test]
+fn test_eof_data_section() -> Result<(), Error> {
+    let mut output = Vec::new();
+    let mut ingester = Ingest::new(&mut output);
+    ingester.ingest_file(source(&["eof", "main3.etk"]))?;
+
+    assert_eq!(output, hex!("ef0001 01000c 020003000100010003 040004 00 00800000 00800000 00800002 00 fe 5f5ff3 cafeb0ba"));
+
+    Ok(())
+}
