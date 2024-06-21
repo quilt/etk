@@ -1,0 +1,13 @@
+section .code
+stop
+
+section .code
+invalid
+
+section .code
+push0
+push0
+return
+
+section .data
+%include_hex("data.etk")

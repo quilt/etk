@@ -21,7 +21,7 @@ use self::{
 };
 
 use crate::ast::Node;
-use crate::ops::AbstractOp;
+use crate::ops::{AbstractOp, EOFSectionKind};
 use etk_ops::cancun::Op;
 use num_bigint::BigInt;
 use pest::{iterators::Pair, Parser};
@@ -55,8 +55,14 @@ fn parse_abstract_op(pair: Pair<Rule>) -> Result<AbstractOp, ParseError> {
             AbstractOp::Op(op)
         }
         Rule::section => {
-            // TODO get section kind
-            AbstractOp::EOFSection
+            let mut pair = pair.into_inner();
+            let section_kind = pair.next().unwrap().as_str();
+
+            if section_kind == ".code" {
+                AbstractOp::EOFSection(EOFSectionKind::Code)
+            } else {
+                AbstractOp::EOFSection(EOFSectionKind::Data)
+            }
         }
         _ => unreachable!(),
     };

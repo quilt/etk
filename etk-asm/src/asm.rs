@@ -142,7 +142,7 @@ mod error {
 
 pub use self::error::Error;
 use crate::ops::expression::Error::{UndefinedVariable, UnknownLabel, UnknownMacro};
-use crate::ops::{self, AbstractOp, Assemble, Expression, MacroDefinition};
+use crate::ops::{self, AbstractOp, Assemble, EOFSectionKind, Expression, MacroDefinition};
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use rand::Rng;
@@ -221,7 +221,7 @@ pub struct Assembler {
     variable_sized_push: Vec<PushDef>,
 
     /// Positions of sections, if assembling EOF
-    sections: Vec<usize>,
+    sections: Vec<SectionDef>,
 }
 
 /// A label definition.
@@ -268,6 +268,13 @@ impl PushDef {
     pub fn op(&self) -> &AbstractOp {
         &self.op
     }
+}
+
+/// An EOF section definition.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SectionDef {
+    position: usize,
+    kind: EOFSectionKind,
 }
 
 impl Assembler {
@@ -346,7 +353,10 @@ impl Assembler {
             RawOp::Op(AbstractOp::Macro(ref m)) => {
                 self.expand_macro(&m.name, &m.parameters)?;
             }
-            RawOp::Op(AbstractOp::EOFSection) => self.sections.push(self.concrete_len),
+            RawOp::Op(AbstractOp::EOFSection(kind)) => self.sections.push(SectionDef {
+                position: self.concrete_len,
+                kind,
+            }),
             RawOp::Op(ref op) => {
                 match op
                     .clone()
@@ -446,12 +456,12 @@ impl Assembler {
                             });
                         }
                         for section in self.sections.iter_mut() {
-                            if *section < pushdef.position {
+                            if section.position < pushdef.position {
                                 // don't move sections that are declared earlier than this push
                                 continue;
                             };
 
-                            *section += imm_size as usize - 1;
+                            section.position += imm_size as usize - 1;
                             // TODO check whether `updated` flag is needed
                         }
                     }
@@ -543,36 +553,49 @@ impl Assembler {
     fn emit_eof_header(&self, output: &mut Vec<u8>) {
         // TODO issue an error if first section doesn't start at 0
 
+        // TODO error if data section is not last
+
+        // Calculate section sizes
+        let mut code_section_sizes = Vec::with_capacity(self.sections.len());
+        let mut data_section_size = 0;
+        for section_bounds in self.sections.windows(2) {
+            if let [start, end] = section_bounds {
+                code_section_sizes.push(end.position - start.position);
+            }
+        }
+
+        // add last section
+        if let Some(&last_section) = self.sections.last() {
+            let last_section_size = self.concrete_len - last_section.position;
+            if last_section.kind == EOFSectionKind::Code {
+                code_section_sizes.push(last_section_size);
+            } else {
+                data_section_size = last_section_size
+            }
+        }
+
         output.extend_from_slice(&[0xef, 0x00, 0x01]);
         // Type section header
         output.push(0x01);
-        let type_section_size = (self.sections.len() * 4) as u16;
+        let type_section_size = (code_section_sizes.len() * 4) as u16;
         output.extend_from_slice(&type_section_size.to_be_bytes());
         // Code section headers
         output.push(0x02);
-        let code_section_num = self.sections.len() as u16;
+
+        let code_section_num = code_section_sizes.len() as u16;
         output.extend_from_slice(&code_section_num.to_be_bytes());
 
-        // Calculate section sizes
-        let mut section_sizes = Vec::with_capacity(self.sections.len());
-        for section_bounds in self.sections.windows(2) {
-            if let [start, end] = section_bounds {
-                section_sizes.push(end - start);
-            }
-        }
-        // add last section
-        if let Some(&last_section_offset) = self.sections.last() {
-            section_sizes.push(self.concrete_len - last_section_offset);
-        }
-
-        for section_size in section_sizes {
-            let size = section_size as u16;
+        for code_section_size in &code_section_sizes {
+            let size = *code_section_size as u16;
             output.extend_from_slice(&size.to_be_bytes());
         }
         // data section header + terminator
-        output.extend_from_slice(&[0x04, 0x00, 0x00, 0x00]);
+        output.push(0x04);
+        output.extend_from_slice(&data_section_size.to_be_bytes());
+        // terminator
+        output.push(0x00);
         // types section
-        for _ in &self.sections {
+        for _ in code_section_sizes {
             // TODO all functions are 0 inputs, non-returning, 0 max stack for now
             output.extend_from_slice(&[0x00, 0x80, 0x00, 0x00]);
         }

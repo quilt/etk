@@ -165,6 +165,15 @@ impl Access {
     }
 }
 
+/// Kind of EOF section
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum EOFSectionKind {
+    /// Code section
+    Code,
+    /// Data section
+    Data,
+}
+
 /// Like an [`Op`], except it also supports virtual instructions.
 ///
 /// In addition to the real EVM instructions, `AbstractOp` also supports defining
@@ -187,7 +196,7 @@ pub enum AbstractOp {
     Macro(InstructionMacroInvocation),
 
     /// EOF Section
-    EOFSection,
+    EOFSection(EOFSectionKind),
 }
 
 impl AbstractOp {
@@ -235,7 +244,7 @@ impl AbstractOp {
             Self::Label(_) => panic!("labels cannot be concretized"),
             Self::Macro(_) => panic!("macros cannot be concretized"),
             Self::MacroDefinition(_) => panic!("macro definitions cannot be concretized"),
-            Self::EOFSection => panic!("EOF sections cannot be concretized"),
+            Self::EOFSection(_) => panic!("EOF sections cannot be concretized"),
         }
     }
 
@@ -269,7 +278,7 @@ impl AbstractOp {
             Self::Push(_) => None,
             Self::Macro(_) => None,
             Self::MacroDefinition(_) => None,
-            Self::EOFSection => None,
+            Self::EOFSection(_) => None,
         }
     }
 
@@ -305,6 +314,20 @@ impl From<ExpressionMacroDefinition> for AbstractOp {
     }
 }
 
+impl fmt::Display for EOFSectionKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Code => {
+                write!(f, "code")?;
+            }
+            Self::Data => {
+                write!(f, "data")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 impl fmt::Display for AbstractOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -319,7 +342,7 @@ impl fmt::Display for AbstractOp {
             Self::Label(lbl) => write!(f, r#"{}:"#, lbl),
             Self::Macro(m) => write!(f, "{}", m),
             Self::MacroDefinition(defn) => write!(f, "{}", defn),
-            Self::EOFSection => write!(f, "EOF section"),
+            Self::EOFSection(kind) => write!(f, "EOF {} section", kind),
         }
     }
 }
